@@ -1,0 +1,1 @@
+# src/__init__.py - Archivo de inicialización del paquete src
