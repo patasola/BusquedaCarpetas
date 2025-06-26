@@ -11,37 +11,42 @@ import threading
 import time
 
 from .config import ConfigManager
-from .cache import CacheManager
+from .cache_manger import CacheManager
 from .search_engine import SearchEngine
 from .ui_components import UIComponents
-from .utils import copy_to_clipboard, open_folder
+from utils import FileUtils
+from .constants import *
 
 class BusquedaCarpetaApp:
     def __init__(self, master):
         self.master = master
-        master.title("Búsqueda Rápida de Carpetas")
-        master.geometry("750x700")  # Aumenté altura para nueva línea
-        master.configure(bg="#f6f5f5")
-        master.minsize(650, 600)
+        master.title(APP_TITLE)
+        master.geometry(WINDOW_SIZE)
+        master.configure(bg=COLORS['background'])
+        master.minsize(*MIN_WINDOW_SIZE)
 
         # Versión de la aplicación
-        self.version = "V. 1.4"
+        self.version = APP_VERSION
 
         # Centrar la ventana
         self.centrar_ventana()
 
         # Inicializar componentes
         self.config = ConfigManager()
-        self.cache_manager = CacheManager()
-        self.search_engine = SearchEngine()
-        self.ui = UIComponents(master, self.version)
+        self.cache_manager = CacheManager(
+            progress_callback=self.actualizar_progreso,
+            status_callback=self.actualizar_estado
+        )
+        self.search_engine = SearchEngine(
+            progress_callback=self.actualizar_progreso,
+            status_callback=self.actualizar_estado,
+            results_callback=self.mostrar_resultados_parciales
+        )
+        self.ui = UIComponents(master)
 
         # Variables de estado
-        self.busqueda_activa = False
-        self.busqueda_cancelada = False
-        self.search_thread = None
         self.resultados = []
-        self.tiempo_inicio = 0
+        self.ruta_carpeta_actual = None
 
         # Configurar interfaz
         self.crear_interfaz()
@@ -62,34 +67,72 @@ class BusquedaCarpetaApp:
 
     def cargar_configuracion_inicial(self):
         """Carga la configuración inicial y actualiza el estado"""
-        ruta = self.config.cargar_ruta()
-        if ruta and os.path.exists(ruta):
-            self.cache_manager.ruta_carpeta = ruta
-            # Verificar si existe cache para esta ruta
-            if self.cache_manager.cache_valido and self.cache_manager.cache_directorios:
-                cache_info = f"Cache: {len(self.cache_manager.cache_directorios.get('directorios', []))} directorios"
-            else:
-                cache_info = "Cache: No construido"
+        ruta = self.config.get_folder_path()
+        if ruta and FileUtils.is_valid_path(ruta):
+            self.ruta_carpeta_actual = ruta
+            self.cache_manager.ruta_base = ruta
             
-            self.actualizar_info_carpeta(f"Carpeta: {os.path.basename(ruta)} | {cache_info}")
+            # Verificar si existe cache para esta ruta
+            if self.cache_manager.is_cache_valid(ruta):
+                cache_info = self.cache_manager.get_cache_info()
+                if cache_info:
+                    total_dirs = cache_info['total_directories']
+                    self.actualizar_info_cache(
+                        f"Carpeta: {FileUtils.get_folder_name(ruta)} | Caché: {total_dirs:,} directorios ✓"
+                    )
+                else:
+                    self.actualizar_info_cache(
+                        f"Carpeta: {FileUtils.get_folder_name(ruta)} | Caché: No construido"
+                    )
+            else:
+                self.actualizar_info_cache(
+                    f"Carpeta: {FileUtils.get_folder_name(ruta)} | Caché: No construido"
+                )
         else:
-            self.actualizar_info_carpeta("Carpeta: No seleccionada | Cache: No disponible")
+            self.actualizar_info_cache("Sin carpeta seleccionada")
 
     def crear_interfaz(self):
         """Crea la interfaz usando el componente UI"""
-        elementos = self.ui.crear_interfaz_completa()
+        # Frame principal
+        self.main_frame = self.ui.crear_frame_principal()
         
-        # Guardar referencias a elementos importantes
-        self.entry = elementos['entry']
-        self.btn_buscar = elementos['btn_buscar']
-        self.btn_cancelar = elementos['btn_cancelar']
-        self.progress = elementos['progress']
-        self.label_porcentaje = elementos['label_porcentaje']
-        self.tree = elementos['tree']
-        self.btn_copiar = elementos['btn_copiar']
-        self.btn_abrir = elementos['btn_abrir']
-        self.label_estado = elementos['label_estado']
-        self.label_carpeta_info = elementos['label_carpeta_info']  # Nueva línea de info
+        # Título
+        self.ui.crear_titulo(self.main_frame)
+        
+        # Campo de búsqueda
+        self.entry = self.ui.crear_campo_busqueda(
+            self.main_frame, 
+            callback_enter=self.buscar_carpeta
+        )
+        
+        # Botones de búsqueda (sin botón de caché)
+        self.btn_buscar, self.btn_cancelar = self.ui.crear_botones_busqueda(
+            self.main_frame,
+            callback_buscar=self.buscar_carpeta,
+            callback_cancelar=self.cancelar_operacion
+        )
+        
+        # Barra de progreso
+        self.progress, self.label_porcentaje = self.ui.crear_barra_progreso(self.main_frame)
+        
+        # TreeView de resultados
+        self.tree = self.ui.crear_treeview_resultados(
+            self.main_frame,
+            callback_select=self.actualizar_botones_acciones
+        )
+        
+        # Botones de acciones
+        self.btn_copiar, self.btn_abrir = self.ui.crear_botones_acciones(
+            self.main_frame,
+            callback_copiar=self.copiar_ruta_seleccionada,
+            callback_abrir=self.abrir_carpeta_seleccionada
+        )
+        
+        # Barra de estado
+        self.label_estado, self.label_version = self.ui.crear_barra_estado(self.main_frame)
+        
+        # Línea de información de caché (nueva)
+        self.label_cache_info = self.ui.crear_info_cache(self.main_frame)
 
     def crear_menu(self):
         """Crea el menú de la aplicación"""
@@ -102,11 +145,11 @@ class BusquedaCarpetaApp:
         )
         menu_archivo.add_separator()
         menu_archivo.add_command(
-            label="Construir cache de directorios", 
+            label="Construir caché de directorios", 
             command=self.construir_cache_manual
         )
         menu_archivo.add_command(
-            label="Limpiar cache", 
+            label="Limpiar caché", 
             command=self.limpiar_cache
         )
         menu_archivo.add_separator()
@@ -125,240 +168,164 @@ class BusquedaCarpetaApp:
         self.tree.bind("<<TreeviewSelect>>", self.actualizar_botones_acciones)
 
     def seleccionar_ruta_busqueda(self):
-        """Selecciona ruta y construye cache automáticamente"""
-        ruta_inicial = self.cache_manager.ruta_carpeta if self.cache_manager.ruta_carpeta else None
+        """Selecciona ruta y construye caché automáticamente"""
+        ruta_inicial = self.ruta_carpeta_actual if self.ruta_carpeta_actual else None
         ruta = filedialog.askdirectory(
             title="Seleccionar ruta de búsqueda",
             initialdir=ruta_inicial
         )
         
         if ruta:
-            self.cache_manager.ruta_carpeta = ruta
-            self.config.guardar_ruta(ruta)
+            self.ruta_carpeta_actual = ruta
+            self.config.set_folder_path(ruta)
             
-            # Limpiar cache anterior
-            self.cache_manager.limpiar_cache()
+            # Limpiar caché anterior
+            self.cache_manager.invalidate_cache()
             
             # Actualizar info inmediatamente
-            self.actualizar_info_carpeta(f"Carpeta: {os.path.basename(ruta)} | Cache: Construyendo...")
-            self.actualizar_estado(f"Ruta establecida: {os.path.basename(ruta)} - Construyendo cache automáticamente...")
+            folder_name = FileUtils.get_folder_name(ruta)
+            self.actualizar_info_cache(f"Carpeta: {folder_name} | Caché: Construyendo...")
+            self.actualizar_estado(f"Ruta establecida: {folder_name} - Construyendo caché automáticamente...")
             
-            # Construir cache automáticamente
+            # Construir caché automáticamente
             self.construir_cache_automatico()
 
     def construir_cache_automatico(self):
-        """Construye el cache automáticamente después de seleccionar carpeta"""
-        if not self.cache_manager.ruta_carpeta:
+        """Construye el caché automáticamente después de seleccionar carpeta"""
+        if not self.ruta_carpeta_actual:
             return
             
-        if self.cache_manager.construyendo_cache or self.busqueda_activa:
+        if self.cache_manager.construyendo_cache or self.search_engine.is_searching():
             return
             
-        self.cache_manager.construyendo_cache = True
+        # Deshabilitar botón de búsqueda mientras se construye el caché
         self.btn_buscar.config(state=tk.DISABLED)
         
-        cache_thread = threading.Thread(
-            target=self.ejecutar_construccion_cache,
-            daemon=True
+        # Iniciar construcción del caché
+        self.cache_manager.build_cache_async(
+            self.ruta_carpeta_actual,
+            completion_callback=self.on_cache_build_complete
         )
-        cache_thread.start()
 
     def construir_cache_manual(self):
-        """Construye el cache manualmente desde el menú"""
-        if not self.cache_manager.ruta_carpeta:
-            self.actualizar_estado("Error: Seleccione una ruta primero")
+        """Construye el caché manualmente desde el menú"""
+        if not self.ruta_carpeta_actual:
+            self.actualizar_estado(MESSAGES['no_folder'])
             return
             
-        if self.cache_manager.construyendo_cache or self.busqueda_activa:
+        if self.cache_manager.construyendo_cache or self.search_engine.is_searching():
             return
             
-        self.cache_manager.construyendo_cache = True
+        # Deshabilitar botón de búsqueda
         self.btn_buscar.config(state=tk.DISABLED)
         
-        self.actualizar_info_carpeta(
-            f"Carpeta: {os.path.basename(self.cache_manager.ruta_carpeta)} | Cache: Construyendo..."
-        )
+        folder_name = FileUtils.get_folder_name(self.ruta_carpeta_actual)
+        self.actualizar_info_cache(f"Carpeta: {folder_name} | Caché: Construyendo...")
         
-        cache_thread = threading.Thread(
-            target=self.ejecutar_construccion_cache,
-            daemon=True
+        # Iniciar construcción del caché
+        self.cache_manager.build_cache_async(
+            self.ruta_carpeta_actual,
+            completion_callback=self.on_cache_build_complete
         )
-        cache_thread.start()
 
-    def ejecutar_construccion_cache(self):
-        """Ejecuta la construcción del cache en hilo separado"""
-        try:
-            self.actualizar_estado("Construyendo cache de directorios...")
-            self.progress["value"] = 0
-            self.label_porcentaje.config(text="0%")
-            
-            inicio = time.time()
-            cache_temp = []
-            processed_dirs = 0
-            chunk_size = 100
-            
-            # Recopilar todos los directorios
-            for root, dirs, _ in os.walk(self.cache_manager.ruta_carpeta):
-                if not self.cache_manager.construyendo_cache:
-                    return
-                    
-                for dir_name in dirs:
-                    path = os.path.join(root, dir_name)
-                    ruta_relativa = os.path.relpath(path, self.cache_manager.ruta_carpeta)
-                    cache_temp.append((dir_name, ruta_relativa, path))
-                    processed_dirs += 1
-                    
-                    # Actualizar progreso cada chunk
-                    if processed_dirs % chunk_size == 0:
-                        tiempo_transcurrido = time.time() - inicio
-                        progreso = min(95, 20 * (tiempo_transcurrido ** 0.3))
-                        self.actualizar_progreso(progreso, tiempo_transcurrido)
-                        
-                        velocidad = processed_dirs / tiempo_transcurrido if tiempo_transcurrido > 0 else 0
-                        self.actualizar_estado(
-                            f"Construyendo cache: {processed_dirs:,} directorios ({velocidad:.0f}/s)"
-                        )
-                        
-                        # Actualizar info de carpeta
-                        carpeta_nombre = os.path.basename(self.cache_manager.ruta_carpeta)
-                        self.actualizar_info_carpeta(
-                            f"Carpeta: {carpeta_nombre} | Cache: {processed_dirs:,} directorios..."
-                        )
-                        
-                        time.sleep(0.01)
-            
-            if self.cache_manager.construyendo_cache:
-                # Guardar cache
-                self.cache_manager.guardar_cache(cache_temp)
-                
-                tiempo_total = time.time() - inicio
-                self.actualizar_progreso(100, tiempo_total)
-                
-                carpeta_nombre = os.path.basename(self.cache_manager.ruta_carpeta)
-                self.actualizar_info_carpeta(
-                    f"Carpeta: {carpeta_nombre} | Cache: {len(cache_temp):,} directorios ✓"
-                )
-                
-                self.actualizar_estado(
-                    f"Cache construido: {len(cache_temp):,} directorios en {tiempo_total:.1f}s"
-                )
-                
-        except Exception as e:
-            self.actualizar_estado(f"Error construyendo cache: {str(e)}")
-        finally:
-            self.cache_manager.construyendo_cache = False
-            self.btn_buscar.config(state=tk.NORMAL)
+    def on_cache_build_complete(self, success, total_dirs):
+        """Callback cuando se completa la construcción del caché"""
+        self.master.after(0, lambda: self._handle_cache_build_complete(success, total_dirs))
+
+    def _handle_cache_build_complete(self, success, total_dirs):
+        """Maneja la finalización de la construcción del caché en el hilo principal"""
+        self.btn_buscar.config(state=tk.NORMAL)
+        
+        if success:
+            folder_name = FileUtils.get_folder_name(self.ruta_carpeta_actual)
+            self.actualizar_info_cache(
+                f"Carpeta: {folder_name} | Caché: {total_dirs:,} directorios ✓"
+            )
+        else:
+            folder_name = FileUtils.get_folder_name(self.ruta_carpeta_actual)
+            self.actualizar_info_cache(
+                f"Carpeta: {folder_name} | Caché: Error en construcción"
+            )
 
     def limpiar_cache(self):
-        """Limpia el cache"""
-        self.cache_manager.limpiar_cache()
+        """Limpia el caché"""
+        self.cache_manager.clear_cache()
         
-        if self.cache_manager.ruta_carpeta:
-            carpeta_nombre = os.path.basename(self.cache_manager.ruta_carpeta)
-            self.actualizar_info_carpeta(f"Carpeta: {carpeta_nombre} | Cache: Limpiado")
+        if self.ruta_carpeta_actual:
+            folder_name = FileUtils.get_folder_name(self.ruta_carpeta_actual)
+            self.actualizar_info_cache(f"Carpeta: {folder_name} | Caché: Limpiado")
         else:
-            self.actualizar_info_carpeta("Carpeta: No seleccionada | Cache: No disponible")
+            self.actualizar_info_cache("Sin carpeta seleccionada")
             
-        self.actualizar_estado("Cache limpiado")
+        self.actualizar_estado(MESSAGES['cache_cleared'])
 
     def buscar_carpeta(self, event=None):
         """Ejecuta la búsqueda de carpetas"""
-        if self.busqueda_activa or self.cache_manager.construyendo_cache:
+        if self.search_engine.is_searching() or self.cache_manager.construyendo_cache:
             return
 
-        if not self.cache_manager.ruta_carpeta:
-            self.actualizar_estado("Error: Seleccione una ruta primero")
+        if not self.ruta_carpeta_actual:
+            self.actualizar_estado(MESSAGES['no_folder'])
             return
 
         criterio = self.entry.get().strip()
         if not criterio:
-            self.actualizar_estado("Error: Ingrese un criterio de búsqueda")
+            self.actualizar_estado(MESSAGES['no_criteria'])
             return
 
-        # Intentar búsqueda en cache primero
-        if self.cache_manager.cache_valido and self.cache_manager.cache_directorios:
-            resultados_cache = self.search_engine.buscar_en_cache(
-                criterio, self.cache_manager.cache_directorios
+        # Intentar búsqueda en caché primero
+        if self.cache_manager.is_cache_valid(self.ruta_carpeta_actual):
+            resultados_cache = self.cache_manager.search_in_cache(
+                criterio, 
+                status_callback=self.actualizar_estado
             )
             if resultados_cache is not None:
                 self.mostrar_resultados(resultados_cache)
-                self.progress["value"] = 100
+                self.progress.config(value=100)
                 self.label_porcentaje.config(text="100%")
-                
-                total_cache = self.cache_manager.cache_directorios['total']
-                self.actualizar_estado(
-                    f"Búsqueda en cache: {len(resultados_cache)} resultados en {total_cache:,} directorios"
-                )
                 return
 
         # Búsqueda tradicional
         self.preparar_busqueda(criterio)
-        self.search_thread = threading.Thread(
-            target=self.ejecutar_busqueda_tradicional,
-            args=(criterio,),
-            daemon=True
+        self.search_engine.search_async(
+            self.ruta_carpeta_actual,
+            criterio,
+            completion_callback=self.on_search_complete
         )
-        self.search_thread.start()
 
     def preparar_busqueda(self, criterio):
         """Prepara la interfaz para una búsqueda tradicional"""
-        self.tiempo_inicio = time.time()
         self.limpiar_resultados()
-        self.busqueda_activa = True
-        self.busqueda_cancelada = False
         self.btn_cancelar.config(state=tk.NORMAL)
         self.btn_buscar.config(state=tk.DISABLED)
-        self.progress["value"] = 0
+        self.progress.config(value=0)
         self.label_porcentaje.config(text="0%")
-        self.actualizar_estado(f"Cache no disponible. Búsqueda tradicional de '{criterio}'...")
 
-    def ejecutar_busqueda_tradicional(self, criterio):
-        """Ejecuta búsqueda tradicional en hilo separado"""
-        try:
-            resultados = self.search_engine.buscar_tradicional(
-                criterio, 
-                self.cache_manager.ruta_carpeta,
-                self.actualizar_progreso_busqueda,
-                lambda: self.busqueda_cancelada
-            )
-            
-            if not self.busqueda_cancelada:
-                self.finalizar_busqueda(resultados, criterio)
-                
-        except Exception as e:
-            self.actualizar_estado(f"Error: {str(e)}")
-        finally:
-            self.busqueda_activa = False
+    def on_search_complete(self, success, resultados):
+        """Callback cuando se completa la búsqueda"""
+        self.master.after(0, lambda: self._handle_search_complete(success, resultados))
+
+    def _handle_search_complete(self, success, resultados):
+        """Maneja la finalización de la búsqueda en el hilo principal"""
+        self.btn_cancelar.config(state=tk.DISABLED)
+        self.btn_buscar.config(state=tk.NORMAL)
+        
+        if success:
+            self.mostrar_resultados(resultados)
+            self.progress.config(value=100)
+
+    def cancelar_operacion(self):
+        """Cancela la operación activa (búsqueda o construcción de caché)"""
+        if self.search_engine.is_searching():
+            self.search_engine.cancel_search()
             self.btn_cancelar.config(state=tk.DISABLED)
             self.btn_buscar.config(state=tk.NORMAL)
-
-    def actualizar_progreso_busqueda(self, processed, matches, tiempo_transcurrido, velocidad):
-        """Callback para actualizar progreso durante búsqueda tradicional"""
-        progreso = min(95, 20 * (tiempo_transcurrido ** 0.3))
-        self.actualizar_progreso(progreso, tiempo_transcurrido)
-        self.actualizar_estado(
-            f"Procesados {processed:,} directorios ({velocidad:.0f}/s) - {matches} coincidencias"
-        )
-
-    def cancelar_busqueda(self):
-        """Cancela la búsqueda activa"""
-        if self.busqueda_activa:
-            self.busqueda_cancelada = True
-            self.btn_cancelar.config(state=tk.DISABLED)
-            tiempo = time.time() - self.tiempo_inicio
-            self.actualizar_estado(f"Búsqueda cancelada ({tiempo:.1f} segundos)")
-
-    def finalizar_busqueda(self, resultados, criterio):
-        """Finaliza la búsqueda y muestra resultados"""
-        self.mostrar_resultados(resultados)
-        self.progress["value"] = 100
-        
-        tiempo = time.time() - self.tiempo_inicio
-        processed = getattr(self.search_engine, 'processed_dirs', 0)
-        self.label_porcentaje.config(text=f"100% • {tiempo:.1f}s")
-        self.actualizar_estado(
-            f"Búsqueda completada: {len(resultados)} resultados en {processed:,} directorios ({tiempo:.1f}s)"
-        )
+        elif self.cache_manager.construyendo_cache:
+            self.cache_manager.cancel_build()
+            self.btn_buscar.config(state=tk.NORMAL)
+            if self.ruta_carpeta_actual:
+                folder_name = FileUtils.get_folder_name(self.ruta_carpeta_actual)
+                self.actualizar_info_cache(f"Carpeta: {folder_name} | Caché: Construcción cancelada")
 
     def mostrar_resultados(self, resultados):
         """Muestra los resultados en el TreeView"""
@@ -369,14 +336,18 @@ class BusquedaCarpetaApp:
             self.tree.insert("", "end", values=("No se encontraron resultados", ""))
             return
             
-        for nombre, ruta, _ in resultados:
-            self.tree.insert("", "end", values=(nombre, ruta))
+        for nombre, ruta_relativa, _ in resultados:
+            self.tree.insert("", "end", values=(nombre, ruta_relativa))
+
+    def mostrar_resultados_parciales(self, resultados):
+        """Muestra resultados parciales durante la búsqueda"""
+        self.master.after(0, lambda: self.mostrar_resultados(resultados))
 
     def limpiar_resultados(self):
         """Limpia los resultados mostrados"""
         self.tree.delete(*self.tree.get_children())
         self.resultados = []
-        self.progress["value"] = 0
+        self.progress.config(value=0)
         self.label_porcentaje.config(text="0%")
 
     def actualizar_botones_acciones(self, event=None):
@@ -391,36 +362,40 @@ class BusquedaCarpetaApp:
         if seleccion:
             idx = self.tree.index(seleccion[0])
             if 0 <= idx < len(self.resultados):
-                return self.resultados[idx][2]
+                return self.resultados[idx][2]  # Ruta completa
         return None
 
     def copiar_ruta_seleccionada(self):
         """Copia la ruta seleccionada al portapapeles"""
-        if ruta := self.obtener_ruta_seleccionada():
-            if copy_to_clipboard(ruta):
-                self.actualizar_estado(f"Ruta copiada: {os.path.basename(ruta)}")
+        ruta = self.obtener_ruta_seleccionada()
+        if ruta:
+            success, error = FileUtils.copy_to_clipboard(ruta)
+            if success:
+                self.actualizar_estado(f"Ruta copiada: {FileUtils.get_folder_name(ruta)}")
             else:
-                self.actualizar_estado("Error al copiar ruta")
+                self.actualizar_estado(f"Error al copiar ruta: {error}")
 
     def abrir_carpeta_seleccionada(self):
         """Abre la carpeta seleccionada"""
-        if ruta := self.obtener_ruta_seleccionada():
-            if open_folder(ruta):
-                self.actualizar_estado(f"Carpeta abierta: {os.path.basename(ruta)}")
+        ruta = self.obtener_ruta_seleccionada()
+        if ruta:
+            success, error = FileUtils.open_folder(ruta)
+            if success:
+                self.actualizar_estado(f"Carpeta abierta: {FileUtils.get_folder_name(ruta)}")
             else:
-                self.actualizar_estado("Error al abrir carpeta")
+                self.actualizar_estado(f"Error al abrir carpeta: {error}")
 
-    def actualizar_progreso(self, porcentaje, tiempo_transcurrido=0):
+    def actualizar_progreso(self, porcentaje, texto_porcentaje):
         """Actualiza la barra de progreso"""
         self.master.after(0, lambda: [
             self.progress.config(value=porcentaje),
-            self.label_porcentaje.config(text=f"{int(porcentaje)}% • {tiempo_transcurrido:.1f}s")
+            self.label_porcentaje.config(text=texto_porcentaje)
         ])
 
     def actualizar_estado(self, mensaje):
         """Actualiza el mensaje de estado"""
         self.master.after(0, lambda: self.label_estado.config(text=mensaje))
 
-    def actualizar_info_carpeta(self, mensaje):
-        """Actualiza la información de carpeta y cache"""
-        self.master.after(0, lambda: self.label_carpeta_info.config(text=mensaje))
+    def actualizar_info_cache(self, mensaje):
+        """Actualiza la información de carpeta y caché"""
+        self.master.after(0, lambda: self.label_cache_info.config(text=mensaje))
