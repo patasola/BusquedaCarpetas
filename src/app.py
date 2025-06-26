@@ -14,7 +14,7 @@ from .config import ConfigManager
 from .cache_manger import CacheManager
 from .search_engine import SearchEngine
 from .ui_components import UIComponents
-from utils import FileUtils
+from .utils import FileUtils
 from .constants import *
 
 class BusquedaCarpetaApp:
