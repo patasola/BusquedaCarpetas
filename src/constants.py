@@ -3,10 +3,10 @@ Constantes de la aplicación Búsqueda Rápida de Carpetas
 """
 
 # Información de la aplicación
-APP_VERSION = "V. 1.4"
+APP_VERSION = "V. 1.5"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
-WINDOW_SIZE = "750x650"
-MIN_WINDOW_SIZE = (650, 550)
+WINDOW_SIZE = "750x700"
+MIN_WINDOW_SIZE = (650, 600)
 
 # Fuentes
 FONT_NORMAL = ("Arial", 10)

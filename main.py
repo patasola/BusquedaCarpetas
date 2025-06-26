@@ -1,6 +1,6 @@
 # main.py - Archivo Principal de la Aplicación
 """
-Búsqueda Rápida de Carpetas v1.4
+Búsqueda Rápida de Carpetas v1.5
 Archivo principal de la aplicación
 """
 
