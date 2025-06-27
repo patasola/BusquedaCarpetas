@@ -1,6 +1,6 @@
-# src/utils.py - Utilidades
+# src/utils.py - Utilidades generales
 """
-Funciones utilitarias para operaciones del sistema
+Funciones de utilidad para la aplicación
 """
 
 import os
@@ -18,14 +18,11 @@ def copy_to_clipboard(text):
         try:
             if platform.system() == "Windows":
                 import subprocess
-                subprocess.run(["clip"], input=text, text=True, check=True)
-                return True
-            elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["pbcopy"], input=text, text=True, check=True)
-                return True
-            else:  # Linux
-                subprocess.run(["xclip", "-selection", "clipboard"], input=text, text=True, check=True)
-                return True
+                process = subprocess.Popen(['clip'], stdin=subprocess.PIPE, text=True)
+                process.communicate(input=text)
+                return process.returncode == 0
+            else:
+                return False
         except Exception:
             return False
     except Exception:
@@ -42,9 +39,17 @@ def open_folder(path):
             os.startfile(path)
         elif system == "Darwin":  # macOS
             subprocess.Popen(["open", path])
-        else:  # Linux
+        else:  # Linux y otros Unix
             subprocess.Popen(["xdg-open", path])
         
         return True
     except Exception:
         return False
+
+def get_folder_name(path):
+    """Obtiene el nombre de la carpeta desde una ruta"""
+    return os.path.basename(path) if path else ""
+
+def is_valid_path(path):
+    """Verifica si una ruta es válida y existe"""
+    return path and os.path.exists(path) and os.path.isdir(path)
