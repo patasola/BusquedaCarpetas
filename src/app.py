@@ -1,6 +1,6 @@
 # src/app.py - Clase Principal de la Aplicación
 """
-Búsqueda Rápida de Carpetas v1.4
+Búsqueda Rápida de Carpetas v1.5
 Clase principal con interfaz y lógica de aplicación
 """
 
@@ -107,9 +107,29 @@ class BusquedaCarpetaApp:
         menubar.add_cascade(label="Archivo", menu=menu_archivo)
         self.master.config(menu=menubar)
 
+    def enfocar_campo_busqueda_con_seleccion(self, event=None):
+        """Enfoca el campo de búsqueda y selecciona los últimos 3 caracteres"""
+        entry = self.elementos_ui['entry']
+        entry.focus_set()
+        
+        # Obtener el contenido actual
+        contenido = entry.get()
+        
+        if contenido:
+            # Calcular posición de inicio para seleccionar los últimos 3 caracteres
+            inicio_seleccion = max(0, len(contenido) - 3)
+            fin_seleccion = len(contenido)
+            
+            # Seleccionar los últimos 3 caracteres (o menos si el texto es más corto)
+            entry.selection_range(inicio_seleccion, fin_seleccion)
+            entry.icursor(fin_seleccion)  # Posicionar cursor al final
+        
+        return "break"  # Prevenir procesamiento adicional del evento
+
     def configurar_eventos(self):
         """Configura eventos y atajos de teclado"""
-        self.master.bind("<F2>", lambda e: self.elementos_ui['entry'].focus())
+        # F2 mejorado: enfoca y selecciona últimos 3 caracteres
+        self.master.bind("<F2>", self.enfocar_campo_busqueda_con_seleccion)
         self.master.bind("<F3>", lambda e: self.copiar_ruta_seleccionada())
         self.master.bind("<F4>", lambda e: self.abrir_carpeta_seleccionada())
         
