@@ -1,6 +1,7 @@
-# src/ui_components.py - Componentes de Interfaz
+# src/ui_components.py - Componentes de Interfaz V.3.6 - Ultra-compacta
 """
 Maneja la creación y configuración de todos los elementos de la interfaz
+Versión ultra-compacta con barras pegadas y layout estabilizado
 """
 
 import tkinter as tk
@@ -13,11 +14,11 @@ class UIComponents:
         self.configurar_estilos()
 
     def configurar_estilos(self):
-        """Configura estilos personalizados"""
+        """Configura estilos personalizados para V.3.6"""
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Colores
+        # Colores V.3.6
         gris_oscuro = "#424242"
         gris_medio = "#757575"
         gris_claro = "#e0e0e0"
@@ -25,104 +26,103 @@ class UIComponents:
         blanco = "#ffffff"
         azul_barra = "#1976D2"
         
-        # Estilos de botones
+        # Estilos de botones compactos
         style.configure('TButton', 
-                      font=("Arial", 10), 
+                      font=("Segoe UI", 9), 
                       foreground=gris_oscuro,
                       background=gris_claro,
-                      padding=8,
-                      width=12)
+                      padding=6,
+                      width=10)
         
-        # Barra de progreso
+        # Barra de progreso compacta
         style.configure('Horizontal.TProgressbar',
-                       thickness=20,
+                       thickness=15,
                        troughcolor=gris_muy_claro,
                        background=azul_barra,
                        borderwidth=0)
         
-        # Treeview
+        # Treeview compacto
         style.configure('Treeview.Heading', 
-                      font=('Arial', 10, 'bold'),
+                      font=('Segoe UI', 9, 'bold'),
                       background=gris_claro,
                       foreground=gris_oscuro)
         
         style.configure('Treeview',
-                      rowheight=25,
+                      rowheight=22,
                       background=blanco,
                       fieldbackground=blanco,
                       foreground=gris_oscuro)
 
     def crear_interfaz_completa(self):
-        """Crea toda la interfaz y retorna referencias a elementos importantes"""
-        # Frame principal
+        """Crea toda la interfaz ultra-compacta y retorna referencias a elementos importantes"""
+        # Frame principal ultra-compacto
         main_frame = tk.Frame(self.master, bg="#f6f5f5")
-        main_frame.pack(expand=True, fill=tk.BOTH, padx=50, pady=20)
+        main_frame.pack(expand=True, fill=tk.BOTH, padx=30, pady=15)
         
-        # Título
+        # Título compacto
         tk.Label(
             main_frame,
-            text="Búsqueda Rápida de Carpetas",
-            font=("Arial", 16, "bold"),
+            text="🔍 Búsqueda Rápida de Carpetas",
+            font=("Segoe UI", 14, "bold"),
             bg="#f6f5f5",
             fg="#424242"
-        ).pack(pady=(0, 20))
+        ).pack(pady=(0, 10))
         
-        # Campo de búsqueda
+        # Campo de búsqueda compacto
         tk.Label(
             main_frame,
-            text="Ingrese el criterio de búsqueda:",
-            font=("Arial", 10),
+            text="Criterio de búsqueda:",
+            font=("Segoe UI", 9),
             bg="#f6f5f5",
             fg="#757575"
         ).pack()
         
         entry = tk.Entry(
             main_frame,
-            width=40,
-            font=("Arial", 10),
-            relief=tk.SOLID,
+            width=35,
+            font=("Segoe UI", 10),
+            relief=tk.FLAT,
             borderwidth=1,
             bg="#ffffff",
             fg="#424242",
             justify="center"
         )
-        entry.pack(pady=10, ipady=5)
+        entry.pack(pady=8, ipady=4)
         entry.focus_set()
         
-        # Botones de búsqueda
+        # Botones de búsqueda compactos
         btn_frame = tk.Frame(main_frame, bg="#f6f5f5")
-        btn_frame.pack(pady=(0, 20))
+        btn_frame.pack(pady=(0, 10))
         
         btn_buscar = ttk.Button(btn_frame, text="Buscar")
-        btn_buscar.pack(side=tk.LEFT, padx=5)
+        btn_buscar.pack(side=tk.LEFT, padx=3)
         
         btn_cancelar = ttk.Button(btn_frame, text="Cancelar", state=tk.DISABLED)
-        btn_cancelar.pack(side=tk.LEFT, padx=5)
+        btn_cancelar.pack(side=tk.LEFT, padx=3)
         
-        # Barra de progreso
+        # Barra de progreso compacta (solo cuando sea necesario)
         progress = ttk.Progressbar(
             main_frame,
             orient="horizontal",
             mode="determinate",
             style='Horizontal.TProgressbar',
-            length=400
+            length=350
         )
-        progress.pack(pady=(0, 10))
         
-        # Etiqueta de porcentaje
+        # Etiqueta de porcentaje compacta
         label_porcentaje = tk.Label(
             main_frame,
             text="0%",
-            font=("Arial", 10),
+            font=("Segoe UI", 9),
             bg="#f6f5f5",
             fg="#757575"
         )
-        label_porcentaje.pack(pady=(0, 15))
         
-        # TreeView
+        # TreeView ultra-compacto
         tree_frame = tk.Frame(main_frame, bg="#f6f5f5")
-        tree_frame.pack(expand=True, fill=tk.BOTH, pady=(0, 15))
+        tree_frame.pack(expand=True, fill=tk.BOTH, pady=(5, 10))
         
+        # Scrollbars inteligentes
         y_scroll = ttk.Scrollbar(tree_frame, orient="vertical")
         x_scroll = ttk.Scrollbar(tree_frame, orient="horizontal")
         
@@ -131,63 +131,74 @@ class UIComponents:
             columns=("Nombre", "Ruta"),
             show="headings",
             selectmode="browse",
-            height=6,
+            height=4,  # Más compacto
             yscrollcommand=y_scroll.set,
             xscrollcommand=x_scroll.set
         )
         
-        tree.heading("Nombre", text="Nombre", anchor=tk.CENTER)
-        tree.heading("Ruta", text="Ruta", anchor=tk.CENTER)
-        tree.column("Nombre", width=200, anchor=tk.CENTER)
-        tree.column("Ruta", width=400, anchor=tk.CENTER)
+        # Configuración de columnas optimizada
+        tree.heading("Nombre", text="Nombre", anchor=tk.W)
+        tree.heading("Ruta", text="Ruta Relativa", anchor=tk.W)
+        tree.column("Nombre", width=150, anchor=tk.W, minwidth=100)
+        tree.column("Ruta", width=350, anchor=tk.W, minwidth=200)
         
         y_scroll.config(command=tree.yview)
         x_scroll.config(command=tree.xview)
         
+        # Posicionamiento de scrollbars
         y_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         x_scroll.pack(side=tk.BOTTOM, fill=tk.X)
         tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
         
-        # Botones de acciones
+        # Botones de acciones compactos
         action_frame = tk.Frame(main_frame, bg="#f6f5f5")
-        action_frame.pack(pady=(0, 10))
+        action_frame.pack(pady=(0, 5))
         
-        btn_copiar = ttk.Button(action_frame, text="Copiar Ruta (F3)", state=tk.DISABLED)
-        btn_copiar.pack(side=tk.LEFT, padx=5)
+        btn_copiar = ttk.Button(action_frame, text="Copiar (F3)", state=tk.DISABLED)
+        btn_copiar.pack(side=tk.LEFT, padx=3)
         
-        btn_abrir = ttk.Button(action_frame, text="Abrir Carpeta (F4)", state=tk.DISABLED)
-        btn_abrir.pack(side=tk.LEFT, padx=5)
+        btn_abrir = ttk.Button(action_frame, text="Abrir (F4)", state=tk.DISABLED)
+        btn_abrir.pack(side=tk.LEFT, padx=3)
         
-        # Línea de información de carpeta y cache
+        # BARRAS PEGADAS - Ultra-compacta sin espacios
+        info_cache_frame = tk.Frame(main_frame, bg="#1976D2", height=20)
+        info_cache_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        info_cache_frame.pack_propagate(False)
+        
         label_carpeta_info = tk.Label(
-            main_frame,
-            text="Carpeta: No seleccionada | Cache: No disponible",
-            font=("Arial", 9),
-            bg="#f6f5f5",
-            fg="#757575"
+            info_cache_frame,
+            text="Sin carpeta seleccionada",
+            font=("Segoe UI", 9),
+            anchor=tk.W,
+            bg="#1976D2",
+            fg="white",
+            padx=10
         )
-        label_carpeta_info.pack(pady=(5, 0))
+        label_carpeta_info.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # Barra de estado
-        status_frame = tk.Frame(main_frame, bg="#f6f5f5", height=28)
-        status_frame.pack(fill=tk.X, pady=(10, 0))
+        # Barra de estado pegada DEBAJO
+        status_frame = tk.Frame(main_frame, bg="#424242", height=20)
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        status_frame.pack_propagate(False)
         
         label_estado = tk.Label(
             status_frame,
-            text="Listo para buscar. Presione F2 para enfocar el campo de búsqueda",
-            font=("Arial", 9),
+            text="Listo. Presione F2 para enfocar búsqueda",
+            font=("Segoe UI", 9),
             anchor=tk.W,
-            bg="#f6f5f5",
-            fg="#424242"
+            bg="#424242",
+            fg="white",
+            padx=10
         )
         label_estado.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         label_version = tk.Label(
             status_frame,
             text=self.version,
-            font=("Arial", 8),
-            bg="#f6f5f5",
-            fg="#757575"
+            font=("Segoe UI", 8),
+            bg="#424242",
+            fg="#cccccc",
+            padx=10
         )
         label_version.pack(side=tk.RIGHT)
         
@@ -204,3 +215,46 @@ class UIComponents:
             'label_estado': label_estado,
             'label_carpeta_info': label_carpeta_info
         }
+
+    @staticmethod
+    def create_progress_bar(parent):
+        """Crea componentes de barra de progreso para uso externo"""
+        # Frame contenedor para la barra de progreso
+        progress_frame = tk.Frame(parent, bg="#f6f5f5")
+        
+        # Contenedor interno
+        progress_container = tk.Frame(progress_frame, bg="#f6f5f5")
+        
+        # Barra de progreso
+        progress = ttk.Progressbar(
+            progress_container,
+            orient="horizontal",
+            mode="determinate",
+            style='Horizontal.TProgressbar',
+            length=350
+        )
+        
+        # Etiqueta de porcentaje
+        label_porcentaje = tk.Label(
+            progress_frame,
+            text="0%",
+            font=("Segoe UI", 9),
+            bg="#f6f5f5",
+            fg="#757575"
+        )
+        
+        return progress_frame, progress, label_porcentaje, progress_container
+
+# Clase para mantener compatibilidad con versiones anteriores
+class Colors:
+    BACKGROUND = "#f6f5f5"
+    TITLE_FG = "#424242"
+    INFO_FG = "#757575" 
+    TREE_FG = "#424242"
+    BUTTON_BG = "#e0e0e0"
+    BUTTON_FG = "#424242"
+
+class Fonts:
+    BUTTONS = ("Segoe UI", 9)
+    NORMAL = ("Segoe UI", 9)
+    TITLE = ("Segoe UI", 14, "bold")

@@ -1,11 +1,12 @@
 # src/app.py - Clase Principal de la Aplicación
 """
-Búsqueda Rápida de Carpetas v1.5
+Búsqueda Rápida de Carpetas V. 3.6 - Estable (Inferno)
 Clase principal con interfaz y lógica de aplicación
+Versión corregida y completa
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, Menu
+from tkinter import ttk, filedialog, Menu, messagebox
 import os
 import threading
 import time
@@ -16,17 +17,19 @@ from .search_engine import SearchEngine
 from .ui_components import UIComponents
 from .utils import copy_to_clipboard, open_folder, get_folder_name, is_valid_path
 from .constants import *
+from .about_dialog import AboutDialog
+from .changelog_viewer import ChangelogViewer
 
 class BusquedaCarpetaApp:
     def __init__(self, master):
         self.master = master
-        master.title(APP_TITLE)
-        master.geometry(WINDOW_SIZE)
-        master.configure(bg=COLORS['background'])
-        master.minsize(*MIN_WINDOW_SIZE)
+        master.title("Búsqueda Rápida de Carpetas V. 3.6 - Estable (Inferno)")
+        master.geometry("660x480")  # Ultra-compacta
+        master.configure(bg="#f6f5f5")
+        master.minsize(650, 470)
 
         # Versión de la aplicación
-        self.version = APP_VERSION
+        self.version = "V. 3.6 - Estable (Inferno)"
 
         # Centrar la ventana
         self.centrar_ventana()
@@ -39,6 +42,10 @@ class BusquedaCarpetaApp:
         )
         self.search_engine = SearchEngine()
         self.ui = UIComponents(master, self.version)
+
+        # Diálogos
+        self.about_dialog = AboutDialog(master, self.version)
+        self.changelog_viewer = ChangelogViewer(master)
 
         # Variables de estado
         self.resultados = []
@@ -87,6 +94,7 @@ class BusquedaCarpetaApp:
         """Crea el menú de la aplicación"""
         menubar = Menu(self.master)
         
+        # Menú Archivo
         menu_archivo = Menu(menubar, tearoff=0)
         menu_archivo.add_command(
             label="Seleccionar ruta de búsqueda", 
@@ -104,27 +112,72 @@ class BusquedaCarpetaApp:
         menu_archivo.add_separator()
         menu_archivo.add_command(label="Salir", command=self.master.quit)
         
+        # Menú Ayuda
+        menu_ayuda = Menu(menubar, tearoff=0)
+        menu_ayuda.add_command(
+            label="Acerca de...",
+            command=self.about_dialog.mostrar_acerca_de
+        )
+        menu_ayuda.add_command(
+            label="Acerca de (Avanzado)...",
+            command=self.about_dialog.mostrar_acerca_de_avanzado
+        )
+        menu_ayuda.add_command(
+            label="Historial de Cambios",
+            command=self.changelog_viewer.mostrar_changelog
+        )
+        
         menubar.add_cascade(label="Archivo", menu=menu_archivo)
+        menubar.add_cascade(label="Ayuda", menu=menu_ayuda)
         self.master.config(menu=menubar)
 
     def enfocar_campo_busqueda_con_seleccion(self, event=None):
-        """Enfoca el campo de búsqueda y selecciona los últimos 3 caracteres"""
-        entry = self.elementos_ui['entry']
-        entry.focus_set()
-        
-        # Obtener el contenido actual
-        contenido = entry.get()
-        
-        if contenido:
-            # Calcular posición de inicio para seleccionar los últimos 3 caracteres
-            inicio_seleccion = max(0, len(contenido) - 3)
-            fin_seleccion = len(contenido)
+        """
+        Enfoca el campo de búsqueda y selecciona los últimos 3 caracteres
+        Versión mejorada para V. 3.6 - Inferno
+        """
+        try:
+            entry = self.elementos_ui['entry']
             
-            # Seleccionar los últimos 3 caracteres (o menos si el texto es más corto)
-            entry.selection_range(inicio_seleccion, fin_seleccion)
-            entry.icursor(fin_seleccion)  # Posicionar cursor al final
-        
-        return "break"  # Prevenir procesamiento adicional del evento
+            # Asegurar que el widget tiene el foco
+            entry.focus_set()
+            
+            # Obtener el contenido actual
+            contenido = entry.get()
+            
+            if contenido:
+                # Calcular posición de inicio para seleccionar los últimos 3 caracteres
+                longitud = len(contenido)
+                inicio_seleccion = max(0, longitud - 3)
+                fin_seleccion = longitud
+                
+                # Limpiar selección previa
+                entry.selection_clear()
+                
+                # Seleccionar los últimos 3 caracteres (o menos si el texto es más corto)
+                entry.selection_range(inicio_seleccion, fin_seleccion)
+                
+                # Posicionar cursor al final de la selección
+                entry.icursor(fin_seleccion)
+                
+                print(f"DEBUG: F2 - Seleccionados últimos 3 caracteres: '{contenido[inicio_seleccion:fin_seleccion]}'")
+            else:
+                # Si no hay contenido, solo enfocar
+                print("DEBUG: F2 - Campo vacío, solo enfocando")
+            
+            # Forzar actualización visual
+            entry.update_idletasks()
+            
+            return "break"  # Prevenir procesamiento adicional del evento
+            
+        except Exception as e:
+            print(f"ERROR en F2: {e}")
+            # Fallback: solo enfocar
+            try:
+                self.elementos_ui['entry'].focus_set()
+            except:
+                pass
+            return "break"
 
     def configurar_eventos(self):
         """Configura eventos y atajos de teclado"""
@@ -133,11 +186,16 @@ class BusquedaCarpetaApp:
         self.master.bind("<F3>", lambda e: self.copiar_ruta_seleccionada())
         self.master.bind("<F4>", lambda e: self.abrir_carpeta_seleccionada())
         
+        # Eventos de la interfaz
         self.elementos_ui['entry'].bind("<Return>", lambda e: self.buscar_carpeta())
         self.elementos_ui['btn_buscar'].config(command=self.buscar_carpeta)
         self.elementos_ui['btn_cancelar'].config(command=self.cancelar_operacion)
         self.elementos_ui['btn_copiar'].config(command=self.copiar_ruta_seleccionada)
         self.elementos_ui['btn_abrir'].config(command=self.abrir_carpeta_seleccionada)
+        
+        # Eventos del TreeView
+        self.elementos_ui['tree'].bind("<<TreeviewSelect>>", self.actualizar_botones_acciones)
+        self.elementos_ui['tree'].bind("<Double-1>", lambda e: self.abrir_carpeta_seleccionada())
 
     def seleccionar_ruta_busqueda(self):
         """Selecciona ruta y construye caché automáticamente"""
@@ -249,6 +307,11 @@ class BusquedaCarpetaApp:
                 self.mostrar_resultados(resultados_cache)
                 self.elementos_ui['progress'].config(value=100)
                 self.elementos_ui['label_porcentaje'].config(text="100%")
+                # Ocultar progreso después de 1 segundo
+                self.master.after(1000, lambda: [
+                    self.elementos_ui['progress'].config(value=0),
+                    self.elementos_ui['label_porcentaje'].config(text="0%")
+                ])
                 return
 
         # Búsqueda tradicional
@@ -286,6 +349,11 @@ class BusquedaCarpetaApp:
             self.mostrar_resultados(resultados)
             self.elementos_ui['progress'].config(value=100)
             self.elementos_ui['label_porcentaje'].config(text="100%")
+            # Ocultar progreso después de 1.5 segundos
+            self.master.after(1500, lambda: [
+                self.elementos_ui['progress'].config(value=0),
+                self.elementos_ui['label_porcentaje'].config(text="0%")
+            ])
         else:
             self.actualizar_estado(f"Error en búsqueda: {resultados}")
 
@@ -315,10 +383,13 @@ class BusquedaCarpetaApp:
         
         if not resultados:
             self.elementos_ui['tree'].insert("", "end", values=("No se encontraron resultados", ""))
+            self.actualizar_estado("Búsqueda completada: 0 resultados encontrados")
             return
             
         for nombre, ruta_relativa, _ in resultados:
             self.elementos_ui['tree'].insert("", "end", values=(nombre, ruta_relativa))
+        
+        self.actualizar_estado(f"Búsqueda completada: {len(resultados)} resultados encontrados")
 
     def limpiar_resultados(self):
         """Limpia los resultados mostrados"""
@@ -362,15 +433,31 @@ class BusquedaCarpetaApp:
 
     def actualizar_progreso(self, porcentaje, texto_porcentaje):
         """Actualiza la barra de progreso"""
-        self.master.after(0, lambda: [
-            self.elementos_ui['progress'].config(value=porcentaje),
-            self.elementos_ui['label_porcentaje'].config(text=texto_porcentaje)
-        ])
+        def update():
+            try:
+                self.elementos_ui['progress'].config(value=porcentaje)
+                self.elementos_ui['label_porcentaje'].config(text=texto_porcentaje)
+            except:
+                pass
+        
+        self.master.after(0, update)
 
     def actualizar_estado(self, mensaje):
         """Actualiza el mensaje de estado"""
-        self.master.after(0, lambda: self.elementos_ui['label_estado'].config(text=mensaje))
+        def update():
+            try:
+                self.elementos_ui['label_estado'].config(text=mensaje)
+            except:
+                pass
+        
+        self.master.after(0, update)
 
     def actualizar_info_cache(self, mensaje):
         """Actualiza la información de carpeta y caché"""
-        self.master.after(0, lambda: self.elementos_ui['label_carpeta_info'].config(text=mensaje))
+        def update():
+            try:
+                self.elementos_ui['label_carpeta_info'].config(text=mensaje)
+            except:
+                pass
+        
+        self.master.after(0, update)
