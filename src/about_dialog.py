@@ -1,74 +1,62 @@
+# src/about_dialog.py - Diálogo Acerca de V.4.1
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk
 from .constants import Colors, Fonts
 
 class AboutDialog:
     def __init__(self, parent, version):
         self.parent = parent
         self.version = version
+        self.dialog = None
     
     def mostrar_acerca_de(self):
-        """Muestra el diálogo 'Acerca de' con información de la aplicación"""
-        mensaje = f"""🔍 Búsqueda Rápida de Carpetas
-        
-Versión: {self.version}
-Inspirada en: La Divina Comedia de Dante Alighieri
-
-👨‍💻 Desarrollado por:
-Elkin Darío Pérez Puyana
-
-🤖 En co-creación con los modelos IA:
-Claude (Claude-3.5-Sonnet)
-DeepSeek Chat (DeepSeek-V3)
-
-🎯 Características V. 3.6:
-• Progreso simplificado: Solo porcentaje visible
-• Interfaz ultra-compacta: Barras perfectamente pegadas
-• Layout estabilizado: Cero movimientos durante operaciones
-• Búsqueda híbrida ultra-rápida
-• Cache inteligente automático
-• Sistema de entrada dual (numérico/alfanumérico)
-• Arquitectura modular refactorizada
-
-⌨️ Atajos de teclado:
-• F2: Enfocar búsqueda
-• F3: Copiar ruta
-• F4: Abrir carpeta  
-• F5: Cambiar modo entrada
-
-🏗️ Tecnología:
-• Python 3.12+
-• Tkinter (Interfaz)
-• Threading (Rendimiento)
-• Cache en memoria
-
-"Nel mezzo del cammin di nostra vita..."
-- Dante Alighieri
-
-V. 3.6 - Estable: ¡El Inferno completado! 🌟"""
-        
-        messagebox.showinfo("Acerca de", mensaje)
-    
-    def mostrar_acerca_de_avanzado(self):
-        """Muestra una ventana 'Acerca de' más detallada"""
-        if hasattr(self, 'about_window') and self.about_window.winfo_exists():
-            self.about_window.lift()
-            self.about_window.focus()
+        """Muestra el diálogo 'Acerca de'"""
+        if self.dialog and self.dialog.winfo_exists():
+            self.dialog.lift()
+            self.dialog.focus()
             return
             
-        self.about_window = tk.Toplevel(self.parent)
-        self.about_window.title("Acerca de - Búsqueda Rápida de Carpetas")
-        self.about_window.geometry("600x520")
-        self.about_window.configure(bg=Colors.BACKGROUND)
-        self.about_window.resizable(False, False)
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Acerca de - Búsqueda Rápida de Carpetas")
+        self.dialog.geometry("500x400")
+        self.dialog.configure(bg=Colors.BACKGROUND)
+        self.dialog.resizable(False, False)
+        
+        self.dialog.transient(self.parent)
+        self.dialog.grab_set()
         
         # Centrar ventana
-        self.about_window.transient(self.parent)
-        self.about_window.grab_set()
+        self._centrar_ventana()
         
-        # Frame principal
-        main_frame = tk.Frame(self.about_window, bg=Colors.BACKGROUND)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=15)
+        # Crear contenido
+        self._crear_contenido()
+        
+        # Configurar eventos
+        self.dialog.protocol("WM_DELETE_WINDOW", self.dialog.destroy)
+        self.dialog.bind("<Escape>", lambda e: self.dialog.destroy())
+    
+    def _centrar_ventana(self):
+        """Centra la ventana en la pantalla"""
+        self.dialog.update_idletasks()
+        
+        # Obtener dimensiones
+        window_width = self.dialog.winfo_reqwidth()
+        window_height = self.dialog.winfo_reqheight()
+        parent_x = self.parent.winfo_rootx()
+        parent_y = self.parent.winfo_rooty()
+        parent_width = self.parent.winfo_width()
+        parent_height = self.parent.winfo_height()
+        
+        # Calcular posición centrada respecto al padre
+        x = parent_x + (parent_width - window_width) // 2
+        y = parent_y + (parent_height - window_height) // 2
+        
+        self.dialog.geometry(f"+{x}+{y}")
+    
+    def _crear_contenido(self):
+        """Crea el contenido del diálogo"""
+        main_frame = tk.Frame(self.dialog, bg=Colors.BACKGROUND)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Título principal
         title_label = tk.Label(
@@ -83,173 +71,61 @@ V. 3.6 - Estable: ¡El Inferno completado! 🌟"""
         # Versión
         version_label = tk.Label(
             main_frame,
-            text=f"Versión: {self.version}",
-            font=("Segoe UI", 12, "bold"),
-            bg=Colors.BACKGROUND,
-            fg="#d32f2f"
-        )
-        version_label.pack(pady=(0, 5))
-        
-        # Inspiración
-        inspiration_label = tk.Label(
-            main_frame,
-            text="Inspirada en: La Divina Comedia de Dante Alighieri",
-            font=("Segoe UI", 10, "italic"),
+            text=self.version,
+            font=("Segoe UI", 12),
             bg=Colors.BACKGROUND,
             fg="#666666"
         )
-        inspiration_label.pack(pady=(0, 15))
+        version_label.pack(pady=(0, 20))
         
-        # Desarrollador
-        developer_frame = tk.LabelFrame(
+        # Información
+        info_text = """Herramienta profesional para búsqueda rápida de directorios
+con sistema híbrido de cache y exploración de árbol integrada.
+
+🌟 Características principales:
+• Búsqueda híbrida (Cache + Tradicional)
+• Explorador de árbol expandible (V.4.1)
+• Historial de búsquedas integrado
+• Navegación completa por teclado
+• Interfaz moderna y responsiva
+
+⚡ Tecnologías:
+• Python 3.8+
+• Tkinter (GUI nativa)
+• Threading (búsquedas asíncronas)
+• Pickle (persistencia de cache)
+
+📋 Inspirado en "La Divina Comedia" de Dante:
+V.4.0 Purgatorio - Purificación del código
+V.4.1 Purgatorio - Explorador integrado"""
+        
+        info_label = tk.Label(
             main_frame,
-            text="👨‍💻 Desarrollado por",
-            font=("Segoe UI", 10, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TITLE_FG,
-            padx=10,
-            pady=5
-        )
-        developer_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        developer_label = tk.Label(
-            developer_frame,
-            text="Elkin Darío Pérez Puyana",
-            font=("Segoe UI", 10, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.INFO_FG
-        )
-        developer_label.pack()
-        
-        # Co-creación IA
-        ia_frame = tk.LabelFrame(
-            main_frame,
-            text="🤖 En co-creación con los modelos IA",
-            font=("Segoe UI", 10, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TITLE_FG,
-            padx=10,
-            pady=5
-        )
-        ia_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        ia_label = tk.Label(
-            ia_frame,
-            text="Claude (Claude-3.5-Sonnet)\nDeepSeek Chat (DeepSeek-V3)",
+            text=info_text,
             font=("Segoe UI", 9),
             bg=Colors.BACKGROUND,
-            fg="#666666",
-            justify=tk.LEFT
+            fg=Colors.INFO_FG,
+            justify=tk.LEFT,
+            wraplength=450
         )
-        ia_label.pack()
+        info_label.pack(pady=(0, 20))
         
-        # Características V. 3.6
-        features_frame = tk.LabelFrame(
+        # Separador
+        separator = ttk.Separator(main_frame, orient='horizontal')
+        separator.pack(fill=tk.X, pady=(0, 15))
+        
+        # Información del desarrollador
+        dev_label = tk.Label(
             main_frame,
-            text="🎯 Características V. 3.6 - Estable",
-            font=("Segoe UI", 10, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TITLE_FG,
-            padx=10,
-            pady=10
-        )
-        features_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        features_text = """• Progreso simplificado: Solo porcentaje visible
-• Interfaz ultra-compacta: Barras perfectamente pegadas
-• Layout estabilizado: Cero movimientos durante operaciones
-• Búsqueda híbrida ultra-rápida
-• Cache inteligente automático
-• Sistema de entrada dual (numérico/alfanumérico)
-• Arquitectura modular refactorizada"""
-        
-        features_label = tk.Label(
-            features_frame,
-            text=features_text,
-            font=("Segoe UI", 9),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TREE_FG,
-            justify=tk.LEFT
-        )
-        features_label.pack(anchor=tk.W)
-        
-        # Atajos de teclado
-        shortcuts_frame = tk.LabelFrame(
-            main_frame,
-            text="⌨️ Atajos de teclado",
-            font=("Segoe UI", 10, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TITLE_FG,
-            padx=10,
-            pady=10
-        )
-        shortcuts_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        shortcuts_text = """• F2: Enfocar búsqueda
-• F3: Copiar ruta
-• F4: Abrir carpeta
-• F5: Cambiar modo entrada"""
-        
-        shortcuts_label = tk.Label(
-            shortcuts_frame,
-            text=shortcuts_text,
-            font=("Segoe UI", 9),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TREE_FG,
-            justify=tk.LEFT
-        )
-        shortcuts_label.pack(anchor=tk.W)
-        
-        # Tecnología
-        tech_frame = tk.LabelFrame(
-            main_frame,
-            text="🏗️ Tecnología",
-            font=("Segoe UI", 10, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TITLE_FG,
-            padx=10,
-            pady=10
-        )
-        tech_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        tech_text = """• Python 3.12+
-• Tkinter (Interfaz)
-• Threading (Rendimiento)
-• Cache en memoria"""
-        
-        tech_label = tk.Label(
-            tech_frame,
-            text=tech_text,
-            font=("Segoe UI", 9),
-            bg=Colors.BACKGROUND,
-            fg=Colors.TREE_FG,
-            justify=tk.LEFT
-        )
-        tech_label.pack(anchor=tk.W)
-        
-        # Cita de Dante
-        quote_label = tk.Label(
-            main_frame,
-            text='"Nel mezzo del cammin di nostra vita..."\n- Dante Alighieri',
+            text="Desarrollado con ❤️ para optimizar la gestión de archivos",
             font=("Segoe UI", 9, "italic"),
             bg=Colors.BACKGROUND,
-            fg="#666666",
-            justify=tk.CENTER
+            fg="#666666"
         )
-        quote_label.pack(pady=(10, 15))
-        
-        # Mensaje final V. 3.6
-        final_label = tk.Label(
-            main_frame,
-            text="V. 3.6 - Estable: ¡El Inferno completado! 🌟",
-            font=("Segoe UI", 9, "bold"),
-            bg=Colors.BACKGROUND,
-            fg=Colors.INFO_FG
-        )
-        final_label.pack(pady=(0, 15))
+        dev_label.pack(pady=(0, 15))
         
         # Botón cerrar
-        close_button = tk.Button(
+        btn_cerrar = tk.Button(
             main_frame,
             text="Cerrar",
             font=Fonts.BUTTONS,
@@ -257,41 +133,9 @@ V. 3.6 - Estable: ¡El Inferno completado! 🌟"""
             fg=Colors.BUTTON_FG,
             relief=tk.FLAT,
             borderwidth=1,
-            padx=20,
+            padx=30,
             pady=8,
-            command=self.about_window.destroy,
+            command=self.dialog.destroy,
             cursor="hand2"
         )
-        close_button.pack(anchor=tk.CENTER)
-        
-        # Configurar eventos
-        self.about_window.protocol("WM_DELETE_WINDOW", self.about_window.destroy)
-        self.about_window.bind("<Escape>", lambda e: self.about_window.destroy())
-    
-    @staticmethod
-    def get_app_info():
-        """Retorna información básica de la aplicación como diccionario"""
-        return {
-            "nombre": "Búsqueda Rápida de Carpetas",
-            "version": "V. 3.6 - Estable (Inferno)",
-            "tema": "La Divina Comedia de Dante Alighieri",
-            "desarrollador": "Elkin Darío Pérez Puyana",
-            "co_creacion_ia": ["Claude (Claude-3.5-Sonnet)", "DeepSeek Chat (DeepSeek-V3)"],
-            "tecnologias": ["Python 3.12+", "Tkinter", "Threading", "Cache en memoria"],
-            "caracteristicas": [
-                "Progreso simplificado: Solo porcentaje visible",
-                "Interfaz ultra-compacta: Barras perfectamente pegadas", 
-                "Layout estabilizado: Cero movimientos durante operaciones",
-                "Búsqueda híbrida ultra-rápida",
-                "Cache inteligente automático",
-                "Sistema de entrada dual (numérico/alfanumérico)"
-            ],
-            "atajos": {
-                "F2": "Enfocar búsqueda",
-                "F3": "Copiar ruta", 
-                "F4": "Abrir carpeta",
-                "F5": "Cambiar modo entrada"
-            },
-            "cita": "Nel mezzo del cammin di nostra vita...",
-            "mensaje": "V. 3.6 - Estable: ¡El Inferno completado! 🌟"
-        }
+        btn_cerrar.pack()

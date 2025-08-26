@@ -1,40 +1,29 @@
+# src/ui_callbacks.py - Callbacks de UI V.4.1 (Compatible)
 import tkinter as tk
 from tkinter import messagebox
 
 class UICallbacks:
-    """
-    Interface optimizada entre managers y UI para minimizar movimientos.
-    Responsabilidades:
-    - Actualizar elementos UI con mínimo impacto visual
-    - Manejar callbacks async de forma suave
-    - Evitar redimensionamientos innecesarios
-    """
-    
     def __init__(self, app_instance):
         self.app = app_instance
-        print("DEBUG: UICallbacks inicializado con optimizaciones de estabilidad")
-    
-    # ===== GESTIÓN DE RESULTADOS OPTIMIZADA =====
     
     def limpiar_resultados(self):
-        """Limpia resultados sin afectar layout de tabla"""
+        """Limpia resultados del TreeView"""
         try:
             for item in self.app.tree.get_children():
                 self.app.tree.delete(item)
-            print("DEBUG: Resultados limpiados")
         except Exception as e:
             print(f"ERROR limpiando resultados: {e}")
     
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """
-        Muestra resultados MINIMIZANDO cambios de layout
-        """
-        print(f"DEBUG: Mostrando {len(resultados)} resultados ({metodo}) - modo estable")
-        
+        """Muestra resultados en TreeView V.4.0 (fallback)"""
         self.limpiar_resultados()
         
+        # CORREGIDO: Solo agregar al historial si NO es búsqueda silenciosa
+        if not getattr(self.app.search_coordinator, 'busqueda_silenciosa', False):
+            num_resultados = len(resultados) if resultados else 0
+            self.app._finalizar_busqueda_con_historial(metodo, num_resultados)
+        
         if not resultados:
-            # Mensaje específico según el método
             if metodo == "Cache":
                 mensaje = f"No se encontraron resultados en cache ({tiempo_total:.3f}s)"
             elif metodo == "Tradicional":
@@ -43,153 +32,135 @@ class UICallbacks:
                 mensaje = f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)"
             
             self.actualizar_estado(mensaje)
-            print(f"DEBUG: {mensaje}")
-            
-            # Para búsqueda tradicional, ocultar progreso gradualmente
-            if metodo == "Tradicional":
-                self.app.master.after(1500, self.app.progress_manager.ocultar)
-            
             return
         
-        # Insertar resultados SIN autoajustes agresivos
         try:
-            for nombre, ruta_rel, ruta_abs in resultados:
-                self.app.tree.insert("", "end", values=(metodo, nombre, ruta_rel))
+            # CORREGIDO: Verificar si tree explorer está activo
+            if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
+                # Usar tree explorer para mostrar resultados
+                formatted_results = []
+                for resultado in resultados:
+                    if isinstance(resultado, tuple) and len(resultado) >= 3:
+                        nombre, ruta_rel, ruta_abs = resultado[:3]
+                        formatted_results.append({
+                            'name': nombre,
+                            'path': ruta_abs,
+                            'files': 0,
+                            'size': '0 B'
+                        })
+                    elif isinstance(resultado, dict):
+                        formatted_results.append(resultado)
+                
+                # Mostrar usando tree explorer
+                self.app.tree_explorer.populate_search_results(formatted_results)
+            else:
+                # FALLBACK: Insertar resultados sin columna "Nombre" en TreeView normal
+                for i, resultado in enumerate(resultados):
+                    # Determinar el tag para filas alternadas
+                    tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                    
+                    # Extraer datos según formato
+                    if isinstance(resultado, tuple) and len(resultado) >= 3:
+                        nombre, ruta_rel, ruta_abs = resultado[:3]
+                    elif isinstance(resultado, dict):
+                        nombre = resultado.get('name', 'Sin nombre')
+                        ruta_rel = resultado.get('path', '')
+                        ruta_abs = resultado.get('path', '')
+                    else:
+                        continue
+                    
+                    # CORREGIDO: Solo 2 columnas (Método, Ruta) - el nombre va en la columna del árbol (#0)
+                    item_id = self.app.tree.insert("", "end", 
+                                                  text=f"📁 {nombre}",  # Nombre en columna del árbol
+                                                  values=(metodo, ruta_rel),  # Solo 2 columnas
+                                                  tags=(tag,))
             
-            # Actualización MÍNIMA de UI
-            self._actualizar_ui_minimal()
-            
-            # Mensaje de estado
-            mensaje = f"Encontrados {len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})"
+            mensaje = f"✅ Encontrados {len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})"
             self.actualizar_estado(mensaje)
-            print(f"DEBUG: {mensaje}")
+            
+            # Configurar scrollbars después de insertar datos
+            self.app.configurar_scrollbars()
             
         except Exception as e:
-            print(f"ERROR mostrando resultados: {e}")
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
     
     def mostrar_resultados_async(self, resultados, metodo, tiempo_total):
-        """Versión async optimizada"""
+        """Versión asíncrona de mostrar_resultados"""
         self.app.master.after(0, lambda: self.mostrar_resultados(resultados, metodo, tiempo_total))
     
-    # ===== GESTIÓN DE ESTADO =====
-    
+    # Gestión de estado
     def actualizar_estado(self, mensaje):
-        """Actualiza estado sin afectar layout"""
+        """Actualiza mensaje en barra de estado"""
         try:
             self.app.label_estado.config(text=mensaje)
-            # Actualización mínima, sin update_idletasks excesivo
-            print(f"DEBUG: Estado: {mensaje}")
         except Exception as e:
             print(f"ERROR actualizando estado: {e}")
     
     def actualizar_estado_async(self, mensaje):
-        """Versión async"""
+        """Versión asíncrona de actualizar_estado"""
         self.app.master.after(0, lambda: self.actualizar_estado(mensaje))
     
-    # ===== GESTIÓN DE PROGRESO =====
-    
-    def actualizar_progreso(self, procesados, total):
-        """Actualiza progreso de forma suave"""
-        try:
-            self.app.progress_manager.actualizar(procesados, total)
-        except Exception as e:
-            print(f"ERROR actualizando progreso: {e}")
-    
-    def actualizar_progreso_async(self, procesados, total):
-        """Versión async con actualización garantizada"""
-        # Actualizar SIEMPRE, sin throttling para evitar inconsistencias
-        self.app.master.after(0, lambda: self.actualizar_progreso(procesados, total))
-    
-    # ===== GESTIÓN DE BOTONES =====
-    
+    # Gestión de botones
     def habilitar_busqueda(self):
-        """Habilita botones sin efectos visuales"""
+        """Habilita botones de búsqueda"""
         try:
             self.app.btn_buscar.config(state=tk.NORMAL)
             self.app.btn_cancelar.config(state=tk.DISABLED)
-            print("DEBUG: Botones habilitados")
         except Exception as e:
             print(f"ERROR habilitando botones: {e}")
     
     def deshabilitar_busqueda(self):
-        """Deshabilita botones sin efectos visuales"""
+        """Deshabilita botones de búsqueda"""
         try:
             self.app.btn_buscar.config(state=tk.DISABLED)
             self.app.btn_cancelar.config(state=tk.NORMAL)
-            print("DEBUG: Botones deshabilitados")
         except Exception as e:
             print(f"ERROR deshabilitando botones: {e}")
     
     def finalizar_busqueda_inmediata(self):
-        """Finaliza búsqueda cache (inmediata)"""
+        """Finaliza búsqueda inmediatamente"""
         self.habilitar_busqueda()
     
     def finalizar_busqueda_async(self):
-        """Finaliza búsqueda tradicional con transición suave"""
+        """Versión asíncrona de finalizar_busqueda"""
         def finalizar():
             self.habilitar_busqueda()
-            # Ocultar progreso con delay más largo para estabilidad
-            self.app.master.after(2000, self.app.progress_manager.ocultar)
         
         self.app.master.after(0, finalizar)
     
-    # ===== DIÁLOGOS DE USUARIO =====
-    
+    # Diálogos de usuario
     def mostrar_advertencia(self, mensaje):
-        """Muestra advertencia"""
+        """Muestra diálogo de advertencia"""
         try:
-            print(f"DEBUG: Advertencia: {mensaje}")
             messagebox.showwarning("Advertencia", mensaje)
         except Exception as e:
             print(f"ERROR mostrando advertencia: {e}")
     
     def mostrar_error(self, mensaje):
-        """Muestra error"""
+        """Muestra diálogo de error"""
         try:
-            print(f"DEBUG: Error: {mensaje}")
             messagebox.showerror("Error", mensaje)
         except Exception as e:
             print(f"ERROR mostrando error: {e}")
     
     def mostrar_info(self, titulo, mensaje):
-        """Muestra información"""
+        """Muestra diálogo informativo"""
         try:
-            print(f"DEBUG: Info: {titulo}")
             messagebox.showinfo(titulo, mensaje)
         except Exception as e:
             print(f"ERROR mostrando info: {e}")
     
-    # ===== OPERACIONES DELEGADAS =====
-    
+    # Operaciones delegadas
     def construir_cache(self):
         """Inicia construcción de cache"""
         try:
-            print("DEBUG: Iniciando construcción de cache")
-            self.app.construir_cache_automatico()
+            self.app.search_coordinator.construir_cache_automatico()
         except Exception as e:
             print(f"ERROR iniciando construcción cache: {e}")
     
-    # ===== UTILIDADES OPTIMIZADAS =====
-    
-    def _actualizar_ui_minimal(self):
-        """Actualización mínima de UI para evitar movimientos"""
-        try:
-            # Solo actualizar scrollbars si realmente es necesario
-            children_count = len(self.app.tree.get_children())
-            
-            # Actualización con delay para evitar "saltos"
-            if children_count > 0:
-                self.app.tree.after(300, self.app.tree.update_scrollbars)
-            
-            print("DEBUG: UI actualizada de forma minimal")
-        except Exception as e:
-            print(f"ERROR en actualización minimal: {e}")
-    
-    # ===== INFORMACIÓN DE ESTADO =====
-    
+    # Información de estado
     def obtener_seleccion_tabla(self):
-        """Obtiene selección de tabla"""
+        """Obtiene información del elemento seleccionado"""
         try:
             selection = self.app.tree.selection()
             if not selection:
@@ -197,12 +168,16 @@ class UICallbacks:
             
             item = self.app.tree.item(selection[0])
             values = item['values']
+            text = item['text']
             
-            if len(values) >= 3:
+            # CORREGIDO: Extraer nombre del texto del árbol y ajustar para nueva estructura
+            nombre = text.replace("📁 ", "").replace("📂 ", "")
+            
+            if len(values) >= 2:
                 return {
                     'metodo': values[0],
-                    'nombre': values[1],
-                    'ruta_rel': values[2]
+                    'nombre': nombre,
+                    'ruta_rel': values[1]  # Ajustado para nueva estructura sin columna Nombre
                 }
             return None
             
@@ -211,7 +186,7 @@ class UICallbacks:
             return None
     
     def hay_seleccion(self):
-        """Verifica si hay selección en tabla"""
+        """Verifica si hay algún elemento seleccionado"""
         try:
             return len(self.app.tree.selection()) > 0
         except:
