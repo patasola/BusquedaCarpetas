@@ -1,4 +1,4 @@
-# src/ui_state_manager.py - Gestión de Estado de UI V.4.1 (Corregido)
+# src/ui_state_manager.py - Gestión de Estado de UI V.4.2 (Refactorizado)
 import tkinter as tk
 
 class UIStateManager:
@@ -6,43 +6,30 @@ class UIStateManager:
     
     def __init__(self, app):
         self.app = app
-        self.modo_entrada = "normal"  # normal, buscando, error
+        self.modo_entrada = "normal"
     
     def configurar_validacion(self):
         """Configura la validación del campo de entrada"""
         try:
-            # Registrar función de validación
             vcmd = (self.app.master.register(self._validar_entrada), '%P')
-            
-            # Configurar validación en el Entry
-            self.app.entry.configure(
-                validate="key",
-                validatecommand=vcmd
-            )
-            
-            # Configurar evento de cambio para habilitar/deshabilitar botón buscar
+            self.app.entry.configure(validate="key", validatecommand=vcmd)
             self.app.entry.bind('<KeyRelease>', self.on_entry_change)
-            
         except Exception as e:
             print(f"Error configurando validación: {e}")
     
     def _validar_entrada(self, nuevo_texto):
         """Valida el texto de entrada en tiempo real"""
         try:
-            # Permitir texto vacío
             if not nuevo_texto:
                 self._actualizar_boton_buscar(False)
                 return True
             
-            # Validar longitud mínima
             if len(nuevo_texto.strip()) >= 1:
                 self._actualizar_boton_buscar(True)
             else:
                 self._actualizar_boton_buscar(False)
             
-            # Siempre permitir la entrada (True)
             return True
-            
         except Exception as e:
             print(f"Error en validación: {e}")
             return True
@@ -61,14 +48,26 @@ class UIStateManager:
         """Configura el modo de entrada de texto"""
         self.modo_entrada = modo
         
-        if modo == "buscando":
-            self.app.entry.configure(state='disabled')
-            self.app.btn_buscar.configure(state='disabled', text='Buscando...')
-        elif modo == "error":
-            self.app.entry.configure(bg='#ffebee')
-        else:  # normal
-            self.app.entry.configure(state='normal', bg='white')
-            self.app.btn_buscar.configure(state='normal', text='Buscar')
+        configs = {
+            "buscando": {
+                'entry': {'state': 'disabled'},
+                'btn_buscar': {'state': 'disabled', 'text': 'Buscando...'}
+            },
+            "error": {
+                'entry': {'bg': '#ffebee'}
+            },
+            "normal": {
+                'entry': {'state': 'normal', 'bg': 'white'},
+                'btn_buscar': {'state': 'normal', 'text': 'Buscar'}
+            }
+        }
+        
+        config = configs.get(modo, configs["normal"])
+        
+        if 'entry' in config:
+            self.app.entry.configure(**config['entry'])
+        if 'btn_buscar' in config:
+            self.app.btn_buscar.configure(**config['btn_buscar'])
     
     def validar_entrada(self, texto):
         """Valida el texto de entrada"""
@@ -84,11 +83,9 @@ class UIStateManager:
         """Actualiza el estado de los botones según la selección"""
         estado = 'normal' if hay_seleccion else 'disabled'
         
-        if hasattr(self.app, 'btn_copiar'):
-            self.app.btn_copiar.configure(state=estado)
-        
-        if hasattr(self.app, 'btn_abrir'):
-            self.app.btn_abrir.configure(state=estado)
+        for btn_attr in ['btn_copiar', 'btn_abrir']:
+            if hasattr(self.app, btn_attr):
+                getattr(self.app, btn_attr).configure(state=estado)
     
     def cambiar_modo_entrada(self):
         """Cambia entre modo numérico y alfanumérico"""
@@ -116,7 +113,6 @@ class UIStateManager:
         try:
             texto = self.app.entry.get().strip()
             
-            # Habilitar/deshabilitar botón buscar
             if texto and hasattr(self.app, 'ruta_carpeta') and self.app.ruta_carpeta:
                 self.app.btn_buscar.configure(state='normal')
             else:

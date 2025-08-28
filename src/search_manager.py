@@ -1,4 +1,4 @@
-# src/search_manager.py - Gestión de Búsquedas V.3.6
+# src/search_manager.py - Gestión de Búsquedas V.4.2 (Refactorizado)
 import threading
 import time
 
@@ -14,6 +14,7 @@ class SearchManager:
         self.busqueda_activa = False
     
     def buscar(self, criterio):
+        """Ejecuta búsqueda con validación y preparación"""
         if not self._validar_busqueda(criterio):
             return False
             
@@ -25,6 +26,7 @@ class SearchManager:
         return self._iniciar_busqueda_tradicional(criterio)
     
     def _validar_busqueda(self, criterio):
+        """Valida criterio y configuración"""
         if not criterio:
             self.ui_callbacks.mostrar_advertencia("Ingrese un criterio de búsqueda")
             return False
@@ -36,6 +38,7 @@ class SearchManager:
         return True
     
     def _preparar_busqueda(self, criterio):
+        """Prepara variables para nueva búsqueda"""
         self.ultimo_criterio = criterio
         self.tiempo_inicio = time.time()
         self.busqueda_activa = True
@@ -44,6 +47,7 @@ class SearchManager:
         self.ui_callbacks.actualizar_estado("Buscando...")
     
     def _buscar_en_cache(self, criterio):
+        """Intenta búsqueda en cache primero"""
         if not self.cache_manager.cache.valido:
             self.ui_callbacks.actualizar_estado("Cache no disponible. Construyendo cache...")
             self.ui_callbacks.construir_cache()
@@ -57,14 +61,16 @@ class SearchManager:
                 return True
             else:
                 tiempo_cache = time.time() - self.tiempo_inicio
-                self.ui_callbacks.actualizar_estado(f"Cache sin resultados ({tiempo_cache:.3f}s), buscando tradicionalmente...")
+                self.ui_callbacks.actualizar_estado(
+                    f"Cache sin resultados ({tiempo_cache:.3f}s), buscando tradicionalmente..."
+                )
                 return False
         
         self.ui_callbacks.actualizar_estado("Error en cache, buscando en directorios...")
         return False
     
     def _iniciar_busqueda_tradicional(self, criterio):
-        # Progreso en barra de estado en lugar de progress_manager
+        """Inicia búsqueda tradicional en thread separado"""
         self.ui_callbacks.actualizar_estado("Búsqueda tradicional iniciada... 0%")
         
         def callback_progreso(procesados, total):
@@ -85,6 +91,7 @@ class SearchManager:
         return True
     
     def _ejecutar_busqueda_tradicional(self, criterio):
+        """Ejecuta búsqueda tradicional y maneja resultados"""
         try:
             resultados = self.search_engine.buscar_tradicional(criterio)
             
@@ -115,6 +122,7 @@ class SearchManager:
             self.busqueda_activa = False
     
     def _finalizar_busqueda_exitosa(self, resultados, metodo):
+        """Finaliza búsqueda exitosa y actualiza UI"""
         tiempo_total = time.time() - self.tiempo_inicio
         self.resultados = resultados
         self.busqueda_activa = False
@@ -123,16 +131,19 @@ class SearchManager:
         self.ui_callbacks.finalizar_busqueda_inmediata()
     
     def cancelar(self):
+        """Cancela búsqueda en curso"""
         if self.busqueda_activa:
             self.search_engine.cancelar_busqueda()
             self.ui_callbacks.actualizar_estado("Búsqueda cancelada")
             self.busqueda_activa = False
     
     def actualizar_componentes(self, cache_manager, search_engine):
+        """Actualiza componentes de cache y search engine"""
         self.cache_manager = cache_manager
         self.search_engine = search_engine
     
     def get_estado(self):
+        """Obtiene estado actual del manager"""
         return {
             "activa": self.busqueda_activa,
             "ultimo_criterio": self.ultimo_criterio,

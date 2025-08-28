@@ -1,4 +1,4 @@
-# src/utils.py - Utilidades del sistema V.4.1
+# src/utils.py - Utilidades del sistema V.4.2 (Refactorizado)
 import os
 import subprocess
 import platform
@@ -9,20 +9,18 @@ def abrir_carpeta(ruta):
     try:
         sistema = platform.system()
         
-        if sistema == "Windows":
-            # Windows - usar explorer
-            subprocess.run(['explorer', ruta], check=True)
-        elif sistema == "Darwin":
-            # macOS - usar open
-            subprocess.run(['open', ruta], check=True)
-        elif sistema == "Linux":
-            # Linux - usar xdg-open
-            subprocess.run(['xdg-open', ruta], check=True)
-        else:
-            # Sistema no soportado
-            return False
-            
-        return True
+        commands = {
+            "Windows": ['explorer', ruta],
+            "Darwin": ['open', ruta],
+            "Linux": ['xdg-open', ruta]
+        }
+        
+        command = commands.get(sistema)
+        if command:
+            subprocess.run(command, check=True)
+            return True
+        
+        return False
         
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         return False
@@ -30,18 +28,12 @@ def abrir_carpeta(ruta):
 def copiar_portapapeles(texto):
     """Copia texto al portapapeles"""
     try:
-        # Crear ventana temporal invisible para acceder al portapapeles
         root = tk.Tk()
-        root.withdraw()  # Ocultar ventana
+        root.withdraw()
         
-        # Limpiar portapapeles y copiar texto
         root.clipboard_clear()
         root.clipboard_append(texto)
-        
-        # Asegurar que el texto se mantenga en el portapapeles
         root.update()
-        
-        # Destruir ventana temporal
         root.destroy()
         
         return True
@@ -80,7 +72,7 @@ def formatear_tamaño_archivo(tamaño_bytes):
     unidades = ['B', 'KB', 'MB', 'GB', 'TB']
     i = 0
     
-    while tamaño_bytes >= 1024 and i < len(unidades) - 1:
+    while tamaño_bytes >= 1024.0 and i < len(unidades) - 1:
         tamaño_bytes /= 1024.0
         i += 1
     

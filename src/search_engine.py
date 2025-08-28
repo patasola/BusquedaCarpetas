@@ -1,9 +1,9 @@
-# src/search_engine.py - Motor de Búsqueda V.4.1 (Búsqueda Tradicional Corregida)
+# src/search_engine.py - Motor de Búsqueda V.4.2 (Refactorizado)
 import os
 import time
 
 class SearchEngine:
-    """Motor de búsqueda tradicional de carpetas"""
+    """Motor de búsqueda tradicional de carpetas optimizado"""
     
     def __init__(self, ruta_base):
         self.ruta_base = ruta_base
@@ -18,10 +18,7 @@ class SearchEngine:
     
     def buscar_tradicional(self, criterio):
         """Realiza búsqueda tradicional en el sistema de archivos"""
-        print(f"🔍 SEARCH_ENGINE: Iniciando búsqueda tradicional para '{criterio}'")
-        
         if not self.ruta_base or not os.path.exists(self.ruta_base):
-            print(f"❌ SEARCH_ENGINE: Ruta base inválida: {self.ruta_base}")
             return []
         
         self.busqueda_cancelada = False
@@ -30,62 +27,47 @@ class SearchEngine:
         resultados = []
         criterio_lower = criterio.lower()
         procesados = 0
+        total_estimado = self._estimar_carpetas_rapido()
         
         try:
-            print(f"🔍 SEARCH_ENGINE: Escaneando desde {self.ruta_base}")
-            
-            # Obtener estimación inicial de carpetas para progreso
-            total_estimado = self._estimar_carpetas_rapido()
-            
             for root, dirs, files in os.walk(self.ruta_base):
-                # Verificar si la búsqueda fue cancelada
                 if self.busqueda_cancelada:
-                    print("🔍 SEARCH_ENGINE: Búsqueda cancelada")
                     break
                 
-                # Procesar cada directorio en el nivel actual
-                for dirname in dirs[:]:  # Usar slice para permitir modificación
-                    if self.busqueda_cancelada:
+                # Procesar directorios
+                for dirname in dirs[:]:
+                    if self.busqueda_cancelada or len(resultados) >= 1000:
                         break
                         
-                    # Verificar si coincide con el criterio
                     if criterio_lower in dirname.lower():
                         ruta_completa = os.path.join(root, dirname)
                         ruta_relativa = os.path.relpath(ruta_completa, self.ruta_base)
                         
-                        resultado = (dirname, ruta_relativa, ruta_completa)
-                        resultados.append(resultado)
+                        resultados.append((dirname, ruta_relativa, ruta_completa))
                         
-                        print(f"✅ SEARCH_ENGINE: Encontrado: {dirname}")
-                        
-                        # Limitar resultados para evitar lentitud extrema
                         if len(resultados) >= 1000:
-                            print(f"🔍 SEARCH_ENGINE: Límite de 1000 resultados alcanzado")
                             break
                     
                     procesados += 1
                     
-                    # Callback de progreso si existe
+                    # Callback de progreso
                     if self.callback_progreso and procesados % 25 == 0:
                         try:
                             porcentaje = min(int((procesados / total_estimado) * 100), 99) if total_estimado > 0 else 0
                             self.callback_progreso(porcentaje, 100, f"Búsqueda tradicional... {len(resultados)} encontradas")
-                        except Exception as e:
-                            print(f"⚠️ Error en callback progreso: {e}")
+                        except Exception:
+                            pass
                 
-                # Limitar profundidad para evitar búsquedas extremadamente largas
+                # Limitar profundidad
                 depth = root.replace(self.ruta_base, '').count(os.sep)
-                if depth >= 8:  # Máximo 8 niveles de profundidad
-                    dirs.clear()  # No continuar más profundo en esta rama
+                if depth >= 8:
+                    dirs.clear()
                     
-                # Si ya tenemos muchos resultados, detener la búsqueda
                 if len(resultados) >= 1000:
                     break
                     
-        except (PermissionError, OSError) as e:
-            print(f"⚠️ SEARCH_ENGINE: Error de permisos: {e}")
-        except Exception as e:
-            print(f"❌ SEARCH_ENGINE: Error inesperado: {e}")
+        except (PermissionError, OSError):
+            pass
         finally:
             self.busqueda_activa = False
             if self.callback_progreso:
@@ -94,34 +76,24 @@ class SearchEngine:
                 except:
                     pass
         
-        print(f"🔍 SEARCH_ENGINE: Búsqueda tradicional completada. {len(resultados)} resultados encontrados")
         return resultados
     
     def _estimar_carpetas_rapido(self):
-        """Hace una estimación rápida del número total de carpetas"""
+        """Estimación rápida del número total de carpetas"""
         try:
             if not self.ruta_base or not os.path.exists(self.ruta_base):
-                return 1000  # Estimación por defecto
+                return 1000
             
-            # Contar carpetas solo en el primer nivel para estimación
-            primer_nivel = 0
-            for item in os.listdir(self.ruta_base):
-                item_path = os.path.join(self.ruta_base, item)
-                if os.path.isdir(item_path):
-                    primer_nivel += 1
+            primer_nivel = sum(1 for item in os.listdir(self.ruta_base)
+                             if os.path.isdir(os.path.join(self.ruta_base, item)))
             
-            # Estimación basada en primer nivel (multiplicador conservador)
-            estimacion = max(primer_nivel * 50, 100)  # Mínimo 100, escalado por 50
-            print(f"🔍 SEARCH_ENGINE: Estimación de carpetas: {estimacion}")
-            return estimacion
+            return max(primer_nivel * 50, 100)
             
-        except Exception as e:
-            print(f"⚠️ Error en estimación: {e}")
-            return 1000  # Valor por defecto seguro
+        except Exception:
+            return 1000
     
     def cancelar_busqueda(self):
         """Cancela la búsqueda en curso"""
-        print("🔍 SEARCH_ENGINE: Cancelando búsqueda...")
         self.busqueda_cancelada = True
         self.busqueda_activa = False
     

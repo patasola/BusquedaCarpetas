@@ -1,4 +1,4 @@
-# src/config.py - Gestor de Configuración V.4.1 (Optimizado)
+# src/config.py - Gestor de Configuración V.4.2 (Refactorizado)
 import os
 import json
 
@@ -9,61 +9,62 @@ class ConfigManager:
         self.config_file = "config.json"
         self.default_config = {
             "ruta_carpeta": os.path.expanduser("~"),
-            "version": "4.1"
+            "version": "4.2"
         }
-        self.config = self.cargar_config()
+        self.config = self._load_config()
     
-    def cargar_config(self):
-        """Carga la configuración desde el archivo"""
+    def _load_config(self):
+        """Carga configuración con fallback a defaults"""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    # Asegurar que tiene todas las claves necesarias
-                    for key, value in self.default_config.items():
-                        if key not in config:
-                            config[key] = value
-                    return config
+                    # Merge con defaults para claves faltantes
+                    return {**self.default_config, **config}
         except Exception:
             pass
         
         return self.default_config.copy()
     
-    def guardar_config(self):
-        """Guarda la configuración al archivo"""
+    def _save_config(self):
+        """Guarda configuración a archivo"""
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
         except Exception:
             pass
     
-    def get_ruta_carpeta(self):
-        """Obtiene la ruta de la carpeta base"""
+    def cargar_ruta(self):
+        """Obtiene ruta válida de carpeta base"""
         ruta = self.config.get("ruta_carpeta", self.default_config["ruta_carpeta"])
         
-        # Verificar que la ruta existe, si no usar el directorio home
+        # Validar existencia, usar home si no existe
         if not os.path.exists(ruta):
             ruta = os.path.expanduser("~")
-            self.set_ruta_carpeta(ruta)
+            self.guardar_ruta(ruta)
         
         return ruta
     
-    def set_ruta_carpeta(self, ruta):
-        """Establece la ruta de la carpeta base"""
+    def guardar_ruta(self, ruta):
+        """Guarda ruta si es válida"""
         if os.path.exists(ruta):
             self.config["ruta_carpeta"] = ruta
-            self.guardar_config()
+            self._save_config()
             return True
         return False
     
-    def cargar_ruta(self):
-        """Obtiene la ruta de la carpeta base (alias para compatibilidad)"""
-        return self.get_ruta_carpeta()
+    # Métodos de compatibilidad
+    def cargar_config(self):
+        return self._load_config()
     
-    def guardar_ruta(self, ruta):
-        """Establece la ruta de la carpeta base (alias para compatibilidad)"""
-        return self.set_ruta_carpeta(ruta)
+    def guardar_config(self):
+        self._save_config()
+    
+    def get_ruta_carpeta(self):
+        return self.cargar_ruta()
+    
+    def set_ruta_carpeta(self, ruta):
+        return self.guardar_ruta(ruta)
     
     def get_version(self):
-        """Obtiene la versión de la aplicación"""
         return self.config.get("version", self.default_config["version"])

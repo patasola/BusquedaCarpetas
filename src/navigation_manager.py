@@ -1,21 +1,18 @@
-# src/navigation_manager.py - Gestión de Navegación V.4.1
+# src/navigation_manager.py - Gestión de Navegación V.4.2 (Refactorizado)
 import tkinter as tk
 
 class NavigationManager:
-    """Maneja la navegación por Tab y layout de la aplicación"""
+    """Maneja navegación por Tab, layout y ajuste de columnas"""
     
     def __init__(self, app):
         self.app = app
     
     def configurar_navegacion(self):
         """Configura la navegación inicial"""
-        # Configurar después de que todos los elementos estén creados
         self.app.master.after_idle(self._configurar_navegacion_tab)
     
     def _configurar_navegacion_tab(self):
-        """Configura la navegación por Tab incluyendo el historial si está visible"""
-        
-        # Orden básico de navegación
+        """Configura navegación por Tab incluyendo historial si está visible"""
         elementos_navegacion = [
             self.app.entry,
             self.app.btn_buscar,
@@ -25,13 +22,11 @@ class NavigationManager:
             self.app.btn_abrir
         ]
         
-        # Agregar historial al final si está visible
-        if (hasattr(self.app, 'historial_manager') and 
-            self.app.historial_manager.visible and 
-            self.app.historial_manager.tree):
+        # Agregar historial si está visible
+        if self._historial_visible():
             elementos_navegacion.append(self.app.historial_manager.tree)
         
-        # Configurar takefocus para todos los elementos
+        # Configurar takefocus
         for elemento in elementos_navegacion:
             if hasattr(elemento, 'configure'):
                 try:
@@ -39,18 +34,8 @@ class NavigationManager:
                 except:
                     pass
         
-        # Limpiar todos los bindings anteriores
-        all_widgets = [self.app.entry, self.app.btn_buscar, self.app.btn_cancelar, 
-                      self.app.tree, self.app.btn_copiar, self.app.btn_abrir]
-        if hasattr(self.app, 'historial_manager') and self.app.historial_manager.tree:
-            all_widgets.append(self.app.historial_manager.tree)
-        
-        for widget in all_widgets:
-            try:
-                widget.unbind("<Tab>")
-                widget.unbind("<Shift-Tab>")
-            except:
-                pass
+        # Limpiar bindings anteriores
+        self._limpiar_bindings(elementos_navegacion)
         
         # Configurar nuevos bindings
         for i, elemento in enumerate(elementos_navegacion):
@@ -63,49 +48,94 @@ class NavigationManager:
             except:
                 pass
     
+    def _historial_visible(self):
+        """Verifica si el historial está visible"""
+        return (hasattr(self.app, 'historial_manager') and 
+                self.app.historial_manager.visible and 
+                self.app.historial_manager.tree)
+    
+    def _limpiar_bindings(self, elementos):
+        """Limpia bindings anteriores"""
+        for widget in elementos:
+            try:
+                widget.unbind("<Tab>")
+                widget.unbind("<Shift-Tab>")
+            except:
+                pass
+    
     def _ir_a_elemento(self, elemento):
         """Navega al elemento especificado"""
         try:
-            # Forzar el foco al elemento
             elemento.focus_set()
             
             if hasattr(elemento, 'get_children'):  # Es un TreeView
                 children = elemento.get_children()
-                if children:
-                    # Si hay elementos en el TreeView, seleccionar el primero si no hay selección
-                    if not elemento.selection():
-                        elemento.selection_set(children[0])
-                        elemento.focus(children[0])
-                        elemento.see(children[0])
-                # Asegurar que el TreeView tenga el foco
-                elemento.focus_set()
-            else:
-                # Para botones y otros elementos
+                if children and not elemento.selection():
+                    elemento.selection_set(children[0])
+                    elemento.focus(children[0])
+                    elemento.see(children[0])
                 elemento.focus_set()
                 
-        except (tk.TclError, AttributeError) as e:
-            # El elemento ya no existe o hay un problema
-            print(f"Error navegando a elemento: {e}")
+        except (tk.TclError, AttributeError):
             pass
         
         return "break"
     
     def actualizar_navegacion_tab(self):
-        """Actualiza la navegación por Tab cuando cambia la visibilidad del historial"""
-        # Llamar inmediatamente y también con delay para asegurar
+        """Actualiza navegación Tab cuando cambia visibilidad del historial"""
         self._configurar_navegacion_tab()
         self.app.master.after(50, self._configurar_navegacion_tab)
+        self._ajustar_columnas_tree()
     
     def ajustar_layout_para_historial(self, mostrar_historial):
-        """Ajusta el layout cuando se muestra/oculta el historial"""
-        if mostrar_historial:
-            # CORREGIDO: Contraer más el contenedor principal para hacer espacio al historial
-            self.app.main_container.configure(width=600)  # Reducido de 700 a 600
-            self.app.main_container.pack_configure(side=tk.LEFT, fill=tk.Y, padx=(20, 0))  # Menos padding
+        """Ajusta layout cuando se muestra/oculta historial"""
+        try:
+            if mostrar_historial:
+                # Reducir ancho del contenedor principal
+                self.app.main_container.pack_forget()
+                self.app.main_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(20, 5), pady=10)
+            else:
+                # Restaurar contenedor original
+                self.app.main_container.pack_forget()
+                self.app.main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+            
+            self._ajustar_columnas_tree()
+            self.app.master.update_idletasks()
+            
+        except Exception as e:
+            print(f"Error en ajustar_layout_para_historial: {e}")
+    
+    def _ajustar_columnas_tree(self):
+        """Ajusta columnas del TreeView según espacio disponible"""
+        try:
+            historial_visible = self._historial_visible()
+            
+            if historial_visible:
+                # Modo compacto - historial visible
+                configuracion = {
+                    "#0": {"width": 180, "minwidth": 120},
+                    "Método": {"width": 25, "minwidth": 22},
+                    "Ruta": {"width": 300, "minwidth": 200}
+                }
+            else:
+                # Modo normal - historial oculto
+                configuracion = {
+                    "#0": {"width": 200, "minwidth": 150},
+                    "Método": {"width": 35, "minwidth": 30},
+                    "Ruta": {"width": 400, "minwidth": 250}
+                }
+            
+            for col, config in configuracion.items():
+                self.app.tree.column(col, **config)
+            
+            self.app.tree.update_idletasks()
+            
+        except Exception as e:
+            print(f"Error ajustando columnas: {e}")
+    
+    def toggle_historial(self):
+        """Método de compatibilidad para alternar historial"""
+        if hasattr(self.app, 'historial_manager'):
+            self.app.historial_manager.toggle_visibility()
         else:
-            # Expandir el contenedor principal a todo el ancho
-            self.app.main_container.configure(width=1050)  # Ancho completo
-            self.app.main_container.pack_configure(side=tk.TOP, fill=tk.BOTH, expand=True, padx=30)
-        
-        # Forzar actualización
-        self.app.master.update_idletasks()
+            print("ERROR: historial_manager no disponible")

@@ -1,4 +1,4 @@
-# src/window_manager.py - Gestión de Ventana V.4.1 (Centrado Corregido)
+# src/window_manager.py - Gestión de Ventana V.4.2 (Refactorizado)
 from .ui_components import Colors
 
 class WindowManager:
@@ -10,39 +10,28 @@ class WindowManager:
     
     def configurar_ventana(self):
         """Configura las propiedades básicas de la ventana"""
-        # Configurar título y fondo
         self.master.title(f"Búsqueda de Carpetas v{self.version}")
         self.master.configure(bg=Colors.BACKGROUND)
         self.master.resizable(True, True)
         
-        # Configurar tamaño inicial
-        window_width = 1200
-        window_height = 700
-        
-        # Obtener dimensiones de la pantalla
+        # Configurar tamaño y posición inicial
+        window_width, window_height = 1200, 700
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
         
-        # Calcular posición centrada
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         
-        # Aplicar geometría con posición centrada
         self.master.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        
-        # Configurar tamaño mínimo
         self.master.minsize(800, 500)
-        
-        # Forzar actualización para asegurar centrado
         self.master.update_idletasks()
         
-        # Opcional: Centrar nuevamente después de que se carguen todos los componentes
+        # Re-centrar después de cargar componentes
         self.master.after(100, self._recentrar_si_necesario)
     
     def _recentrar_si_necesario(self):
         """Re-centra la ventana si no está en la posición correcta"""
         try:
-            # Obtener posición actual
             self.master.update_idletasks()
             
             current_x = self.master.winfo_x()
@@ -50,48 +39,34 @@ class WindowManager:
             current_width = self.master.winfo_width()
             current_height = self.master.winfo_height()
             
-            # Obtener dimensiones de pantalla
             screen_width = self.master.winfo_screenwidth()
             screen_height = self.master.winfo_screenheight()
             
-            # Calcular posición ideal centrada
             ideal_x = (screen_width - current_width) // 2
             ideal_y = (screen_height - current_height) // 2
             
-            # Si la ventana no está cerca del centro, recentrarla
             if abs(current_x - ideal_x) > 100 or abs(current_y - ideal_y) > 100:
                 self.master.geometry(f"{current_width}x{current_height}+{ideal_x}+{ideal_y}")
                 
-        except Exception as e:
-            # Si hay algún error, ignorar silenciosamente
+        except Exception:
             pass
     
     def centrar_ventana(self):
-        """Centra la ventana en la pantalla (método público)"""
+        """Centra la ventana en la pantalla"""
         try:
             self.master.update_idletasks()
             
-            # Obtener dimensiones actuales de la ventana
             window_width = self.master.winfo_width()
             window_height = self.master.winfo_height()
-            
-            # Obtener dimensiones de la pantalla
             screen_width = self.master.winfo_screenwidth()
             screen_height = self.master.winfo_screenheight()
             
-            # Calcular posición centrada
-            x = (screen_width - window_width) // 2
-            y = (screen_height - window_height) // 2
+            x = max(0, min((screen_width - window_width) // 2, screen_width - window_width))
+            y = max(0, min((screen_height - window_height) // 2, screen_height - window_height))
             
-            # Asegurar que no quede fuera de la pantalla
-            x = max(0, min(x, screen_width - window_width))
-            y = max(0, min(y, screen_height - window_height))
-            
-            # Aplicar nueva posición
             self.master.geometry(f"{window_width}x{window_height}+{x}+{y}")
             
-        except Exception as e:
-            # Si hay error, usar posición por defecto
+        except Exception:
             self.master.geometry("1200x700+100+100")
     
     def maximizar_ventana(self):

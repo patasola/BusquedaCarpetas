@@ -1,4 +1,4 @@
-# src/about_dialog.py - Diálogo Acerca de V.4.1
+# src/about_dialog.py - Diálogo Acerca de V.4.2 (Refactorizado)
 import tkinter as tk
 from tkinter import ttk
 from .constants import Colors, Fonts
@@ -16,41 +16,29 @@ class AboutDialog:
             self.dialog.focus()
             return
             
+        self._crear_ventana()
+        self._crear_contenido()
+        self._configurar_eventos()
+    
+    def _crear_ventana(self):
+        """Crea y configura la ventana"""
         self.dialog = tk.Toplevel(self.parent)
         self.dialog.title("Acerca de - Búsqueda Rápida de Carpetas")
-        self.dialog.geometry("500x400")
+        self.dialog.geometry("480x520")  # Aumentado a 520px
         self.dialog.configure(bg=Colors.BACKGROUND)
         self.dialog.resizable(False, False)
-        
         self.dialog.transient(self.parent)
         self.dialog.grab_set()
         
         # Centrar ventana
-        self._centrar_ventana()
-        
-        # Crear contenido
-        self._crear_contenido()
-        
-        # Configurar eventos
-        self.dialog.protocol("WM_DELETE_WINDOW", self.dialog.destroy)
-        self.dialog.bind("<Escape>", lambda e: self.dialog.destroy())
-    
-    def _centrar_ventana(self):
-        """Centra la ventana en la pantalla"""
         self.dialog.update_idletasks()
-        
-        # Obtener dimensiones
-        window_width = self.dialog.winfo_reqwidth()
-        window_height = self.dialog.winfo_reqheight()
         parent_x = self.parent.winfo_rootx()
         parent_y = self.parent.winfo_rooty()
-        parent_width = self.parent.winfo_width()
-        parent_height = self.parent.winfo_height()
+        parent_w = self.parent.winfo_width()
+        parent_h = self.parent.winfo_height()
         
-        # Calcular posición centrada respecto al padre
-        x = parent_x + (parent_width - window_width) // 2
-        y = parent_y + (parent_height - window_height) // 2
-        
+        x = parent_x + (parent_w - 480) // 2
+        y = parent_y + (parent_h - 520) // 2  # Ajustado para nueva altura
         self.dialog.geometry(f"+{x}+{y}")
     
     def _crear_contenido(self):
@@ -59,73 +47,73 @@ class AboutDialog:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Título principal
-        title_label = tk.Label(
+        tk.Label(
             main_frame,
-            text="🔍 Búsqueda Rápida de Carpetas",
+            text="Búsqueda Rápida de Carpetas",
             font=("Segoe UI", 16, "bold"),
             bg=Colors.BACKGROUND,
             fg=Colors.TITLE_FG
-        )
-        title_label.pack(pady=(0, 10))
+        ).pack(pady=(0, 10))
         
         # Versión
-        version_label = tk.Label(
+        tk.Label(
             main_frame,
             text=self.version,
             font=("Segoe UI", 12),
             bg=Colors.BACKGROUND,
             fg="#666666"
-        )
-        version_label.pack(pady=(0, 20))
+        ).pack(pady=(0, 20))
         
-        # Información
-        info_text = """Herramienta profesional para búsqueda rápida de directorios
-con sistema híbrido de cache y exploración de árbol integrada.
+        # Información principal - texto más compacto
+        info_text = """Sistema híbrido de cache y exploración de árbol integrada.
 
-🌟 Características principales:
+V.4.2 - Características principales:
 • Búsqueda híbrida (Cache + Tradicional)
-• Explorador de árbol expandible (V.4.1)
-• Historial de búsquedas integrado
+• Explorador de árbol expandible
+• Historial con panel lateral integrado
 • Navegación completa por teclado
-• Interfaz moderna y responsiva
+• Código refactorizado (50% menos líneas)
 
-⚡ Tecnologías:
-• Python 3.8+
-• Tkinter (GUI nativa)
-• Threading (búsquedas asíncronas)
-• Pickle (persistencia de cache)
+Tecnologías:
+• Python 3.8+ con Tkinter nativo
+• Threading asíncrono + Pickle cache
+• Arquitectura modular optimizada
 
-📋 Inspirado en "La Divina Comedia" de Dante:
-V.4.0 Purgatorio - Purificación del código
-V.4.1 Purgatorio - Explorador integrado"""
+Inspirado en "La Divina Comedia":
+V.4.2 Purgatorio - Refactorización completa"""
         
-        info_label = tk.Label(
+        tk.Label(
             main_frame,
             text=info_text,
             font=("Segoe UI", 9),
             bg=Colors.BACKGROUND,
             fg=Colors.INFO_FG,
             justify=tk.LEFT,
-            wraplength=450
-        )
-        info_label.pack(pady=(0, 20))
+            wraplength=440
+        ).pack(pady=(0, 20))
         
         # Separador
-        separator = ttk.Separator(main_frame, orient='horizontal')
-        separator.pack(fill=tk.X, pady=(0, 15))
+        ttk.Separator(main_frame, orient='horizontal').pack(fill=tk.X, pady=(0, 15))
         
         # Información del desarrollador
-        dev_label = tk.Label(
+        tk.Label(
             main_frame,
-            text="Desarrollado con ❤️ para optimizar la gestión de archivos",
+            text="Co-creado por Elkin Darío Pérez Puyana y Claude Sonnet 4",
             font=("Segoe UI", 9, "italic"),
             bg=Colors.BACKGROUND,
             fg="#666666"
-        )
-        dev_label.pack(pady=(0, 15))
+        ).pack(pady=(5, 0))
+        
+        tk.Label(
+            main_frame,
+            text="Desarrollado con colaboración humano-IA para optimizar la gestión de archivos",
+            font=("Segoe UI", 8),
+            bg=Colors.BACKGROUND,
+            fg="#888888"
+        ).pack(pady=(0, 15))
         
         # Botón cerrar
-        btn_cerrar = tk.Button(
+        tk.Button(
             main_frame,
             text="Cerrar",
             font=Fonts.BUTTONS,
@@ -133,9 +121,12 @@ V.4.1 Purgatorio - Explorador integrado"""
             fg=Colors.BUTTON_FG,
             relief=tk.FLAT,
             borderwidth=1,
-            padx=30,
-            pady=8,
+            padx=30, pady=8,
             command=self.dialog.destroy,
             cursor="hand2"
-        )
-        btn_cerrar.pack()
+        ).pack()
+    
+    def _configurar_eventos(self):
+        """Configura eventos de la ventana"""
+        self.dialog.protocol("WM_DELETE_WINDOW", self.dialog.destroy)
+        self.dialog.bind("<Escape>", lambda e: self.dialog.destroy())

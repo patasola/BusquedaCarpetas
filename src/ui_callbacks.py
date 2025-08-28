@@ -1,164 +1,165 @@
-# src/ui_callbacks.py - Callbacks de UI V.4.1 (Compatible)
+# src/ui_callbacks.py - Callbacks de UI V.4.2 (Refactorizado)
 import tkinter as tk
 from tkinter import messagebox
+import os
+import time
 
 class UICallbacks:
     def __init__(self, app_instance):
         self.app = app_instance
-    
+        self._last_adjust_time = 0
+        self._ajuste_en_progreso = False
+
+    def _ajustar_columnas_inmediato(self):
+        """Ajuste de columnas automático optimizado"""
+        if self._ajuste_en_progreso or time.time() - self._last_adjust_time < 0.05:
+            return
+            
+        self._ajuste_en_progreso = True
+        
+        try:
+            tree = self.app.tree
+            if not tree or len(tree.get_children()) == 0:
+                return
+            
+            max_length = 0
+            max_depth = 0
+            
+            def analizar_visibles(parent='', depth=0):
+                nonlocal max_length, max_depth
+                for item in tree.get_children(parent):
+                    texto = tree.item(item, 'text')
+                    if texto:
+                        texto_limpio = texto.replace('📁', '').replace('📂', '').strip()
+                        length_with_depth = len(texto_limpio) + (depth * 2)
+                        
+                        max_length = max(max_length, length_with_depth)
+                        max_depth = max(max_depth, depth)
+                    
+                    if tree.item(item, 'open'):
+                        analizar_visibles(item, depth + 1)
+            
+            analizar_visibles()
+            
+            if max_length == 0:
+                return
+            
+            # Calcular ancho óptimo
+            if max_length <= 12:
+                nuevo_ancho = 200
+            elif max_length <= 20:
+                nuevo_ancho = 200 + (max_length - 12) * 10
+            elif max_length <= 35:
+                nuevo_ancho = 280 + (max_length - 20) * 8
+            elif max_length <= 50:
+                nuevo_ancho = 400 + (max_length - 35) * 6
+            else:
+                nuevo_ancho = min(490 + (max_length - 50) * 4, 600)
+            
+            nuevo_ancho += max_depth * 12
+            
+            # Aplicar si hay diferencia significativa
+            ancho_actual = tree.column('#0', 'width')
+            if abs(nuevo_ancho - ancho_actual) > 5:
+                tree.column('#0', width=nuevo_ancho)
+                self._last_adjust_time = time.time()
+                tree.update_idletasks()
+                
+        except Exception:
+            pass
+        finally:
+            self._ajuste_en_progreso = False
+
     def limpiar_resultados(self):
         """Limpia resultados del TreeView"""
         try:
             for item in self.app.tree.get_children():
                 self.app.tree.delete(item)
         except Exception as e:
-            print(f"ERROR limpiando resultados: {e}")
-    
+            print(f"Error limpiando resultados: {e}")
+
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Muestra resultados en TreeView V.4.0 (fallback)"""
+        """Muestra resultados en TreeView"""
         self.limpiar_resultados()
         
-        # CORREGIDO: Solo agregar al historial si NO es búsqueda silenciosa
-        if not getattr(self.app.search_coordinator, 'busqueda_silenciosa', False):
-            num_resultados = len(resultados) if resultados else 0
-            self.app._finalizar_busqueda_con_historial(metodo, num_resultados)
-        
         if not resultados:
-            if metodo == "Cache":
-                mensaje = f"No se encontraron resultados en cache ({tiempo_total:.3f}s)"
-            elif metodo == "Tradicional":
-                mensaje = f"No se encontraron resultados en la búsqueda tradicional ({tiempo_total:.3f}s)"
-            else:
-                mensaje = f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)"
-            
-            self.actualizar_estado(mensaje)
+            self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
             return
         
         try:
-            # CORREGIDO: Verificar si tree explorer está activo
-            if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
-                # Usar tree explorer para mostrar resultados
-                formatted_results = []
-                for resultado in resultados:
-                    if isinstance(resultado, tuple) and len(resultado) >= 3:
-                        nombre, ruta_rel, ruta_abs = resultado[:3]
-                        formatted_results.append({
-                            'name': nombre,
-                            'path': ruta_abs,
-                            'files': 0,
-                            'size': '0 B'
-                        })
-                    elif isinstance(resultado, dict):
-                        formatted_results.append(resultado)
+            for i, resultado in enumerate(resultados):
+                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                 
-                # Mostrar usando tree explorer
-                self.app.tree_explorer.populate_search_results(formatted_results)
-            else:
-                # FALLBACK: Insertar resultados sin columna "Nombre" en TreeView normal
-                for i, resultado in enumerate(resultados):
-                    # Determinar el tag para filas alternadas
-                    tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                    
-                    # Extraer datos según formato
-                    if isinstance(resultado, tuple) and len(resultado) >= 3:
-                        nombre, ruta_rel, ruta_abs = resultado[:3]
-                    elif isinstance(resultado, dict):
-                        nombre = resultado.get('name', 'Sin nombre')
-                        ruta_rel = resultado.get('path', '')
-                        ruta_abs = resultado.get('path', '')
-                    else:
-                        continue
-                    
-                    # CORREGIDO: Solo 2 columnas (Método, Ruta) - el nombre va en la columna del árbol (#0)
-                    item_id = self.app.tree.insert("", "end", 
-                                                  text=f"📁 {nombre}",  # Nombre en columna del árbol
-                                                  values=(metodo, ruta_rel),  # Solo 2 columnas
-                                                  tags=(tag,))
+                if isinstance(resultado, tuple) and len(resultado) >= 3:
+                    nombre, ruta_rel, ruta_abs = resultado[:3]
+                elif isinstance(resultado, dict):
+                    nombre = resultado.get('name', 'Sin nombre')
+                    ruta_rel = resultado.get('path', '')
+                else:
+                    continue
+                
+                letra_metodo = metodo[0].upper() if metodo else 'C'
+                self.app.tree.insert("", "end",
+                                   text=f"📁 {nombre}",
+                                   values=(letra_metodo, ruta_rel),
+                                   tags=(tag,))
             
-            mensaje = f"✅ Encontrados {len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})"
-            self.actualizar_estado(mensaje)
-            
-            # Configurar scrollbars después de insertar datos
-            self.app.configurar_scrollbars()
+            self.actualizar_estado(f"{len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
+            self._ajustar_columnas_inmediato()
             
         except Exception as e:
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
-    
-    def mostrar_resultados_async(self, resultados, metodo, tiempo_total):
-        """Versión asíncrona de mostrar_resultados"""
-        self.app.master.after(0, lambda: self.mostrar_resultados(resultados, metodo, tiempo_total))
-    
-    # Gestión de estado
+
     def actualizar_estado(self, mensaje):
-        """Actualiza mensaje en barra de estado"""
+        """Actualiza la barra de estado"""
         try:
-            self.app.label_estado.config(text=mensaje)
+            if hasattr(self.app, 'label_estado') and self.app.label_estado:
+                self.app.label_estado.config(text=mensaje)
+                self.app.master.update_idletasks()
         except Exception as e:
-            print(f"ERROR actualizando estado: {e}")
-    
-    def actualizar_estado_async(self, mensaje):
-        """Versión asíncrona de actualizar_estado"""
-        self.app.master.after(0, lambda: self.actualizar_estado(mensaje))
-    
-    # Gestión de botones
-    def habilitar_busqueda(self):
-        """Habilita botones de búsqueda"""
-        try:
-            self.app.btn_buscar.config(state=tk.NORMAL)
-            self.app.btn_cancelar.config(state=tk.DISABLED)
-        except Exception as e:
-            print(f"ERROR habilitando botones: {e}")
-    
+            print(f"Error actualizando estado: {e}")
+
     def deshabilitar_busqueda(self):
         """Deshabilita botones de búsqueda"""
         try:
-            self.app.btn_buscar.config(state=tk.DISABLED)
-            self.app.btn_cancelar.config(state=tk.NORMAL)
+            if hasattr(self.app, 'btn_buscar'):
+                self.app.btn_buscar.config(state='disabled')
+            if hasattr(self.app, 'entry'):
+                self.app.entry.config(state='disabled')
         except Exception as e:
-            print(f"ERROR deshabilitando botones: {e}")
-    
-    def finalizar_busqueda_inmediata(self):
-        """Finaliza búsqueda inmediatamente"""
-        self.habilitar_busqueda()
-    
-    def finalizar_busqueda_async(self):
-        """Versión asíncrona de finalizar_busqueda"""
-        def finalizar():
-            self.habilitar_busqueda()
-        
-        self.app.master.after(0, finalizar)
-    
-    # Diálogos de usuario
+            print(f"Error deshabilitando búsqueda: {e}")
+
+    def habilitar_busqueda(self):
+        """Habilita botones de búsqueda"""
+        try:
+            if hasattr(self.app, 'btn_buscar'):
+                self.app.btn_buscar.config(state='normal')
+            if hasattr(self.app, 'entry'):
+                self.app.entry.config(state='normal')
+        except Exception as e:
+            print(f"Error habilitando búsqueda: {e}")
+
     def mostrar_advertencia(self, mensaje):
         """Muestra diálogo de advertencia"""
         try:
             messagebox.showwarning("Advertencia", mensaje)
         except Exception as e:
-            print(f"ERROR mostrando advertencia: {e}")
-    
+            print(f"Error mostrando advertencia: {e}")
+
     def mostrar_error(self, mensaje):
         """Muestra diálogo de error"""
         try:
             messagebox.showerror("Error", mensaje)
         except Exception as e:
-            print(f"ERROR mostrando error: {e}")
-    
+            print(f"Error mostrando error: {e}")
+
     def mostrar_info(self, titulo, mensaje):
         """Muestra diálogo informativo"""
         try:
             messagebox.showinfo(titulo, mensaje)
         except Exception as e:
-            print(f"ERROR mostrando info: {e}")
-    
-    # Operaciones delegadas
-    def construir_cache(self):
-        """Inicia construcción de cache"""
-        try:
-            self.app.search_coordinator.construir_cache_automatico()
-        except Exception as e:
-            print(f"ERROR iniciando construcción cache: {e}")
-    
-    # Información de estado
+            print(f"Error mostrando info: {e}")
+
     def obtener_seleccion_tabla(self):
         """Obtiene información del elemento seleccionado"""
         try:
@@ -170,24 +171,159 @@ class UICallbacks:
             values = item['values']
             text = item['text']
             
-            # CORREGIDO: Extraer nombre del texto del árbol y ajustar para nueva estructura
             nombre = text.replace("📁 ", "").replace("📂 ", "")
             
             if len(values) >= 2:
+                letra = values[0]
+                ruta_rel = values[1]
+                
+                metodo_map = {"C": "Cache", "T": "Tradicional", "E": "Tree"}
+                metodo_original = metodo_map.get(letra, "Desconocido")
+                
                 return {
-                    'metodo': values[0],
+                    'metodo': metodo_original,
                     'nombre': nombre,
-                    'ruta_rel': values[1]  # Ajustado para nueva estructura sin columna Nombre
+                    'ruta_rel': ruta_rel
                 }
             return None
             
         except Exception as e:
-            print(f"ERROR obteniendo selección: {e}")
+            print(f"Error obteniendo selección: {e}")
             return None
-    
+
     def hay_seleccion(self):
         """Verifica si hay algún elemento seleccionado"""
         try:
             return len(self.app.tree.selection()) > 0
         except:
             return False
+
+    def copiar_ruta(self):
+        """Copia ruta seleccionada al portapapeles"""
+        try:
+            if not hasattr(self.app, 'tree') or not self.app.tree.selection():
+                return
+            
+            item = self.app.tree.selection()[0]
+            
+            # Obtener ruta desde tree_explorer si está disponible
+            if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
+                ruta = getattr(self.app.tree_explorer, 'get_selected_path', lambda: None)()
+            else:
+                values = self.app.tree.item(item, 'values')
+                ruta = values[1] if values and len(values) > 1 else None
+            
+            if ruta:
+                self.app.master.clipboard_clear()
+                self.app.master.clipboard_append(ruta)
+                self.actualizar_estado(f"Ruta copiada: {os.path.basename(ruta)}")
+            else:
+                messagebox.showwarning("Advertencia", "No se pudo obtener la ruta")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al copiar ruta: {e}")
+
+    def abrir_carpeta(self):
+        """Abre carpeta seleccionada en el explorador"""
+        try:
+            if not hasattr(self.app, 'tree') or not self.app.tree.selection():
+                return
+            
+            item = self.app.tree.selection()[0]
+            
+            # Obtener ruta desde tree_explorer si está disponible
+            if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
+                ruta = getattr(self.app.tree_explorer, 'get_selected_path', lambda: None)()
+            else:
+                values = self.app.tree.item(item, 'values')
+                ruta = values[1] if values and len(values) > 1 else None
+            
+            if ruta and os.path.exists(ruta):
+                import subprocess
+                import sys
+                
+                if sys.platform == "win32":
+                    subprocess.Popen(['explorer', ruta])
+                elif sys.platform == "darwin":
+                    subprocess.Popen(['open', ruta])
+                else:
+                    subprocess.Popen(['xdg-open', ruta])
+                    
+                self.actualizar_estado(f"Carpeta abierta: {os.path.basename(ruta)}")
+            else:
+                messagebox.showwarning("Advertencia", "La carpeta no existe o no se pudo obtener la ruta")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al abrir carpeta: {e}")
+
+    def toggle_historial(self):
+        """Alterna visibilidad del historial"""
+        try:
+            if hasattr(self.app, 'ui_manager') and hasattr(self.app.ui_manager, 'toggle_historial'):
+                self.app.ui_manager.toggle_historial()
+            elif hasattr(self.app, 'historial_manager'):
+                self.app.historial_manager.toggle_visibility()
+        except Exception as e:
+            print(f"Error al alternar historial: {e}")
+
+    def construir_cache(self):
+        """Inicia construcción de cache"""
+        try:
+            self.app.search_coordinator.construir_cache_automatico()
+        except Exception as e:
+            print(f"Error iniciando construcción cache: {e}")
+
+    def mostrar_acerca_de(self):
+        """Muestra información sobre la aplicación"""
+        info = """Búsqueda de Carpetas V.4.2
+Explorador Integrado
+
+Funcionalidades principales:
+• Búsqueda rápida en cache
+• Explorador de árbol integrado
+• Historial de búsquedas
+• Ajuste automático de columnas
+• Copiar rutas y abrir carpetas
+
+Métodos de búsqueda:
+• C = Cache (rápido)
+• T = Tradicional (completo)
+• E = Explorer (expandible)
+
+© 2024 - Sistema de Búsqueda de Carpetas"""
+        messagebox.showinfo("Acerca de", info.strip())
+
+    # Métodos de compatibilidad simplificados
+    def buscar(self):
+        """Ejecuta búsqueda"""
+        criterio = self.app.entry.get().strip()
+        if criterio:
+            self.app.search_coordinator.ejecutar_busqueda(criterio)
+        else:
+            messagebox.showwarning("Advertencia", "Ingresa un criterio de búsqueda")
+
+    def limpiar(self):
+        """Limpia resultados y criterio"""
+        self.limpiar_resultados()
+        if hasattr(self.app, 'entry'):
+            self.app.entry.delete(0, tk.END)
+        self.actualizar_estado("Listo para búsqueda")
+
+    def salir(self):
+        """Cierra la aplicación"""
+        if messagebox.askokcancel("Salir", "¿Deseas cerrar la aplicación?"):
+            self.app.master.quit()
+            self.app.master.destroy()
+
+    # Alias para compatibilidad
+    def mostrar_resultados_async(self, resultados, metodo, tiempo_total):
+        self.app.master.after(0, lambda: self.mostrar_resultados(resultados, metodo, tiempo_total))
+    
+    def actualizar_estado_async(self, mensaje):
+        self.app.master.after(0, lambda: self.actualizar_estado(mensaje))
+    
+    def finalizar_busqueda_inmediata(self):
+        self.habilitar_busqueda()
+    
+    def finalizar_busqueda_async(self):
+        self.app.master.after(0, self.habilitar_busqueda)
