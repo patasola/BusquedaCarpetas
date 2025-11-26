@@ -83,6 +83,9 @@ class UICallbacks:
         self.limpiar_resultados()
         
         if not resultados:
+            # Restaurar botón de búsqueda cuando no hay resultados
+            self.app.btn_buscar.configure(state='normal', text='Buscar')
+            self.app.btn_cancelar.configure(state='disabled')
             self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
             return
         
