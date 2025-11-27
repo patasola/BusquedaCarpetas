@@ -1,4 +1,4 @@
-# src/ui_state_manager.py - Gestión de Estado de UI V.4.2 (Refactorizado)
+# src/ui_state_manager.py - Gestión de Estado de UI V.4.2 (Refactorizado y Completo)
 import tkinter as tk
 
 class UIStateManager:
@@ -91,6 +91,11 @@ class UIStateManager:
         """Cambia entre modo numérico y alfanumérico"""
         self.app.modo_numerico = not self.app.modo_numerico
         self.actualizar_indicador_modo()
+        
+        # Limpiar y enfocar el campo
+        if hasattr(self.app, 'entry'):
+            self.app.entry.delete(0, tk.END)
+            self.app.entry.focus_set()
     
     def actualizar_indicador_modo(self):
         """Actualiza el indicador visual del modo actual"""
@@ -102,9 +107,20 @@ class UIStateManager:
     def enfocar_y_seleccionar_campo(self):
         """Enfoca el campo de búsqueda y selecciona todo el texto (F2)"""
         try:
-            self.app.entry.focus_set()
+            # Asegurar que el campo esté habilitado
+            self.app.entry.configure(state='normal')
+            
+            # Enfocar el campo
+            self.app.entry.focus_force()
+            
+            # Seleccionar todo el texto
             self.app.entry.select_range(0, tk.END)
             self.app.entry.icursor(tk.END)
+            
+            # Si hay texto, habilitar el botón buscar
+            if self.app.entry.get().strip() and hasattr(self.app, 'ruta_carpeta') and self.app.ruta_carpeta:
+                self.app.btn_buscar.configure(state='normal')
+                
         except Exception as e:
             print(f"Error enfocando campo: {e}")
     
@@ -112,6 +128,10 @@ class UIStateManager:
         """Maneja cambios en el campo de entrada"""
         try:
             texto = self.app.entry.get().strip()
+            
+            # Asegurar que el entry esté habilitado
+            if self.app.entry['state'] == 'disabled':
+                self.app.entry.configure(state='normal')
             
             if texto and hasattr(self.app, 'ruta_carpeta') and self.app.ruta_carpeta:
                 self.app.btn_buscar.configure(state='normal')

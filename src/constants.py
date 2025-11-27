@@ -1,7 +1,7 @@
-# src/constants.py - Constantes V.4.2 (Refactorizado)
+# src/constants.py - Constantes V.4.5 (Mensajes actualizados para nuevo mapeo)
 
 # Información de la aplicación
-APP_VERSION = "V. 4.2 - Refactorizada"
+APP_VERSION = "V. 4.5 - Paneles Duales con Redimensión"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana
@@ -65,7 +65,7 @@ class Fonts:
     TABLE_HEADER = ("Segoe UI", 10, "bold")
 
 class Messages:
-    READY = "F2: Enfocar búsqueda • F3: Copiar • F4: Abrir • F5: Modo • Tab: Navegar"
+    READY = "F1: Ayuda • F5: Buscar • F6: Copiar • F7: Abrir • Tab: Navegar"
     FOLDER_SELECTED = "Carpeta seleccionada y caché construido"
     CACHE_BUILDING = "Construyendo caché automáticamente..."
     CACHE_COMPLETED = "Caché construido exitosamente"

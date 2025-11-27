@@ -1,421 +1,586 @@
-# src/historial_manager.py - Barra Lateral de Historial V.4.2 (Refactorizada)
-import os
+# src/historial_manager.py - Gestor del Historial de Búsquedas - Con paneles duales V.4.4
 import tkinter as tk
-from tkinter import messagebox, ttk
-import time
-from .constants import Colors
+from tkinter import ttk
+from datetime import datetime
+import json
+import os
 
 class HistorialManager:
-    """Gestor de historial como barra lateral integrada"""
+    """Gestiona el historial de búsquedas con registro automático y posicionamiento dual"""
     
-    def __init__(self, parent_app):
-        self.parent_app = parent_app
-        self.barra_historial = None
-        self.tree = None
-        self.historial = []
+    def __init__(self, app):
+        self.app = app
         self.visible = False
-        self.orden_columnas = {'Hora': 'asc', 'Criterio': 'asc'}
+        self.frame = None
+        self.tree = None
+        self.historial_data = []
+        self.historial_file = "historial_busquedas.json"
+        self.assigned_column = None  # Columna asignada para posicionamiento dual
+        
+        # Variables para redimensionamiento
+        self.resize_start_x = 0
+        self.resize_start_width = 0
+        
+        # Cargar historial existente
+        self.cargar_historial()
     
     def toggle_visibility(self):
-        """Alterna visibilidad de la barra de historial"""
+        """Alterna la visibilidad del historial"""
         if self.visible:
-            self.ocultar()
+            self.hide()
         else:
-            self.mostrar()
-        
-        if hasattr(self.parent_app, '_actualizar_menu_ver'):
-            self.parent_app._actualizar_menu_ver()
+            self.show()
     
-    def mostrar(self):
-        """Muestra la barra de historial"""
-        if self.visible:
-            return
+    def show(self):
+        """Muestra el panel de historial con posicionamiento dual"""
+        if not self.frame:
+            self.create_historial()
         
-        if hasattr(self.parent_app, 'ajustar_layout_para_historial'):
-            self.parent_app.ajustar_layout_para_historial(True)
-        
-        self._crear_barra_lateral()
-        self.visible = True
-        
-        if hasattr(self.parent_app, 'actualizar_navegacion_tab'):
-            self.parent_app.actualizar_navegacion_tab()
+        if self.frame:
+            # Obtener columna asignada del sistema de paneles duales
+            self.assigned_column = self.app.assign_panel_position('historial')
+            
+            # Mostrar en la columna asignada
+            self.frame.grid(row=0, column=self.assigned_column, sticky='ns', padx=(0, 0))
+            self.visible = True
+            
+            # Actualizar la variable del menú
+            if hasattr(self.app, 'mostrar_historial'):
+                self.app.mostrar_historial.set(True)
+            
+            print(f"[DEBUG] Historial mostrado en columna {self.assigned_column}")
     
-    def ocultar(self):
-        """Oculta la barra de historial"""
-        if self.barra_historial:
-            self.barra_historial.destroy()
-            self.barra_historial = None
-            self.tree = None
-        
-        if hasattr(self.parent_app, 'ajustar_layout_para_historial'):
-            self.parent_app.ajustar_layout_para_historial(False)
-        
-        self.visible = False
-        
-        if hasattr(self.parent_app, '_actualizar_menu_ver'):
-            self.parent_app._actualizar_menu_ver()
+    def hide(self):
+        """Oculta el panel de historial y libera su posición"""
+        if self.frame:
+            self.frame.grid_forget()
+            self.visible = False
+            
+            # Liberar posición en el sistema dual
+            if self.assigned_column is not None:
+                self.app.release_panel_position('historial')
+                print(f"[DEBUG] Historial liberado de columna {self.assigned_column}")
+                self.assigned_column = None
+            
+            # Actualizar la variable del menú
+            if hasattr(self.app, 'mostrar_historial'):
+                self.app.mostrar_historial.set(False)
     
-    def _crear_barra_lateral(self):
-        """Crea la barra lateral de historial"""
+    def create_historial(self):
+        """Crea el widget del historial con estilo consistente - ANCHO 8CM"""
         try:
-            parent_container = self.parent_app.main_container.master
+            # Calcular ancho del panel (8cm)
+            panel_width = 300  # Fallback
+            if hasattr(self.app, 'window_manager') and hasattr(self.app.window_manager, 'get_panel_width'):
+                panel_width = self.app.window_manager.get_panel_width()
             
-            # Frame lateral
-            self.barra_historial = tk.Frame(
-                parent_container,
-                bg=Colors.BACKGROUND,
-                width=380,
-                relief=tk.RIDGE,
-                borderwidth=1
+            print(f"[DEBUG] Historial usando ancho: {panel_width}px (8cm)")
+            
+            # Frame contenedor principal - hijo del app_frame
+            if hasattr(self.app, 'app_frame'):
+                parent_frame = self.app.app_frame
+            else:
+                parent_frame = self.app.master
+            
+            self.frame = tk.Frame(parent_frame, width=panel_width, relief=tk.RIDGE, borderwidth=1)
+            self.frame.pack_propagate(False)
+            
+            # Grip de redimensionamiento en el borde izquierdo
+            self.grip_frame = tk.Frame(self.frame, width=5, bg='#d0d0d0', cursor='sb_h_double_arrow')
+            self.grip_frame.pack(side='left', fill='y')
+            self.grip_frame.pack_propagate(False)
+            
+            # Eventos para el grip
+            self.grip_frame.bind('<Button-1>', self.start_resize)
+            self.grip_frame.bind('<B1-Motion>', self.do_resize)
+            self.grip_frame.bind('<Enter>', lambda e: self.grip_frame.config(bg='#b0b0b0'))
+            self.grip_frame.bind('<Leave>', lambda e: self.grip_frame.config(bg='#d0d0d0'))
+            
+            # Frame de contenido
+            self.content_frame = tk.Frame(self.frame)
+            self.content_frame.pack(side='right', fill='both', expand=True)
+            
+            # Título
+            title_frame = tk.Frame(self.content_frame, bg='#2c3e50')
+            title_frame.pack(fill='x')
+            
+            title_label = tk.Label(
+                title_frame,
+                text="Historial de Busquedas",
+                bg='#2c3e50',
+                fg='white',
+                font=('Segoe UI', 10, 'bold'),
+                pady=8
             )
-            self.barra_historial.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 10), pady=10)
-            self.barra_historial.pack_propagate(False)
+            title_label.pack(side='left', expand=True)
             
-            # Header
-            header = tk.Frame(self.barra_historial, bg=Colors.BACKGROUND, height=50)
-            header.pack(fill=tk.X, padx=5, pady=5)
-            header.pack_propagate(False)
+            # Botón cerrar
+            close_btn = tk.Button(
+                title_frame,
+                text="X",
+                command=self.hide,
+                bg='#2c3e50',
+                fg='white',
+                font=('Segoe UI', 10, 'bold'),
+                bd=0,
+                padx=8,
+                pady=4
+            )
+            close_btn.pack(side='right')
             
-            tk.Label(
-                header,
-                text="Historial de Búsquedas",
-                font=("Segoe UI", 12, "bold"),
-                bg=Colors.BACKGROUND,
-                fg=Colors.TITLE_FG,
-                anchor="w"
-            ).pack(side=tk.LEFT, padx=10, pady=10)
+            # Botones de control
+            control_frame = tk.Frame(self.content_frame)
+            control_frame.pack(fill='x', padx=5, pady=5)
             
-            tk.Button(
-                header,
-                text="✕",
-                font=("Segoe UI", 10, "bold"),
-                bg=Colors.BUTTON_BG,
-                fg=Colors.BUTTON_FG,
-                relief=tk.FLAT,
-                width=3,
-                command=self.ocultar,
-                cursor="hand2"
-            ).pack(side=tk.RIGHT, padx=10, pady=10)
+            btn_limpiar = tk.Button(
+                control_frame,
+                text="Limpiar",
+                command=self.limpiar_historial,
+                font=('Segoe UI', 9),
+                bg='#ffebee',
+                fg='#c62828',
+                relief='flat',
+                padx=10,
+                pady=4
+            )
+            btn_limpiar.pack(side='left', padx=(0, 5))
             
-            # Contenido
-            contenido = tk.Frame(self.barra_historial, bg=Colors.BACKGROUND)
-            contenido.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+            btn_exportar = tk.Button(
+                control_frame,
+                text="Exportar",
+                command=self.exportar_historial,
+                font=('Segoe UI', 9),
+                bg='#e8f5e8',
+                fg='#2e7d32',
+                relief='flat',
+                padx=10,
+                pady=4
+            )
+            btn_exportar.pack(side='left')
             
-            # TreeView frame
-            tree_frame = tk.Frame(contenido, bg=Colors.BACKGROUND)
-            tree_frame.pack(fill=tk.BOTH, expand=True)
+            # TreeView con scrollbar
+            tree_frame = tk.Frame(self.content_frame)
+            tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
             
-            # TreeView del historial
+            # Scrollbars
+            vsb = ttk.Scrollbar(tree_frame, orient="vertical")
+            hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
+            
+            # TreeView con el MISMO estilo que el principal
             self.tree = ttk.Treeview(
                 tree_frame,
-                columns=("Hora", "Criterio"),
-                show="headings",
-                selectmode="browse",
-                height=18,
-                style="Custom.Treeview"
+                columns=("Criterio", "Metodo", "Resultados", "Tiempo", "Fecha"),
+                show="tree headings",
+                style="Custom.Treeview"  # MISMO ESTILO
             )
             
-            # Configurar encabezados clickeables
-            self.tree.heading("Hora", text="Hora", anchor=tk.CENTER,
-                             command=lambda: self._ordenar_por_columna('Hora'))
-            self.tree.heading("Criterio", text="Criterio", anchor=tk.CENTER,
-                             command=lambda: self._ordenar_por_columna('Criterio'))
+            # Aplicar exactamente el mismo estilo que el TreeView principal
+            style = ttk.Style()
             
-            # Configurar columnas
-            self.tree.column("Hora", width=80, anchor=tk.CENTER, minwidth=70)
-            self.tree.column("Criterio", width=280, anchor=tk.W, minwidth=200)
+            # Asegurar que el estilo existe (puede que ya esté configurado)
+            style.configure('Custom.Treeview',
+                          rowheight=28,
+                          background="#ffffff",
+                          fieldbackground="#ffffff", 
+                          foreground="#2c3e50",
+                          selectbackground="#e3f2fd",
+                          selectforeground="#0d47a1",
+                          borderwidth=1,
+                          relief="solid",
+                          font=('Segoe UI', 10))  # MISMA FUENTE
             
-            # Scrollbar
-            scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
-            self.tree.configure(yscrollcommand=scrollbar.set)
+            style.configure('Custom.Treeview.Heading', 
+                          font=('Segoe UI', 10, 'bold'),
+                          background="#f8f9fa",
+                          foreground="#2c3e50",
+                          relief="flat",
+                          borderwidth=1)
             
-            self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            # Configurar encabezados (busca esta sección)
+            self.tree.heading("#0", text="#", anchor=tk.CENTER)
+            self.tree.heading("Criterio", text="Criterio", anchor=tk.W)
+            self.tree.heading("Metodo", text="M", anchor=tk.CENTER)
+            self.tree.heading("Resultados", text="Res.", anchor=tk.CENTER)  # Texto más corto
+            self.tree.heading("Tiempo", text="Tiempo", anchor=tk.CENTER)
+            self.tree.heading("Fecha", text="Hora", anchor=tk.CENTER)  # Texto más corto
+
             
-            # Configurar estilos
+            # Configurar columnas con anchos similares al TreeView principal
+            self.tree.column("#0", width=35, anchor=tk.CENTER, minwidth=30, stretch=False)  # Reducido de 40
+            self.tree.column("Criterio", width=100, anchor=tk.W, minwidth=80, stretch=True)  # Reducido de 120 a 100
+            self.tree.column("Metodo", width=30, anchor=tk.CENTER, minwidth=25, stretch=False)  # Reducido de 35
+            self.tree.column("Resultados", width=50, anchor=tk.CENTER, minwidth=45, stretch=False)  # Reducido de 70
+            self.tree.column("Tiempo", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 60
+            self.tree.column("Fecha", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 80
+            # Configurar scrollbars
+            self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+            vsb.configure(command=self.tree.yview)
+            hsb.configure(command=self.tree.xview)
+            
+            # Configurar tags para filas alternadas (MISMO QUE TreeView principal)
             self.tree.tag_configure('evenrow', background='#ffffff')
             self.tree.tag_configure('oddrow', background='#f8f9fa')
             
-            # Frame de botones
-            botones_frame = tk.Frame(self.barra_historial, bg=Colors.BACKGROUND, height=60)
-            botones_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=10)
-            botones_frame.pack_propagate(False)
+            # Tags para métodos (MISMOS COLORES que TreeView principal)
+            self.tree.tag_configure('cache_method', 
+                                  foreground='#1b5e20', 
+                                  background='#e8f5e8',
+                                  font=('Segoe UI', 10, 'bold'))
+            self.tree.tag_configure('tradicional_method', 
+                                  foreground='#0d47a1', 
+                                  background='#e3f2fd',
+                                  font=('Segoe UI', 10, 'bold'))
+            self.tree.tag_configure('tree_method', 
+                                  foreground='#e65100', 
+                                  background='#fff3e0',
+                                  font=('Segoe UI', 10, 'bold'))
             
-            tk.Button(
-                botones_frame,
-                text="Limpiar",
-                font=("Segoe UI", 9),
-                bg="#ffebee",
-                fg="#c62828",
-                relief=tk.FLAT,
-                padx=15,
-                pady=8,
-                command=self._limpiar_historial,
-                cursor="hand2"
-            ).pack(pady=15)
+            # Función para actualizar scrollbars
+            def update_scrollbars():
+                try:
+                    self.tree.update_idletasks()
+                    
+                    # Scrollbar vertical
+                    if self.tree.get_children():
+                        total_items = len(self.tree.get_children())
+                        tree_height = self.tree.winfo_height()
+                        if tree_height > 1:
+                            visible_items = max(1, tree_height // 28)
+                            
+                            if total_items > visible_items:
+                                if not vsb.winfo_viewable():
+                                    vsb.pack(side='right', fill='y')
+                            else:
+                                if vsb.winfo_viewable():
+                                    vsb.pack_forget()
+                    else:
+                        if vsb.winfo_viewable():
+                            vsb.pack_forget()
+                    
+                    # Scrollbar horizontal
+                    if self.tree.get_children():
+                        max_width = 0
+                        for item in self.tree.get_children():
+                            try:
+                                bbox = self.tree.bbox(item, column='#0')
+                                if bbox:
+                                    item_width = bbox[0] + bbox[2]
+                                    max_width = max(max_width, item_width)
+                            except:
+                                pass
+                        
+                        tree_width = self.tree.winfo_width()
+                        if tree_width > 1 and max_width > tree_width:
+                            if not hsb.winfo_viewable():
+                                hsb.pack(side='bottom', fill='x')
+                        else:
+                            if hsb.winfo_viewable():
+                                hsb.pack_forget()
+                    else:
+                        if hsb.winfo_viewable():
+                            hsb.pack_forget()
+                
+                except Exception as e:
+                    print(f"Error actualizando scrollbars historial: {e}")
+            
+            self.update_scrollbars = update_scrollbars
+            
+            # Empaquetar TreeView
+            self.tree.pack(side='left', fill='both', expand=True)
             
             # Eventos
-            self._configurar_eventos()
-            self._actualizar_tabla()
+            self.tree.bind('<Double-1>', self.on_double_click)
+            self.tree.bind('<Return>', self.on_enter_key)
+            self.tree.bind('<Button-3>', self.show_context_menu)
+            self.tree.bind('<Configure>', lambda e: self.tree.after_idle(self.update_scrollbars))
             
-            self.parent_app.master.update_idletasks()
+            # Configurar foco del TreeView
+            self.tree.configure(takefocus=True)
+            
+            # Cargar datos existentes
+            self.actualizar_vista()
             
         except Exception as e:
-            print(f"Error creando barra historial: {e}")
+            print(f"Error creando historial: {e}")
+            self.frame = None
     
-    def _configurar_eventos(self):
-        """Configura eventos del historial"""
-        eventos = {
-            "<<TreeviewSelect>>": self._on_seleccion,
-            "<Double-1>": lambda e: self._repetir_busqueda(),
-            "<Return>": lambda e: self._repetir_busqueda(),
-            "<F3>": lambda e: self._repetir_busqueda(),
-            "<F4>": lambda e: self._abrir_primera_carpeta(),
-            "<Delete>": lambda e: self._eliminar_entrada(),
-            "<FocusIn>": self._on_focus_in_historial
-        }
-        
-        for evento, comando in eventos.items():
-            self.tree.bind(evento, comando)
-        
-        # Navegación
-        nav_keys = ["<Up>", "<Down>", "<Prior>", "<Next>", "<Home>", "<End>"]
-        for key in nav_keys:
-            self.tree.bind(key, self._manejar_navegacion_historial)
+    def start_resize(self, event):
+        """Inicia el redimensionamiento"""
+        self.resize_start_x = event.x_root
+        self.resize_start_width = self.frame.winfo_width()
     
-    def _actualizar_tabla(self):
-        """Actualiza la tabla del historial"""
+    def do_resize(self, event):
+        """Realiza el redimensionamiento"""
+        if not self.frame:
+            return
+        
+        # Calcular nuevo ancho
+        diff = self.resize_start_x - event.x_root
+        new_width = self.resize_start_width + diff
+        
+        # Limitar ancho entre 250 y 500 píxeles
+        new_width = max(250, min(500, new_width))
+        
+        # Aplicar nuevo ancho
+        self.frame.configure(width=new_width)
+    
+    def agregar_busqueda(self, criterio, metodo, num_resultados, tiempo_total):
+        """Agrega una búsqueda al historial - SIEMPRE registra, sin importar si está visible"""
+        try:
+            # Crear entrada del historial
+            entrada = {
+                'criterio': criterio,
+                'metodo': metodo,
+                'resultados': num_resultados,
+                'tiempo': f"{tiempo_total:.2f}s",
+                'fecha': datetime.now().strftime("%H:%M:%S"),
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Agregar al inicio de la lista (más reciente primero)
+            self.historial_data.insert(0, entrada)
+            
+            # Limitar a los últimos 100 registros
+            if len(self.historial_data) > 100:
+                self.historial_data = self.historial_data[:100]
+            
+            # Guardar en archivo
+            self.guardar_historial()
+            
+            # Actualizar vista solo si está visible
+            if self.visible and self.tree:
+                self.actualizar_vista()
+                
+            print(f"[DEBUG] Búsqueda registrada en historial: {criterio} ({metodo}) - {num_resultados} resultados")
+            
+        except Exception as e:
+            print(f"Error agregando búsqueda al historial: {e}")
+    
+    def actualizar_vista(self):
+        """Actualiza la vista del TreeView con los datos del historial"""
         if not self.tree:
             return
         
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        
-        if not self.historial:
-            self.tree.insert("", "end", 
-                           values=("--:--", "Sin búsquedas aún"),
-                           tags=('evenrow',))
-            return
-        
-        for i, entrada in enumerate(self.historial):
-            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-            criterio = entrada["criterio"]
-            if len(criterio) > 35:
-                criterio = criterio[:32] + "..."
-            
-            self.tree.insert("", "end",
-                           values=(entrada["hora"], criterio),
-                           tags=(tag,))
-    
-    def _on_seleccion(self, event):
-        """Maneja selección en la barra de historial"""
-        if not self.tree.selection() or not self.historial:
-            return
-        
-        item_index = self.tree.index(self.tree.selection()[0])
-        
-        if 0 <= item_index < len(self.historial):
-            entrada = self.historial[item_index]
-            criterio = entrada["criterio"]
-            
-            self.parent_app.entry.delete(0, tk.END)
-            self.parent_app.entry.insert(0, criterio)
-            
-            self._busqueda_rapida_cache(criterio)
-    
-    def _busqueda_rapida_cache(self, criterio):
-        """Búsqueda rápida solo en cache para historial"""
         try:
-            if not self.parent_app.cache_manager.cache.valido:
-                if hasattr(self.parent_app, 'ui_callbacks'):
-                    self.parent_app.ui_callbacks.actualizar_estado("Cache no disponible")
-                return
+            # Limpiar TreeView
+            for item in self.tree.get_children():
+                self.tree.delete(item)
             
-            resultados = self.parent_app.cache_manager.buscar_en_cache(criterio)
+            # Agregar entradas del historial
+            for i, entrada in enumerate(self.historial_data):
+                # Determinar tags según el método y fila alternada
+                row_tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                
+                # Tag del método
+                metodo = entrada['metodo'].upper()
+                if metodo == 'C':
+                    method_tag = 'cache_method'
+                elif metodo == 'T':
+                    method_tag = 'tradicional_method'
+                elif metodo == 'A' or metodo == 'E':
+                    method_tag = 'tree_method'
+                else:
+                    method_tag = row_tag
+                
+                # Combinar tags
+                tags = (row_tag, method_tag)
+                
+                # Insertar en TreeView
+                self.tree.insert('', 'end', 
+                               text=str(i + 1),
+                               values=(
+                                   entrada['criterio'],
+                                   entrada['metodo'],
+                                   entrada['resultados'],
+                                   entrada['tiempo'],
+                                   entrada['fecha']
+                               ),
+                               tags=tags)
             
-            if resultados:
-                self._mostrar_resultados_rapidos(resultados, "Cache (Historial)")
-            else:
-                if hasattr(self.parent_app, 'ui_callbacks'):
-                    self.parent_app.ui_callbacks.actualizar_estado(
-                        f"Sin resultados en cache para '{criterio}'"
-                    )
-                    self.parent_app.ui_callbacks.limpiar_resultados()
+            # Actualizar scrollbars
+            if hasattr(self, 'update_scrollbars'):
+                self.tree.after_idle(self.update_scrollbars)
                 
         except Exception as e:
-            print(f"Error en búsqueda rápida: {e}")
+            print(f"Error actualizando vista historial: {e}")
     
-    def _mostrar_resultados_rapidos(self, resultados, metodo):
-        """Muestra resultados de búsqueda rápida"""
-        if hasattr(self.parent_app, 'tree_explorer') and self.parent_app.tree_explorer:
-            formatted_results = []
-            for nombre, ruta_rel, ruta_abs in resultados:
-                formatted_results.append({
-                    'name': nombre,
-                    'path': ruta_abs,
-                    'files': 0,
-                    'size': '0 B'
-                })
-            
-            self.parent_app.tree_explorer.populate_search_results(formatted_results)
-        else:
-            # Fallback
-            for item in self.parent_app.tree.get_children():
-                self.parent_app.tree.delete(item)
-            
-            for i, (nombre, ruta_rel, ruta_abs) in enumerate(resultados):
-                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                self.parent_app.tree.insert("", "end", 
-                                          text=f"📂 {nombre}",
-                                          values=(metodo, ruta_rel),
-                                          tags=(tag,))
-        
-        if hasattr(self.parent_app, 'ui_callbacks'):
-            self.parent_app.ui_callbacks.actualizar_estado(
-                f"{len(resultados)} resultados desde cache (historial)"
-            )
-        
-        if hasattr(self.parent_app, 'configurar_scrollbars'):
-            self.parent_app.configurar_scrollbars()
-    
-    def _ordenar_por_columna(self, columna):
-        """Ordena el historial por columna"""
-        if columna not in ['Hora', 'Criterio']:
-            return
-        
-        orden_actual = self.orden_columnas[columna]
-        nuevo_orden = 'desc' if orden_actual == 'asc' else 'asc'
-        self.orden_columnas[columna] = nuevo_orden
-        
-        simbolo = '↑' if nuevo_orden == 'asc' else '↓'
-        self.tree.heading(columna, text=f"{columna} {simbolo}")
-        
-        # Limpiar otros encabezados
-        for col in ['Hora', 'Criterio']:
-            if col != columna:
-                self.tree.heading(col, text=col)
-                self.orden_columnas[col] = 'asc'
-        
-        # Ordenar
-        reverse = (nuevo_orden == 'desc')
-        if columna == 'Hora':
-            self.historial.sort(key=lambda x: x['timestamp'], reverse=reverse)
-        elif columna == 'Criterio':
-            self.historial.sort(key=lambda x: x['criterio'].lower(), reverse=reverse)
-        
-        self._actualizar_tabla()
-    
-    def _repetir_busqueda(self):
-        """Repite la búsqueda seleccionada"""
-        if not self.tree.selection() or not self.historial:
-            return
-        
-        item_index = self.tree.index(self.tree.selection()[0])
-        if 0 <= item_index < len(self.historial):
-            entrada = self.historial[item_index]
-            self.parent_app.entry.delete(0, tk.END)
-            self.parent_app.entry.insert(0, entrada["criterio"])
-            self.parent_app.entry.focus()
-            self.parent_app.buscar_carpeta()
-    
-    def _abrir_primera_carpeta(self):
-        """Abre la primera carpeta de la búsqueda seleccionada"""
-        self._repetir_busqueda()
-        
-        def abrir_despues():
-            if self.parent_app.tree.get_children():
-                primer_item = self.parent_app.tree.get_children()[0]
-                self.parent_app.tree.selection_set(primer_item)
-                self.parent_app.tree.focus(primer_item)
-                if hasattr(self.parent_app, 'abrir_carpeta_seleccionada'):
-                    self.parent_app.abrir_carpeta_seleccionada()
-        
-        self.parent_app.master.after(500, abrir_despues)
-    
-    def _eliminar_entrada(self):
-        """Elimina entrada seleccionada del historial"""
-        if not self.tree.selection() or not self.historial:
-            return
-        
-        item_index = self.tree.index(self.tree.selection()[0])
-        if 0 <= item_index < len(self.historial):
-            del self.historial[item_index]
-            self._actualizar_tabla()
-    
-    def _limpiar_historial(self):
-        """Limpia todo el historial"""
-        if not self.historial:
-            return
-        
-        if messagebox.askquestion("Limpiar historial", 
-                                 "¿Limpiar todo el historial de esta sesión?") == "yes":
-            self.historial.clear()
-            self._actualizar_tabla()
-    
-    def _manejar_navegacion_historial(self, event):
-        """Maneja navegación con flechas"""
-        elementos = self.tree.get_children()
-        if not elementos:
-            return "break"
-        
-        seleccion = self.tree.selection()
-        if not seleccion:
-            self._seleccionar_item(elementos[0])
-            return "break"
-        
+    def cargar_historial(self):
+        """Carga el historial desde archivo"""
         try:
-            indice = elementos.index(seleccion[0])
-        except ValueError:
-            self._seleccionar_item(elementos[0])
-            return "break"
+            if os.path.exists(self.historial_file):
+                with open(self.historial_file, 'r', encoding='utf-8') as f:
+                    self.historial_data = json.load(f)
+                print(f"[DEBUG] Historial cargado: {len(self.historial_data)} entradas")
+            else:
+                self.historial_data = []
+        except Exception as e:
+            print(f"Error cargando historial: {e}")
+            self.historial_data = []
+    
+    def guardar_historial(self):
+        """Guarda el historial en archivo"""
+        try:
+            with open(self.historial_file, 'w', encoding='utf-8') as f:
+                json.dump(self.historial_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error guardando historial: {e}")
+    
+    def limpiar_historial(self):
+        """Limpia todo el historial"""
+        from tkinter import messagebox
         
-        movimientos = {
-            "Up": max(0, indice - 1),
-            "Down": min(len(elementos) - 1, indice + 1),
-            "Prior": max(0, indice - 5),
-            "Next": min(len(elementos) - 1, indice + 5),
-            "Home": 0,
-            "End": len(elementos) - 1
-        }
+        if messagebox.askyesno("Confirmar", "¿Está seguro de que desea limpiar todo el historial?"):
+            self.historial_data = []
+            self.guardar_historial()
+            if self.tree:
+                self.actualizar_vista()
+            if hasattr(self.app, 'label_estado'):
+                self.app.label_estado.config(text="Historial limpiado")
+    
+    def exportar_historial(self):
+        """Exporta el historial a archivo CSV"""
+        try:
+            from tkinter import filedialog
+            import csv
+            
+            filename = filedialog.asksaveasfilename(
+                title="Exportar historial",
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            )
+            
+            if filename:
+                with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerow(['Criterio', 'Método', 'Resultados', 'Tiempo', 'Fecha', 'Timestamp'])
+                    
+                    for entrada in self.historial_data:
+                        writer.writerow([
+                            entrada['criterio'],
+                            entrada['metodo'],
+                            entrada['resultados'],
+                            entrada['tiempo'],
+                            entrada['fecha'],
+                            entrada['timestamp']
+                        ])
+                
+                if hasattr(self.app, 'label_estado'):
+                    self.app.label_estado.config(text=f"Historial exportado: {filename}")
+                    
+        except Exception as e:
+            print(f"Error exportando historial: {e}")
+    
+    def on_double_click(self, event):
+        """Maneja doble clic en el historial"""
+        selection = self.tree.selection()
+        if not selection:
+            return
         
-        nuevo_indice = movimientos.get(event.keysym, indice)
-        if nuevo_indice != indice:
-            self._seleccionar_item(elementos[nuevo_indice])
+        item = self.tree.item(selection[0])
+        values = item.get('values')
+        if not values:
+            return
+            
+        criterio = values[0]  # Primera columna es el criterio
         
+        # Realizar nueva búsqueda con el criterio del historial
+        if hasattr(self.app, 'entry'):
+            self.app.entry.delete(0, tk.END)
+            self.app.entry.insert(0, criterio)
+            if hasattr(self.app, 'buscar_carpeta'):
+                self.app.buscar_carpeta()
+    
+    def on_enter_key(self, event):
+        """Maneja tecla Enter"""
+        self.on_double_click(event)
         return "break"
     
-    def _seleccionar_item(self, elemento):
-        """Selecciona un item del historial"""
-        self.tree.selection_set(elemento)
-        self.tree.focus(elemento)
-        self.tree.see(elemento)
+    def show_context_menu(self, event):
+        """Muestra menú contextual"""
+        item = self.tree.identify_row(event.y)
+        if not item:
+            return
+        
+        # Seleccionar el item
+        self.tree.selection_set(item)
+        
+        # Crear menú contextual
+        context_menu = tk.Menu(self.tree, tearoff=0)
+        context_menu.add_command(label="Buscar de nuevo", command=self.on_double_click)
+        context_menu.add_separator()
+        context_menu.add_command(label="Copiar criterio", command=self.copy_criterio)
+        context_menu.add_separator()
+        context_menu.add_command(label="Eliminar entrada", command=self.delete_entry)
+        
+        try:
+            context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            context_menu.grab_release()
     
-    def _on_focus_in_historial(self, event):
-        """Maneja cuando el historial recibe foco"""
-        elementos = self.tree.get_children()
-        if elementos and not self.tree.selection():
-            self._seleccionar_item(elementos[0])
+    def copy_criterio(self):
+        """Copia el criterio seleccionado al portapapeles"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+        
+        item = self.tree.item(selection[0])
+        values = item.get('values')
+        if not values:
+            return
+            
+        criterio = values[0]
+        
+        try:
+            self.app.master.clipboard_clear()
+            self.app.master.clipboard_append(criterio)
+            
+            if hasattr(self.app, 'label_estado'):
+                self.app.label_estado.config(text=f"Criterio copiado: {criterio}")
+        except Exception as e:
+            print(f"Error copiando criterio: {e}")
     
-    def agregar_busqueda(self, criterio, metodo, num_resultados, tiempo):
-        """Agrega nueva búsqueda al historial"""
-        entrada = {
-            "timestamp": time.time(),
-            "hora": time.strftime("%H:%M:%S"),
-            "fecha": time.strftime("%d/%m/%Y"),
-            "criterio": criterio,
-            "metodo": metodo,
-            "resultados": num_resultados,
-            "tiempo": tiempo,
-            "ruta_base": self.parent_app.ruta_carpeta
-        }
+    def delete_entry(self):
+        """Elimina la entrada seleccionada del historial"""
+        selection = self.tree.selection()
+        if not selection:
+            return
         
-        self.historial.insert(0, entrada)
-        
-        # Limitar a 50 entradas
-        if len(self.historial) > 50:
-            self.historial = self.historial[:50]
-        
-        if self.visible and self.tree:
-            self._actualizar_tabla()
-            if hasattr(self.parent_app, 'actualizar_navegacion_tab'):
-                self.parent_app.actualizar_navegacion_tab()
+        try:
+            # Obtener índice de la entrada
+            item = self.tree.item(selection[0])
+            index_text = item.get('text', '0')
+            index = int(index_text) - 1  # El texto es el número de fila
+            
+            # Eliminar de los datos
+            if 0 <= index < len(self.historial_data):
+                criterio_eliminado = self.historial_data[index]['criterio']
+                del self.historial_data[index]
+                self.guardar_historial()
+                self.actualizar_vista()
+                
+                if hasattr(self.app, 'label_estado'):
+                    self.app.label_estado.config(text=f"Entrada eliminada: {criterio_eliminado}")
+        except (ValueError, IndexError) as e:
+            print(f"Error eliminando entrada del historial: {e}")
+    
+    def get_stats(self):
+        """Obtiene estadísticas del historial"""
+        try:
+            total = len(self.historial_data)
+            if total == 0:
+                return {'total': 0}
+            
+            # Contar por método
+            metodos = {}
+            for entrada in self.historial_data:
+                metodo = entrada.get('metodo', 'Desconocido')
+                metodos[metodo] = metodos.get(metodo, 0) + 1
+            
+            return {
+                'total': total,
+                'por_metodo': metodos,
+                'mas_reciente': self.historial_data[0]['fecha'] if total > 0 else None
+            }
+        except Exception as e:
+            print(f"Error obteniendo estadísticas: {e}")
+            return {'total': 0}

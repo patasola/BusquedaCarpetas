@@ -1,4 +1,4 @@
-# src/ui_manager.py - Gestión de Elementos de Interfaz V.4.2 (Refactorizado)
+# src/ui_manager.py - Gestión de Elementos de Interfaz V.4.4 (Toggle Corregido)
 import tkinter as tk
 
 class UIManager:
@@ -7,106 +7,157 @@ class UIManager:
     def __init__(self, app):
         self.app = app
         
-        # Variables de estado
-        self.mostrar_barra_estado = tk.BooleanVar(value=True)
-        self.mostrar_barra_cache = tk.BooleanVar(value=True)
-        self.mostrar_historial = tk.BooleanVar(value=False)
-        
-        # Referencias a frames
+        # Referencias a frames - se asignarán después
         self.status_frame = None
         self.cache_frame = None
         
-        # Callbacks para actualizar menú
-        self.mostrar_barra_estado.trace_add('write', self._on_barra_estado_change)
-        self.mostrar_barra_cache.trace_add('write', self._on_barra_cache_change)
+        # Flag para prevenir loops en callbacks
+        self._updating_vars = False
     
     def configurar_referencias(self, status_frame, cache_frame):
         """Configura las referencias a los frames de las barras"""
         self.status_frame = status_frame
         self.cache_frame = cache_frame
+        
+        print(f"[DEBUG] Referencias configuradas - Status: {bool(status_frame)}, Cache: {bool(cache_frame)}")
+        
+        # Asegurar que las barras estén visibles inicialmente
         self._asegurar_barras_visibles()
     
     def _asegurar_barras_visibles(self):
-        """Asegura que las barras estén visibles al inicio"""
-        if self.status_frame and self.mostrar_barra_estado.get():
-            self.status_frame.pack(side=tk.BOTTOM, fill=tk.X, anchor='w')
-        
-        if self.cache_frame and self.mostrar_barra_cache.get():
-            if self.mostrar_barra_estado.get():
-                self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, before=self.status_frame, anchor='w')
-            else:
-                self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, anchor='w')
-    
-    def _on_barra_estado_change(self, *args):
-        """Callback cuando cambia el estado de la barra de estado"""
-        self.toggle_barra_estado()
-    
-    def _on_barra_cache_change(self, *args):
-        """Callback cuando cambia el estado de la barra de cache"""
-        self.toggle_barra_cache()
+        """Asegura que las barras estén visibles al inicio según variables"""
+        try:
+            # Barra de cache (arriba de status)
+            if self.cache_frame and hasattr(self.app, 'mostrar_barra_cache') and self.app.mostrar_barra_cache.get():
+                if self.status_frame and hasattr(self.app, 'mostrar_barra_estado') and self.app.mostrar_barra_estado.get():
+                    self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, before=self.status_frame)
+                else:
+                    self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X)
+                print("[DEBUG] Barra de cache mostrada")
+            
+            # Barra de estado (abajo)
+            if self.status_frame and hasattr(self.app, 'mostrar_barra_estado') and self.app.mostrar_barra_estado.get():
+                self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+                print("[DEBUG] Barra de estado mostrada")
+        except Exception as e:
+            print(f"[ERROR] Error asegurando barras visibles: {e}")
     
     def toggle_barra_estado(self):
         """Alterna la visibilidad de la barra de estado"""
-        if not self.status_frame:
+        if self._updating_vars:
             return
             
-        if self.mostrar_barra_estado.get():
-            self.status_frame.pack(side=tk.BOTTOM, fill=tk.X, anchor='w')
-            if self.mostrar_barra_cache.get() and self.cache_frame:
-                self.cache_frame.pack_forget()
-                self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, before=self.status_frame, anchor='w')
-        else:
-            self.status_frame.pack_forget()
-            if self.mostrar_barra_cache.get() and self.cache_frame:
-                self.cache_frame.pack_forget()
-                self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, anchor='w')
+        try:
+            if not self.status_frame or not hasattr(self.app, 'mostrar_barra_estado'):
+                print("[DEBUG] No hay referencia a status_frame o variable")
+                return
+            
+            mostrar = self.app.mostrar_barra_estado.get()
+            print(f"[DEBUG] toggle_barra_estado - mostrar: {mostrar}")
+            
+            if mostrar:
+                # Mostrar barra de estado
+                self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+                
+                # Reposicionar barra de cache si está visible
+                if (self.cache_frame and 
+                    hasattr(self.app, 'mostrar_barra_cache') and 
+                    self.app.mostrar_barra_cache.get()):
+                    self.cache_frame.pack_forget()
+                    self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, before=self.status_frame)
+                
+                print("[DEBUG] Barra de estado mostrada")
+            else:
+                # Ocultar barra de estado
+                self.status_frame.pack_forget()
+                
+                # Reposicionar barra de cache al fondo si está visible
+                if (self.cache_frame and 
+                    hasattr(self.app, 'mostrar_barra_cache') and 
+                    self.app.mostrar_barra_cache.get()):
+                    self.cache_frame.pack_forget()
+                    self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X)
+                
+                print("[DEBUG] Barra de estado ocultada")
+                
+        except Exception as e:
+            print(f"[ERROR] Error en toggle_barra_estado: {e}")
     
     def toggle_barra_cache(self):
         """Alterna la visibilidad de la barra de cache"""
-        if not self.cache_frame:
+        if self._updating_vars:
             return
             
-        if self.mostrar_barra_cache.get():
-            if self.mostrar_barra_estado.get() and self.status_frame:
-                self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, before=self.status_frame, anchor='w')
+        try:
+            if not self.cache_frame or not hasattr(self.app, 'mostrar_barra_cache'):
+                print("[DEBUG] No hay referencia a cache_frame o variable")
+                return
+            
+            mostrar = self.app.mostrar_barra_cache.get()
+            print(f"[DEBUG] toggle_barra_cache - mostrar: {mostrar}")
+            
+            if mostrar:
+                # Mostrar barra de cache
+                if (self.status_frame and 
+                    hasattr(self.app, 'mostrar_barra_estado') and 
+                    self.app.mostrar_barra_estado.get()):
+                    # Si status está visible, cache va antes (arriba)
+                    self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, before=self.status_frame)
+                else:
+                    # Si status no está visible, cache va al fondo
+                    self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X)
+                
+                print("[DEBUG] Barra de cache mostrada")
             else:
-                self.cache_frame.pack(side=tk.BOTTOM, fill=tk.X, anchor='w')
-        else:
-            self.cache_frame.pack_forget()
+                # Ocultar barra de cache
+                self.cache_frame.pack_forget()
+                print("[DEBUG] Barra de cache ocultada")
+                
+        except Exception as e:
+            print(f"[ERROR] Error en toggle_barra_cache: {e}")
     
     def toggle_historial(self):
         """Alterna la visibilidad del historial"""
-        self.app.historial_manager.toggle_visibility()
-        self._actualizar_variable_sin_callback(self.mostrar_historial, self.app.historial_manager.visible)
-    
-    def _actualizar_variable_sin_callback(self, variable, valor):
-        """Actualiza una variable BooleanVar sin disparar callbacks"""
-        callback_info = variable.trace_info()
-        for callback_id in callback_info:
-            variable.trace_remove(*callback_id)
-        
-        variable.set(valor)
-    
-    def actualizar_estado_historial(self):
-        """Actualiza el estado del historial sin triggerar eventos"""
-        self._actualizar_variable_sin_callback(self.mostrar_historial, self.app.historial_manager.visible)
+        if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
+            self.app.historial_manager.toggle_visibility()
+            
+            # Actualizar variable sin callback
+            if hasattr(self.app, 'mostrar_historial'):
+                self._updating_vars = True
+                self.app.mostrar_historial.set(self.app.historial_manager.visible)
+                self._updating_vars = False
     
     def configurar_menu_ver(self, menu_ver):
         """Configura el menú Ver con los checkbuttons correctos"""
-        menu_ver.add_checkbutton(
-            label="Barra de Estado",
-            variable=self.mostrar_barra_estado
-        )
-        menu_ver.add_checkbutton(
-            label="Barra de Cache",
-            variable=self.mostrar_barra_cache
-        )
-        menu_ver.add_separator()
+        # Historial de búsquedas
         menu_ver.add_checkbutton(
             label="Historial de Búsquedas",
-            variable=self.mostrar_historial,
+            variable=self.app.mostrar_historial,
             command=self.toggle_historial,
-            accelerator="Ctrl+H"
+            accelerator="Ctrl+Alt+H"
+        )
+        
+        # Explorador de archivos 
+        menu_ver.add_checkbutton(
+            label="Explorador de Archivos", 
+            variable=self.app.mostrar_explorador,
+            command=self.app.toggle_explorador,
+            accelerator="Ctrl+Alt+E"
+        )
+        
+        menu_ver.add_separator()
+        
+        # Barras de información
+        menu_ver.add_checkbutton(
+            label="Barra de Información de Cache",
+            variable=self.app.mostrar_barra_cache,
+            command=self.toggle_barra_cache
+        )
+        
+        menu_ver.add_checkbutton(
+            label="Barra de Estado",
+            variable=self.app.mostrar_barra_estado,
+            command=self.toggle_barra_estado
         )
         
         return menu_ver

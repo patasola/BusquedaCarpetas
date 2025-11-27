@@ -1,10 +1,10 @@
-# src/search_coordinator.py - Coordinador de Búsquedas V.4.2 (Refactorizado)
+# src/search_coordinator.py - Coordinador de Búsquedas V.4.5 - OPTIMIZADO
 import time
 import threading
 import os
 
 class SearchCoordinator:
-    """Coordina las búsquedas con construcción inteligente de cache"""
+    """Coordina las búsquedas sin bloquear la UI - OPTIMIZADO sin redundancias"""
     
     def __init__(self, app):
         self.app = app
@@ -15,7 +15,7 @@ class SearchCoordinator:
         self.search_cancelled = False
     
     def ejecutar_busqueda(self, criterio, silenciosa=False):
-        """Ejecuta búsqueda normal o silenciosa"""
+        """Ejecuta búsqueda completamente asíncrona"""
         if not criterio:
             if not silenciosa:
                 self.app.ui_callbacks.mostrar_advertencia("Ingrese un criterio de búsqueda")
@@ -32,59 +32,170 @@ class SearchCoordinator:
         self.search_cancelled = False
         
         if not silenciosa:
+            # Actualizar UI inmediatamente SIN bloquear
             self.app.ui_callbacks.deshabilitar_busqueda()
+            self.app.ui_callbacks.limpiar_resultados()
+            self.app.ui_callbacks.actualizar_estado("Iniciando búsqueda...")
         
-        # Ejecutar búsqueda en thread
+        # TODO en background thread
         self.current_search_thread = threading.Thread(
-            target=self._perform_search,
+            target=self._perform_search_async,
             args=(criterio, silenciosa),
             daemon=True
         )
         self.current_search_thread.start()
     
-    def _perform_search(self, criterio, silenciosa):
-        """Realiza búsqueda en thread separado"""
+    def _perform_search_async(self, criterio, silenciosa):
+        """Realiza búsqueda completamente en background"""
         try:
             start_time = time.time()
             
+            # Actualizar UI de forma asíncrona
             if not silenciosa:
-                self.app.master.after(0, self._on_search_started, criterio)
+                self.app.master.after(0, lambda: self.app.ui_callbacks.actualizar_estado("Buscando..."))
             
-            # Intentar cache primero
-            resultados = []
-            metodo = "Cache"
+            # 1. INTENTAR BÚSQUEDA EN MÚLTIPLES UBICACIONES PRIMERO
+            multi_results = None
+            metodo = "Multi"
             
-            if self._should_use_cache(criterio):
-                resultados = self._search_from_cache(criterio)
+            try:
+                if hasattr(self.app, 'multi_location_search'):
+                    # Verificar si hay ubicaciones múltiples configuradas
+                    enabled_locations = self.app.multi_location_search.get_enabled_locations()
+                    if enabled_locations:
+                        multi_results = self._search_multi_locations_fast(criterio)
+                        metodo = "Multi"
+            except Exception as e:
+                print(f"[DEBUG] Error en búsqueda múltiple: {e}")
+                multi_results = None
             
-            # Si cache no tiene resultados, usar búsqueda tradicional
-            if not resultados:
-                metodo = "Tradicional"
-                
-                if not self.app.search_engine.ruta_base or self.app.search_engine.ruta_base != self.app.ruta_carpeta:
-                    self.app.search_engine.actualizar_ruta_base(self.app.ruta_carpeta)
-                
-                resultados = self._search_traditional(criterio)
+            # 2. FALLBACK A BÚSQUEDA NORMAL SI NO HAY RESULTADOS MÚLTIPLES
+            if not multi_results:
+                if self._should_use_cache(criterio):
+                    multi_results = self._search_from_cache(criterio)
+                    metodo = "Cache"
+                else:
+                    multi_results = self._search_traditional(criterio)
+                    metodo = "Tradicional"
             
             search_time = time.time() - start_time
             
             if not self.search_cancelled:
-                # Formatear resultados para tree explorer
-                if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
-                    formatted_results = self._format_results_for_tree(resultados)
-                else:
-                    formatted_results = resultados
-                
-                self.app.master.after(0, self._on_search_completed, 
-                                    formatted_results, criterio, metodo, search_time, silenciosa)
+                # Programar actualización de UI
+                self.app.master.after(0, self._on_search_completed_async, 
+                                    multi_results, criterio, metodo, search_time, silenciosa)
                 
         except Exception as e:
             print(f"Error en búsqueda: {e}")
             if not self.search_cancelled:
                 self.app.master.after(0, self._on_search_error, str(e))
     
+    def _search_multi_locations_fast(self, criterio):
+        """Búsqueda rápida en múltiples ubicaciones SIN bloquear"""
+        all_results = []
+        
+        try:
+            enabled_locations = self.app.multi_location_search.get_enabled_locations()
+            
+            for location in enabled_locations:
+                if self.search_cancelled:
+                    break
+                
+                # Búsqueda super rápida por ubicación (max 50ms cada una)
+                location_results = self._search_single_location_fast(location, criterio)
+                
+                # Agregar metadatos de ubicación
+                for result in location_results:
+                    if isinstance(result, tuple) and len(result) >= 3:
+                        nombre, ruta_rel, ruta_abs = result[:3]
+                        enhanced_result = (nombre, ruta_rel, ruta_abs, location['name'])
+                        all_results.append(enhanced_result)
+                
+                # Límite total para evitar sobrecarga
+                if len(all_results) >= 200:
+                    break
+            
+        except Exception as e:
+            print(f"[DEBUG] Error en búsqueda multi-ubicaciones: {e}")
+            return []
+        
+        return all_results
+    
+    def _search_single_location_fast(self, location, criterio):
+        """Búsqueda ultra-rápida en una sola ubicación"""
+        try:
+            print(f"[DEBUG] Buscando en ubicación: {location['name']} - {location['path']}")
+            
+            # USAR CACHE SI EXISTE con nombre único por ubicación
+            from .cache_manager import CacheManager
+            import hashlib
+            
+            # Generar nombre único de archivo cache basado en la ruta
+            path_hash = hashlib.md5(location['path'].encode()).hexdigest()[:8]
+            cache_filename = f"cache_{path_hash}.pkl"
+            
+            temp_cache = CacheManager(location['path'])
+            temp_cache.cache_file = cache_filename
+            
+            # Cargar cache existente con el nombre correcto
+            cache_loaded = temp_cache.cargar_cache()
+            
+            if cache_loaded and temp_cache.cache.valido and len(temp_cache.cache.directorios.get('directorios', [])) > 0:
+                print(f"[DEBUG] Cache válido encontrado para {location['name']}: {temp_cache.cache.directorios['total']} directorios")
+                results = temp_cache.buscar_en_cache(criterio)
+                if results:
+                    print(f"[DEBUG] Cache devolvió {len(results)} resultados para {location['name']}")
+                    return results[:20]  # Limitar a 20
+                else:
+                    print(f"[DEBUG] Cache no encontró resultados para '{criterio}' en {location['name']}")
+                    return []
+            else:
+                print(f"[DEBUG] No hay cache válido para {location['name']} (archivo: {cache_filename})")
+            
+            # Si no hay cache, búsqueda directa MUY limitada
+            return self._search_direct_limited(location['path'], criterio)
+            
+        except Exception as e:
+            print(f"[DEBUG] Error buscando en {location['path']}: {e}")
+            return []
+    
+    def _search_direct_limited(self, path, criterio):
+        """Búsqueda directa super limitada para no bloquear"""
+        results = []
+        criterio_lower = criterio.lower()
+        start_time = time.time()
+        
+        try:
+            for root, dirs, files in os.walk(path):
+                # Tiempo máximo por ubicación: 50ms
+                if time.time() - start_time > 0.05:
+                    break
+                
+                if self.search_cancelled:
+                    break
+                
+                # Procesar solo los primeros 20 directorios por nivel
+                for dirname in dirs[:20]:
+                    if criterio_lower in dirname.lower():
+                        ruta_completa = os.path.join(root, dirname)
+                        ruta_relativa = os.path.relpath(ruta_completa, path)
+                        results.append((dirname, ruta_relativa, ruta_completa))
+                        
+                        if len(results) >= 25:  # Max 25 resultados por ubicación
+                            return results
+                
+                # Limitar profundidad
+                depth = root.replace(path, '').count(os.sep)
+                if depth >= 3:
+                    dirs.clear()
+                
+        except (PermissionError, OSError):
+            pass
+        
+        return results
+    
     def _should_use_cache(self, criterio):
-        """Determina si debe usar cache o búsqueda tradicional"""
+        """Determina si debe usar cache - MÁS ESTRICTO"""
         try:
             cache_manager = getattr(self.app, 'cache_manager', None)
             
@@ -94,10 +205,6 @@ class SearchCoordinator:
             if len(cache_manager.cache.directorios.get('directorios', [])) == 0:
                 return False
             
-            # Búsquedas por tamaño con unidades van directo a tradicional
-            if any(unit in criterio.upper() for unit in ['MB', 'GB', 'TB', 'KB']):
-                return False
-            
             return True
             
         except Exception as e:
@@ -105,122 +212,72 @@ class SearchCoordinator:
             return False
     
     def _search_from_cache(self, criterio):
-        """Realiza búsqueda desde cache"""
-        resultados = self.app.cache_manager.buscar_en_cache(criterio)
-        return resultados if resultados else []
+        """Búsqueda desde cache - OPTIMIZADA"""
+        try:
+            resultados = self.app.cache_manager.buscar_en_cache(criterio)
+            return resultados[:100] if resultados else []  # Limitar a 100 resultados
+        except Exception as e:
+            print(f"Error en búsqueda cache: {e}")
+            return []
     
     def _search_traditional(self, criterio):
-        """Realiza búsqueda tradicional"""
+        """Búsqueda tradicional - MÁS RÁPIDA"""
         try:
             if not os.path.exists(self.app.search_engine.ruta_base):
                 return []
             
-            resultados = self.app.search_engine.buscar_tradicional(criterio)
-            return resultados if resultados else []
+            # Configurar límites más estrictos
+            self.app.search_engine.busqueda_cancelada = False
+            resultados = []
+            criterio_lower = criterio.lower()
+            start_time = time.time()
+            processed = 0
+            
+            for root, dirs, files in os.walk(self.app.search_engine.ruta_base):
+                # Tiempo máximo: 2 segundos
+                if time.time() - start_time > 2.0 or self.search_cancelled:
+                    break
+                
+                # Procesar directorios con límite
+                for dirname in dirs[:30]:  # Solo primeros 30 por nivel
+                    if criterio_lower in dirname.lower():
+                        ruta_completa = os.path.join(root, dirname)
+                        ruta_relativa = os.path.relpath(ruta_completa, self.app.search_engine.ruta_base)
+                        resultados.append((dirname, ruta_relativa, ruta_completa))
+                        
+                        if len(resultados) >= 150:  # Max 150 resultados
+                            return resultados
+                
+                processed += 1
+                # Limitar profundidad más agresivamente
+                depth = root.replace(self.app.search_engine.ruta_base, '').count(os.sep)
+                if depth >= 4:
+                    dirs.clear()
+                
+                # Cada 50 carpetas verificar cancelación
+                if processed % 50 == 0 and self.search_cancelled:
+                    break
+            
+            return resultados
             
         except Exception as e:
             print(f"Error en búsqueda tradicional: {e}")
             return []
     
-    def _format_results_for_tree(self, resultados):
-        """Convierte resultados al formato esperado por tree explorer"""
-        if not resultados:
-            return []
-            
-        formatted = []
-        
-        for resultado in resultados:
-            if isinstance(resultado, tuple) and len(resultado) >= 3:
-                nombre, ruta_rel, ruta_abs = resultado[:3]
-                formatted_item = {
-                    'name': nombre,
-                    'path': ruta_abs,
-                    'files': self._get_file_count_quick(ruta_abs),
-                    'size': self._get_folder_size_quick(ruta_abs)
-                }
-            elif isinstance(resultado, dict):
-                formatted_item = resultado
-            else:
-                path = str(resultado)
-                formatted_item = {
-                    'name': os.path.basename(path),
-                    'path': path,
-                    'files': self._get_file_count_quick(path),
-                    'size': self._get_folder_size_quick(path)
-                }
-                    
-            formatted.append(formatted_item)
-            
-        return formatted
-    
-    def _get_file_count_quick(self, path):
-        """Obtiene conteo rápido de archivos"""
-        try:
-            if not os.path.exists(path) or not os.path.isdir(path):
-                return 0
-            return len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
-        except (PermissionError, OSError):
-            return 0
-            
-    def _get_folder_size_quick(self, path):
-        """Obtiene tamaño rápido de carpeta"""
-        try:
-            if not os.path.exists(path) or not os.path.isdir(path):
-                return "0 B"
-                
-            total_size = 0
-            count = 0
-            
-            for item in os.listdir(path):
-                if count >= 20:
-                    break
-                item_path = os.path.join(path, item)
-                if os.path.isfile(item_path):
-                    total_size += os.path.getsize(item_path)
-                    count += 1
-                    
-            return self._format_size(total_size)
-        except (PermissionError, OSError):
-            return "N/A"
-    
-    def _format_size(self, size_bytes):
-        """Formatea tamaño en bytes"""
-        if size_bytes == 0:
-            return "0 B"
-            
-        for unit in ['B', 'KB', 'MB', 'GB']:
-            if size_bytes < 1024.0:
-                return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
-            
-        return f"{size_bytes:.1f} TB"
-    
-    def _on_search_started(self, criterio):
-        """Callback cuando inicia búsqueda"""
-        if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
-            self.app.tree.delete(*self.app.tree.get_children())
-        else:
-            self.app.ui_callbacks.limpiar_resultados()
-            
-        self.app.ui_callbacks.actualizar_estado("Buscando...")
-        self.app.btn_buscar.configure(state='disabled', text='Buscando...')
-        self.app.btn_cancelar.configure(state='normal')
-    
-    def _on_search_completed(self, resultados, criterio, metodo, tiempo, silenciosa):
+    def _on_search_completed_async(self, resultados, criterio, metodo, tiempo, silenciosa):
         """Callback cuando se completa búsqueda"""
         if not silenciosa:
             self.app.btn_buscar.configure(state='normal', text='Buscar')
             self.app.btn_cancelar.configure(state='disabled')
         
-        # Mostrar resultados
-        if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
-            formatted_results = self._format_results_for_tree(resultados)
-            self.app.tree_explorer.populate_search_results(formatted_results)
+        # Mostrar resultados según el tipo
+        if metodo == "Multi" and hasattr(self.app, 'mostrar_resultados_multi_ubicacion'):
+            self.app.mostrar_resultados_multi_ubicacion(resultados, criterio)
         else:
             self.app.ui_callbacks.mostrar_resultados(resultados, metodo, tiempo)
         
-        # Actualizar estado
-        mensaje = f"Encontradas {len(resultados)} carpetas ({metodo}) - {tiempo:.2f}s"
+        # Mensaje de estado
+        mensaje = f"✅ {len(resultados)} carpetas encontradas ({metodo}) - {tiempo:.2f}s"
         self.app.ui_callbacks.actualizar_estado(mensaje)
         
         # Agregar al historial si no es silenciosa
@@ -260,87 +317,11 @@ class SearchCoordinator:
         """Alias para cancelar_busqueda"""
         return self.cancelar_busqueda()
     
-    def construir_cache_automatico(self):
-        """Construcción inteligente de cache automático"""
-        if not self._should_build_cache_automatically():
-            return
-        
-        if (self.app.cache_manager.construyendo or 
-            (hasattr(self.app, 'search_manager') and self.app.search_manager.busqueda_activa)):
-            return
-        
-        self.app.btn_buscar.config(state='disabled')
-        self.app.ui_callbacks.actualizar_estado("Construyendo cache automáticamente... 0%")
-        
-        threading.Thread(target=self._ejecutar_construccion_cache_visual, daemon=True).start()
-    
-    def _should_build_cache_automatically(self):
-        """Determina si debería construir cache automáticamente"""
-        try:
-            if not self.app.ruta_carpeta or not os.path.exists(self.app.ruta_carpeta):
-                return False
-            
-            cache_manager = self.app.cache_manager
-            
-            if (cache_manager.cache.valido and 
-                len(cache_manager.cache.directorios.get('directorios', [])) > 0):
-                return False
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error verificando necesidad de cache: {e}")
-            return False
-    
-    def construir_cache_manual(self):
-        """Inicia construcción manual de cache"""
-        if not self.app.ruta_carpeta:
-            self.app.ui_callbacks.mostrar_advertencia("Seleccione una ruta primero")
-            return
-        
-        if self.app.cache_manager.construyendo:
-            self.app.ui_callbacks.actualizar_estado("Ya se está construyendo el cache")
-            return
-        
-        self.app.btn_buscar.config(state='disabled')
-        self.app.ui_callbacks.actualizar_estado("Iniciando construcción manual de cache... 0%")
-        
-        threading.Thread(target=self._ejecutar_construccion_cache_visual, daemon=True).start()
-    
-    def _ejecutar_construccion_cache_visual(self):
-        """Ejecuta construcción de cache con progreso visual"""
-        try:
-            inicio = time.time()
-            
-            def callback_progreso_cache(procesados, total, mensaje=""):
-                porcentaje = int(procesados) if total == 100 else int((procesados / total) * 100)
-                mensaje_completo = f"{mensaje} - {porcentaje}%" if mensaje else f"Construyendo cache... {porcentaje}%"
-                
-                if porcentaje % 5 == 0 or porcentaje >= 95:
-                    self.app.master.after(0, lambda: self.app.ui_callbacks.actualizar_estado(mensaje_completo))
-            
-            self.app.cache_manager.callback_progreso = callback_progreso_cache
-            
-            if self.app.cache_manager.construir_cache():
-                tiempo_total = time.time() - inicio
-                self.app.master.after(0, lambda: [
-                    self.app.ui_callbacks.actualizar_estado(f"Cache construido en {tiempo_total:.1f}s"),
-                    self.app.actualizar_info_carpeta()
-                ])
-            else:
-                self.app.master.after(0, lambda: [
-                    self.app.ui_callbacks.actualizar_estado("Error al construir cache")
-                ])
-        except Exception as e:
-            self.app.master.after(0, lambda: [
-                self.app.ui_callbacks.actualizar_estado(f"Error crítico: {str(e)}")
-            ])
-        finally:
-            self.app.cache_manager.callback_progreso = None
-            self.app.master.after(0, lambda: self.app.btn_buscar.config(state='normal'))
+    # ELIMINADOS los métodos construir_cache_automatico, construir_cache_manual, etc.
+    # Estos ahora se manejan directamente en cache_manager y app.py
     
     def verificar_problemas_cache(self):
-        """Ejecuta diagnóstico del cache"""
+        """Ejecuta diagnóstico del cache - MÉTODO MANTENIDO para compatibilidad"""
         if not self.app.ruta_carpeta:
             self.app.ui_callbacks.mostrar_advertencia("No hay ruta seleccionada")
             return
@@ -362,7 +343,7 @@ class SearchCoordinator:
             resultado = "Diagnóstico completo:\n\n" + "\n".join([f"{k}: {v}" for k, v in checks])
             
             if not cache_stats['valido'] or cache_stats['carpetas'] == 0:
-                resultado += "\n\nRecomendación: Construir cache de directorios"
+                resultado += "\n\nRecomendación: El caché se construirá automáticamente en la próxima búsqueda"
             
             self.app.ui_callbacks.mostrar_info("Resultados del diagnóstico", resultado)
             
@@ -370,7 +351,7 @@ class SearchCoordinator:
             self.app.ui_callbacks.mostrar_error(f"Error en diagnóstico: {str(e)}")
     
     def limpiar_cache(self):
-        """Limpia el cache completamente"""
+        """Limpia el cache completamente - MÉTODO MANTENIDO para compatibilidad"""
         self.app.cache_manager.limpiar()
         self.app.actualizar_info_carpeta()
         self.app.ui_callbacks.actualizar_estado("Cache limpiado")

@@ -1,5 +1,7 @@
-# src/event_manager.py - Gestión de Eventos V.4.2 (Refactorizado y Corregido)
+# src/event_manager.py - Gestión de Eventos V.4.2 (Mensajes corregidos)
 import tkinter as tk
+import os
+import subprocess
 
 class EventManager:
     """Maneja todos los eventos de la aplicación"""
@@ -163,32 +165,87 @@ class EventManager:
         self.app.configurar_scrollbars()
     
     def abrir_carpeta_seleccionada(self):
-        """Abre la carpeta seleccionada"""
+        """Abre la carpeta seleccionada - CORREGIDO FINAL"""
         seleccion = self.app.ui_callbacks.obtener_seleccion_tabla()
         if not seleccion:
             self._actualizar_estado("Seleccione una carpeta primero")
             return
         
-        ruta_abs = self.app.file_manager.obtener_ruta_absoluta(
-            self.app.ruta_carpeta, seleccion['ruta_rel']
-        )
+        # Obtener ruta absoluta correcta
+        ruta_rel = seleccion['ruta_rel']
         
-        if not self.app.file_manager.verificar_ruta_existe(ruta_abs):
-            self._actualizar_estado(f"La carpeta no existe: {ruta_abs}")
-            return
+        # Si ya es una ruta absoluta, usarla directamente
+        if os.path.isabs(ruta_rel):
+            ruta_abs = ruta_rel
+        else:
+            # Construir ruta absoluta desde la ruta base
+            ruta_abs = os.path.join(self.app.ruta_carpeta, ruta_rel)
         
+        # Normalizar la ruta
+        ruta_abs = os.path.normpath(ruta_abs)
         nombre = seleccion['nombre']
         
+        # Verificar que la carpeta existe ANTES de intentar abrir
+        if not os.path.exists(ruta_abs):
+            self._actualizar_estado(f"La carpeta no existe: {nombre}")
+            return
+        
+        if not os.path.isdir(ruta_abs):
+            self._actualizar_estado(f"La ruta no es un directorio: {nombre}")
+            return
+        
         try:
-            # Intentar abrir y copiar - asumir éxito a menos que haya excepción
-            self.app.file_manager.abrir_carpeta(ruta_abs)
-            self.app.file_manager.copiar_ruta(ruta_abs)
+            # USAR DIRECTAMENTE el método que sabemos que funciona
+            exito = self._abrir_carpeta_directo(ruta_abs)
             
-            # Si llegamos aquí, asumir que funcionó
-            self._actualizar_estado(f"Carpeta abierta y ruta copiada: {nombre}")
-                    
+            if exito:
+                # También copiar la ruta al portapapeles
+                if self._copiar_ruta_portapapeles(ruta_abs):
+                    self._actualizar_estado(f"Carpeta abierta y ruta copiada: {nombre}")
+                else:
+                    self._actualizar_estado(f"Carpeta abierta: {nombre}")
+            else:
+                self._actualizar_estado(f"No se pudo abrir la carpeta: {nombre}")
+                
         except Exception as e:
-            self._actualizar_estado(f"Error abriendo carpeta: {nombre} - {str(e)}")
+            self._actualizar_estado(f"Error abriendo carpeta {nombre}: {str(e)}")
+    
+    def _abrir_carpeta_directo(self, ruta):
+        """Abre carpeta directamente usando subprocess - CORREGIDO DEFINITIVO"""
+        try:
+            import platform
+            
+            sistema = platform.system()
+            
+            if sistema == "Windows":
+                # Para Windows: usar os.startfile que es más confiable
+                try:
+                    os.startfile(ruta)
+                    return True
+                except OSError:
+                    # Fallback con subprocess sin verificar returncode
+                    subprocess.Popen(['explorer', ruta])
+                    return True
+            elif sistema == "Darwin":
+                subprocess.Popen(['open', ruta])
+                return True
+            else:
+                subprocess.Popen(['xdg-open', ruta])
+                return True
+            
+        except Exception as e:
+            print(f"Error abriendo carpeta directamente: {e}")
+            return False
+    
+    def _copiar_ruta_portapapeles(self, ruta):
+        """Copia ruta al portapapeles"""
+        try:
+            self.app.master.clipboard_clear()
+            self.app.master.clipboard_append(ruta)
+            return True
+        except Exception as e:
+            print(f"Error copiando al portapapeles: {e}")
+            return False
     
     def copiar_ruta_seleccionada(self):
         """Copia la ruta de la carpeta seleccionada"""
@@ -197,19 +254,28 @@ class EventManager:
             self._actualizar_estado("Seleccione una carpeta primero")
             return
         
-        ruta_abs = self.app.file_manager.obtener_ruta_absoluta(
-            self.app.ruta_carpeta, seleccion['ruta_rel']
-        )
+        # Obtener ruta absoluta correcta
+        ruta_rel = seleccion['ruta_rel']
         
+        # Si ya es una ruta absoluta, usarla directamente
+        if os.path.isabs(ruta_rel):
+            ruta_abs = ruta_rel
+        else:
+            # Construir ruta absoluta desde la ruta base
+            ruta_abs = os.path.join(self.app.ruta_carpeta, ruta_rel)
+        
+        # Normalizar la ruta
+        ruta_abs = os.path.normpath(ruta_abs)
         nombre = seleccion['nombre']
         
         try:
-            # Intentar copiar - asumir éxito a menos que haya excepción
-            self.app.file_manager.copiar_ruta(ruta_abs)
-            self._actualizar_estado(f"Ruta copiada: {nombre}")
+            if self._copiar_ruta_portapapeles(ruta_abs):
+                self._actualizar_estado(f"Ruta copiada: {nombre}")
+            else:
+                self._actualizar_estado(f"Error copiando ruta: {nombre}")
                     
         except Exception as e:
-            self._actualizar_estado(f"Error copiando ruta: {nombre} - {str(e)}")
+            self._actualizar_estado(f"Error copiando ruta {nombre}: {str(e)}")
     
     def _actualizar_estado(self, mensaje):
         """Helper para actualizar estado"""

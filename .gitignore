@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.pyc
+
+# Cache files
+cache_*.pkl
+*.pkl
+
+# Config files (datos del usuario)
+config.json
+historial_busquedas.json
+search_locations.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Virtual environment
+venv/
+env/
+ENV/
