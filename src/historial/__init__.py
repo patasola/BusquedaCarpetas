@@ -1,8 +1,8 @@
 # src/historial/__init__.py
 """
-Módulo de gestión del historial de búsquedas refactorizado
+Módulo de gestión del historial de búsquedas
 """
 
-from .historial_manager import HistorialManager
+from .historial_storage import HistorialStorage
 
-__all__ = ['HistorialManager']
+__all__ = ['HistorialStorage']
