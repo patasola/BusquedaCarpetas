@@ -73,6 +73,18 @@ class ThemeManager:
     def get_color(self, key):
         return self.colores.get(key, "#FFFFFF")
     
+    def apply_theme_to_item(self, tree, item_id):
+        """Aplica tema a un item individual del TreeView (para items nuevos)"""
+        try:
+            # Obtener tags existentes
+            current_tags = list(tree.item(item_id, 'tags'))
+            # Añadir 'themed' si no existe
+            if 'themed' not in current_tags:
+                current_tags.append('themed')
+            tree.item(item_id, tags=current_tags)
+        except Exception as e:
+            print(f"[ThemeManager] Error aplicando tema a item: {e}")
+    
     def register_callback(self, callback):
         """Registra callback para notificaciones de cambio de tema"""
         if callback not in self.theme_callbacks:
