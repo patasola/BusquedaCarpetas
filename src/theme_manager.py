@@ -151,54 +151,73 @@ class ThemeManager:
             pass
     
     def _actualizar_treeviews(self):
-        """Actualiza TreeViews directamente"""
+        """Actualiza TreeViews usando TAGS (funciona en Windows)"""
+        print(f"[ThemeManager] Aplicando tema {self.tema_actual} a TreeViews")
+        
         try:
+            # Configurar tag universal para items
+            tag_colors = {
+                'fg': self.colores["tree_fg"],
+                'bg': self.colores["tree_bg"]
+            }
+            
             # TreeView principal
             if hasattr(self.app, 'tree') and self.app.tree:
-                tree = self.app.tree
-                tree.configure(
-                    background=self.colores["tree_bg"],
-                    foreground=self.colores["tree_fg"]
-                )
-                if tree.master:
-                    try:
-                        tree.master.configure(bg=self.colores["tree_bg"])
-                    except:
-                        pass
-                tree.update_idletasks()
+                self._apply_theme_to_tree(self.app.tree, "Principal", tag_colors)
             
             # TreeView historial
             if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
                 if hasattr(self.app.historial_manager, 'tree') and self.app.historial_manager.tree:
-                    htree = self.app.historial_manager.tree
-                    htree.configure(
-                        background=self.colores["tree_bg"],
-                        foreground=self.colores["tree_fg"]
-                    )
-                    if htree.master:
-                        try:
-                            htree.master.configure(bg=self.colores["tree_bg"])
-                        except:
-                            pass
-                    htree.update_idletasks()
+                    self._apply_theme_to_tree(self.app.historial_manager.tree, "Historial", tag_colors)
             
             # TreeView explorador
             if hasattr(self.app, 'file_explorer') and self.app.file_explorer:
                 if hasattr(self.app.file_explorer, 'tree') and self.app.file_explorer.tree:
-                    etree = self.app.file_explorer.tree
-                    etree.configure(
-                        background=self.colores["tree_bg"],
-                        foreground=self.colores["tree_fg"]
-                    )
-                    if etree.master:
-                        try:
-                            etree.master.configure(bg=self.colores["tree_bg"])
-                        except:
-                            pass
-                    etree.update_idletasks()
+                    self._apply_theme_to_tree(self.app.file_explorer.tree, "Explorador", tag_colors)
                             
         except Exception as e:
             print(f"[ThemeManager] Error actualizando TreeViews: {e}")
+    
+    def _apply_theme_to_tree(self, tree, nombre, tag_colors):
+        """Aplica tema a un TreeView específico usando tags"""
+        try:
+            print(f"[ThemeManager] Actualizando TreeView {nombre}")
+            
+            # 1. Configurar tag 'themed' con colores
+            tree.tag_configure('themed',
+                foreground=tag_colors['fg'],
+                background=tag_colors['bg']
+            )
+            
+            # 2. Aplicar tag a TODOS los items existentes
+            def apply_to_items(parent=''):
+                items = tree.get_children(parent)
+                for item in items:
+                    # Obtener tags existentes
+                    current_tags = list(tree.item(item, 'tags'))
+                    # Añadir 'themed' si no existe
+                    if 'themed' not in current_tags:
+                        current_tags.append('themed')
+                    tree.item(item, tags=current_tags)
+                    # Recursivo para hijos
+                    apply_to_items(item)
+            
+            apply_to_items()
+            
+            # 3. Actualizar frame contenedor
+            if tree.master:
+                try:
+                    tree.master.configure(bg=self.colores["tree_bg"])
+                except:
+                    pass
+            
+            # 4. Forzar refresh visual
+            tree.update_idletasks()
+            
+            print(f"[ThemeManager] TreeView {nombre} actualizado exitosamente")
+            
+        except Exception as e:
+            print(f"[ThemeManager] Error en TreeView {nombre}: {e}")
     
     def _configurar_estilos_ttk(self):
         """Configura los estilos de ttk"""
