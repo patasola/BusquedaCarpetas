@@ -1,4 +1,4 @@
-# src/theme_manager.py - V2 con actualización forzada de TreeViews
+# src/theme_manager.py - V3 con callbacks y actualización dinámica
 import tkinter as tk
 from tkinter import ttk
 
@@ -8,9 +8,8 @@ class ThemeManager:
     # Definición de paletas de colores
     TEMAS = {
         "claro": {
-            # Modo claro con mejor contraste
             "bg": "#F5F5F5",
-            "fg": "#1e1e1e",  # Texto muy oscuro para legibilidad
+            "fg": "#1e1e1e",
             "bg_alt": "#FFFFFF",
             "fg_alt": "#333333",
             "button_bg": "#E0E0E0",
@@ -19,13 +18,12 @@ class ThemeManager:
             "entry_bg": "#FFFFFF",
             "entry_fg": "#1e1e1e",
             "entry_border": "#CCCCCC",
-            # TreeView con texto oscuro
             "tree_bg": "#FFFFFF",
-            "tree_fg": "#1e1e1e",  # Negro suave para legibilidad
+            "tree_fg": "#1e1e1e",
             "tree_selected_bg": "#0078D7",
             "tree_selected_fg": "#FFFFFF",
             "tree_field_bg": "#FAFAFA",
-            "tree_heading_bg": "#F0F0F0",  # Heading gris claro
+            "tree_heading_bg": "#F0F0F0",
             "frame_bg": "#F5F5F5",
             "border": "#CCCCCC",
             "status_bg": "#007acc",
@@ -36,43 +34,76 @@ class ThemeManager:
             "menu_active_fg": "#FFFFFF",
         },
         "oscuro": {
-            # Paleta VSCode Dark Theme
-            "bg": "#1e1e1e",  # Fondo editor VSCode
-            "fg": "#d4d4d4",  # Texto VSCode
-            "bg_alt": "#252526",  # Sidebar VSCode
+            "bg": "#1e1e1e",
+            "fg": "#d4d4d4",
+            "bg_alt": "#252526",
             "fg_alt": "#cccccc",
-            
-            # Componentes
             "button_bg": "#333333",
             "button_fg": "#d4d4d4",
             "button_active_bg": "#3e3e42",
-            
-            # Entry
             "entry_bg": "#252526",
             "entry_fg": "#d4d4d4",
             "entry_border": "#3e3e42",
-            
-            # TreeView - Colores VSCode
-            "tree_bg": "#252526",  # Sidebar background
-            "tree_fg": "#cccccc",  # Texto lista archivos
-            "tree_selected_bg": "#0974bc",  # Azul selección VSCode
+            "tree_bg": "#252526",
+            "tree_fg": "#cccccc",
+            "tree_selected_bg": "#0974bc",
             "tree_selected_fg": "#ffffff",
             "tree_field_bg": "#252526",
-            "tree_heading_bg": "#2d2d30",  # Heading gris medio (no tan negro)
-            
-            # Frame
+            "tree_heading_bg": "#2d2d30",
             "frame_bg": "#1e1e1e",
             "border": "#3e3e42",
-            
-            # Barras
-            "status_bg": "#007acc",  # Azul barra estado VSCode
+            "status_bg": "#007acc",
             "status_fg": "#ffffff",
-            
-            # Menú
             "menu_bg": "#252526",
             "menu_fg": "#cccccc",
             "menu_active_bg": "#0974bc",
             "menu_active_fg": "#ffffff",
+        }
+    }
+    
+    def __init__(self, app, tema_inicial="claro"):
+        self.app = app
+        self.tema_actual = tema_inicial
+        self.colores = self.TEMAS[tema_inicial].copy()
+        self.theme_callbacks = []
+    
+    def get_color(self, key):
+        return self.colores.get(key, "#FFFFFF")
+    
+    def register_callback(self, callback):
+        """Registra callback para notificaciones de cambio de tema"""
+        if callback not in self.theme_callbacks:
+            self.theme_callbacks.append(callback)
+    
+    def _notify_callbacks(self):
+        """Notifica a todos los callbacks"""
+        for callback in self.theme_callbacks:
+            try:
+                callback()
+            except Exception as e:
+                print(f"[ThemeManager] Error en callback: {e}")
+    
+    def cambiar_tema(self, nombre_tema):
+        if nombre_tema not in self.TEMAS:
+            return
+        
+        self.tema_actual = nombre_tema
+        self.colores = self.TEMAS[nombre_tema].copy()
+        self.aplicar_tema()
+        self._notify_callbacks()
+    
+    def toggle_tema(self):
+        nuevo_tema = "oscuro" if self.tema_actual == "claro" else "claro"
+        self.cambiar_tema(nuevo_tema)
+    
+    def aplicar_tema(self):
+        """Aplica el tema actual a todos los widgets"""
+        self.app.master.configure(bg=self.colores["bg"])
+        self._aplicar_tema_recursivo(self.app.master)
+        self._configurar_estilos_ttk()
+        self._actualizar_treeviews()
+    
+    def _aplicar_tema_recursivo(self, widget):
         try:
             widget_class = widget.winfo_class()
             
@@ -120,66 +151,50 @@ class ThemeManager:
             pass
     
     def _actualizar_treeviews(self):
-        """Actualiza DIRECTAMENTE todos los TreeViews forzando colores"""
-        print(f"[ThemeManager] Actualizando TreeViews a tema {self.tema_actual}")
+        """Actualiza TreeViews directamente"""
         try:
-            # TreeView principal de resultados
+            # TreeView principal
             if hasattr(self.app, 'tree') and self.app.tree:
                 tree = self.app.tree
-                print(f"[ThemeManager] Actualizando TreeView principal")
-                
-                # CRÍTICO: Aplicar colores DIRECTAMENTE al widget
                 tree.configure(
                     background=self.colores["tree_bg"],
                     foreground=self.colores["tree_fg"]
                 )
-                
-                # Actualizar frame contenedor
                 if tree.master:
                     try:
                         tree.master.configure(bg=self.colores["tree_bg"])
-                    except Exception as e:
-                        print(f"[ThemeManager] Error frame principal: {e}")
-                
-                # Forzar refresh
+                    except:
+                        pass
                 tree.update_idletasks()
             
-            # TreeView de historial
+            # TreeView historial
             if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
                 if hasattr(self.app.historial_manager, 'tree') and self.app.historial_manager.tree:
                     htree = self.app.historial_manager.tree
-                    print(f"[ThemeManager] Actualizando TreeView historial")
-                    
                     htree.configure(
                         background=self.colores["tree_bg"],
                         foreground=self.colores["tree_fg"]
                     )
-                    
                     if htree.master:
                         try:
                             htree.master.configure(bg=self.colores["tree_bg"])
-                        except Exception as e:
-                            print(f"[ThemeManager] Error frame historial: {e}")
-                    
+                        except:
+                            pass
                     htree.update_idletasks()
             
-            # TreeView del explorador
+            # TreeView explorador
             if hasattr(self.app, 'file_explorer') and self.app.file_explorer:
                 if hasattr(self.app.file_explorer, 'tree') and self.app.file_explorer.tree:
                     etree = self.app.file_explorer.tree
-                    print(f"[ThemeManager] Actualizando TreeView explorador")
-                    
                     etree.configure(
                         background=self.colores["tree_bg"],
                         foreground=self.colores["tree_fg"]
                     )
-                    
                     if etree.master:
                         try:
                             etree.master.configure(bg=self.colores["tree_bg"])
-                        except Exception as e:
-                            print(f"[ThemeManager] Error frame explorador: {e}")
-                    
+                        except:
+                            pass
                     etree.update_idletasks()
                             
         except Exception as e:
@@ -189,13 +204,12 @@ class ThemeManager:
         """Configura los estilos de ttk"""
         style = ttk.Style()
         
-        # Forzar tema base
         try:
-            style.theme_use('clam')  # Tema base que permite personalización
+            style.theme_use('clam')
         except:
             pass
         
-        # TreeView y Custom.Treeview
+        # TreeView styles
         for style_name in ["Treeview", "Custom.Treeview"]:
             style.configure(style_name,
                 background=self.colores["tree_bg"],
@@ -210,7 +224,7 @@ class ThemeManager:
                 foreground=[("selected", self.colores["tree_selected_fg"])]
             )
         
-        # Headings - usar color específico si existe
+        # Headings
         heading_bg = self.colores.get("tree_heading_bg", self.colores["button_bg"])
         for heading_name in ["Treeview.Heading", "Custom.Treeview.Heading"]:
             style.configure(heading_name,
@@ -223,10 +237,6 @@ class ThemeManager:
             style.map(heading_name,
                 background=[("active", self.colores["button_active_bg"])]
             )
-    
-    def toggle_tema(self):
-        nuevo_tema = "oscuro" if self.tema_actual == "claro" else "claro"
-        self.cambiar_tema(nuevo_tema)
     
     def get_tema_actual(self):
         return self.tema_actual
