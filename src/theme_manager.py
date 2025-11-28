@@ -73,33 +73,6 @@ class ThemeManager:
             "menu_fg": "#cccccc",
             "menu_active_bg": "#0974bc",
             "menu_active_fg": "#ffffff",
-        }
-    }
-    
-    def __init__(self, app, tema_inicial="claro"):
-        self.app = app
-        self.tema_actual = tema_inicial
-        self.colores = self.TEMAS[tema_inicial].copy()
-    
-    def get_color(self, key):
-        return self.colores.get(key, "#FFFFFF")
-    
-    def cambiar_tema(self, nombre_tema):
-        if nombre_tema not in self.TEMAS:
-            return
-        
-        self.tema_actual = nombre_tema
-        self.colores = self.TEMAS[nombre_tema].copy()
-        self.aplicar_tema()
-    
-    def aplicar_tema(self):
-        """Aplica el tema actual a todos los widgets"""
-        self.app.master.configure(bg=self.colores["bg"])
-        self._aplicar_tema_recursivo(self.app.master)
-        self._configurar_estilos_ttk()
-        self._actualizar_treeviews()  # NUEVO: Actualizar TreeViews directamente
-    
-    def _aplicar_tema_recursivo(self, widget):
         try:
             widget_class = widget.winfo_class()
             
@@ -147,38 +120,67 @@ class ThemeManager:
             pass
     
     def _actualizar_treeviews(self):
-        """Actualiza DIRECTAMENTE todos los TreeViews forzando colores en el widget"""
+        """Actualiza DIRECTAMENTE todos los TreeViews forzando colores"""
+        print(f"[ThemeManager] Actualizando TreeViews a tema {self.tema_actual}")
         try:
             # TreeView principal de resultados
             if hasattr(self.app, 'tree') and self.app.tree:
                 tree = self.app.tree
+                print(f"[ThemeManager] Actualizando TreeView principal")
                 
-                # CRÍTICO: Aplicar colores DIRECTAMENTE al widget, no solo estilos
+                # CRÍTICO: Aplicar colores DIRECTAMENTE al widget
                 tree.configure(
                     background=self.colores["tree_bg"],
                     foreground=self.colores["tree_fg"]
                 )
                 
-                # Actualizar frame contenedor también
+                # Actualizar frame contenedor
                 if tree.master:
                     try:
                         tree.master.configure(bg=self.colores["tree_bg"])
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"[ThemeManager] Error frame principal: {e}")
+                
+                # Forzar refresh
+                tree.update_idletasks()
             
             # TreeView de historial
             if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
                 if hasattr(self.app.historial_manager, 'tree') and self.app.historial_manager.tree:
                     htree = self.app.historial_manager.tree
+                    print(f"[ThemeManager] Actualizando TreeView historial")
+                    
                     htree.configure(
                         background=self.colores["tree_bg"],
                         foreground=self.colores["tree_fg"]
                     )
+                    
                     if htree.master:
                         try:
                             htree.master.configure(bg=self.colores["tree_bg"])
-                        except:
-                            pass
+                        except Exception as e:
+                            print(f"[ThemeManager] Error frame historial: {e}")
+                    
+                    htree.update_idletasks()
+            
+            # TreeView del explorador
+            if hasattr(self.app, 'file_explorer') and self.app.file_explorer:
+                if hasattr(self.app.file_explorer, 'tree') and self.app.file_explorer.tree:
+                    etree = self.app.file_explorer.tree
+                    print(f"[ThemeManager] Actualizando TreeView explorador")
+                    
+                    etree.configure(
+                        background=self.colores["tree_bg"],
+                        foreground=self.colores["tree_fg"]
+                    )
+                    
+                    if etree.master:
+                        try:
+                            etree.master.configure(bg=self.colores["tree_bg"])
+                        except Exception as e:
+                            print(f"[ThemeManager] Error frame explorador: {e}")
+                    
+                    etree.update_idletasks()
                             
         except Exception as e:
             print(f"[ThemeManager] Error actualizando TreeViews: {e}")
