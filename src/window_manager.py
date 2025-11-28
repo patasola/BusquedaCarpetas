@@ -72,23 +72,6 @@ class WindowManager:
     def _calculate_expected_width(self):
         """Calcula el ancho esperado según paneles activos"""
         if self.manual_app_width:
-            app_width = self.manual_app_width
-        else:
-            app_width = self.base_app_width
-        
-        return app_width + (self.current_panel_count * self.panel_width)
-    
-    def add_panel(self):
-        """Agrega un panel con redimensionamiento inteligente"""
-        self.current_panel_count += 1
-        self._smart_resize()
-        print(f"[DEBUG] Panel agregado. Total: {self.current_panel_count}")
-    
-    
-    def update_panel_count(self, count):
-        """Actualiza el contador de paneles"""
-        if count != self.current_panel_count:
-            diff = count - self.current_panel_count
             self.current_panel_count = count
             
             if diff > 0:
