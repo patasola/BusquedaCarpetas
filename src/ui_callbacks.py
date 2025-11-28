@@ -89,6 +89,12 @@ class UICallbacks:
             self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
             return
         
+        try:
+            for i, resultado in enumerate(resultados):
+                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                
+                if isinstance(resultado, tuple) and len(resultado) >= 3:
+                    nombre, ruta_rel, ruta_abs = resultado[:3]
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
 
     def actualizar_estado(self, mensaje):
