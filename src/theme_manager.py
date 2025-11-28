@@ -44,18 +44,21 @@ class ThemeManager:
             "entry_bg": "#252526",
             "entry_fg": "#d4d4d4",
             "entry_border": "#3e3e42",
+            # TreeView - Colores mejorados para legibilidad
             "tree_bg": "#252526",
-            "tree_fg": "#cccccc",
+            "tree_fg": "#e8e8e8",  # MÁS BRILLANTE para mejor legibilidad
             "tree_selected_bg": "#0974bc",
             "tree_selected_fg": "#ffffff",
             "tree_field_bg": "#252526",
             "tree_heading_bg": "#2d2d30",
+            "tree_heading_fg": "#b0b0b0",  # GRIS SUAVE para headers, no negro
             "frame_bg": "#1e1e1e",
             "border": "#3e3e42",
             "status_bg": "#007acc",
             "status_fg": "#ffffff",
-            "menu_bg": "#252526",
-            "menu_fg": "#cccccc",
+            # Menú mejorado
+            "menu_bg": "#2d2d30",  # Más claro
+            "menu_fg": "#e0e0e0",  # Más brillante
             "menu_active_bg": "#0974bc",
             "menu_active_fg": "#ffffff",
         }
@@ -245,10 +248,11 @@ class ThemeManager:
         
         # Headings
         heading_bg = self.colores.get("tree_heading_bg", self.colores["button_bg"])
+        heading_fg = self.colores.get("tree_heading_fg", self.colores["button_fg"])  # Usar gris suave
         for heading_name in ["Treeview.Heading", "Custom.Treeview.Heading"]:
             style.configure(heading_name,
                 background=heading_bg,
-                foreground=self.colores["button_fg"],
+                foreground=heading_fg,  # GRIS SUAVE
                 relief="flat",
                 borderwidth=0 if heading_name == "Treeview.Heading" else 1
             )
