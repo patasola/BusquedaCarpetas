@@ -89,12 +89,6 @@ class UICallbacks:
             self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
             return
         
-        try:
-            for i, resultado in enumerate(resultados):
-                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                
-                if isinstance(resultado, tuple) and len(resultado) >= 3:
-                    nombre, ruta_rel, ruta_abs = resultado[:3]
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
 
     def actualizar_estado(self, mensaje):
@@ -160,25 +154,6 @@ class UICallbacks:
             
             nombre = text.replace("📁 ", "").replace("📂 ", "")
             
-            if len(values) >= 2:
-                letra = values[0]
-                ruta_rel = values[1]
-                
-                metodo_map = {"C": "Cache", "T": "Tradicional", "E": "Tree"}
-                metodo_original = metodo_map.get(letra, "Desconocido")
-                
-                return {
-                    'metodo': metodo_original,
-                    'nombre': nombre,
-                    'ruta_rel': ruta_rel
-                }
-            return None
-            
-        except Exception as e:
-            print(f"Error obteniendo selección: {e}")
-            return None
-
-    def hay_seleccion(self):
         """Verifica si hay algún elemento seleccionado"""
         try:
             return len(self.app.tree.selection()) > 0
