@@ -1,0 +1,19 @@
+{
+  "results": {
+    "visible_columns": [
+      "Método",
+      "Ruta",
+      "Demandante",
+      "Demandado"
+    ],
+    "all_columns": [
+      "Método",
+      "Ruta",
+      "Demandante",
+      "Demandado",
+      "Resultados",
+      "Hora",
+      "Tiempo"
+    ]
+  }
+}

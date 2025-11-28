@@ -5,6 +5,8 @@ from datetime import datetime
 import json
 import os
 
+from .column_manager import ColumnManager
+
 class HistorialManager:
     """Gestiona el historial de búsquedas con registro automático y posicionamiento dual"""
     
@@ -212,6 +214,22 @@ class HistorialManager:
             self.tree.column("Resultados", width=50, anchor=tk.CENTER, minwidth=45, stretch=False)  # Reducido de 70
             self.tree.column("Tiempo", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 60
             self.tree.column("Fecha", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 80
+            
+            # Definicion de columnas para ColumnManager
+            column_definitions = {
+                "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "minwidth": 80, "stretch": True, "default_visible": True},
+                "Metodo": {"title": "M", "width": 30, "anchor": "center", "minwidth": 25, "stretch": False, "default_visible": True},
+                "Resultados": {"title": "Res.", "width": 50, "anchor": "center", "minwidth": 45, "stretch": False, "default_visible": True},
+                "Tiempo": {"title": "Tiempo", "width": 55, "anchor": "center", "minwidth": 50, "stretch": False, "default_visible": True},
+                "Fecha": {"title": "Hora", "width": 55, "anchor": "center", "minwidth": 50, "stretch": False, "default_visible": True},
+                "Demandante": {"title": "Demandante", "width": 150, "anchor": "w", "minwidth": 100, "stretch": False, "default_visible": False},
+                "Demandado": {"title": "Demandado", "width": 150, "anchor": "w", "minwidth": 100, "stretch": False, "default_visible": False},
+                "Ruta": {"title": "Ruta", "width": 200, "anchor": "w", "minwidth": 150, "stretch": False, "default_visible": False}
+            }
+            
+            # Inicializar ColumnManager
+            self.column_manager = ColumnManager(self.tree, "historial_tree", column_definitions)
+            
             # Configurar scrollbars
             self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
             vsb.configure(command=self.tree.yview)

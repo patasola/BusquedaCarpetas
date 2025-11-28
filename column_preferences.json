@@ -1,0 +1,29 @@
+{
+  "historial_tree": {
+    "visible_columns": [
+      "Criterio",
+      "Metodo",
+      "Resultados",
+      "Tiempo",
+      "Fecha"
+    ],
+    "column_order": [
+      "Criterio",
+      "Metodo",
+      "Resultados",
+      "Tiempo",
+      "Fecha"
+    ],
+    "column_widths": {
+      "Criterio": 100,
+      "Metodo": 30,
+      "Resultados": 50,
+      "Tiempo": 55,
+      "Fecha": 55,
+      "Demandante": 150,
+      "Demandado": 150,
+      "Ruta": 200,
+      "#0": 200
+    }
+  }
+}
