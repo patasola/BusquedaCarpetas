@@ -1,4 +1,4 @@
-# src/constants.py - Constantes V.4.5 (Mensajes actualizados para nuevo mapeo)
+# src/constants.py - Constantes V.4.5 (Refactored - sin clase Colors)
 
 # Información de la aplicación
 APP_VERSION = "V. 4.5 - Paneles Duales con Redimensión"
@@ -26,36 +26,8 @@ MAX_RESULTADOS = 2000
 PROGRESS_UPDATE_INTERVAL = 100  # Cada 100 carpetas
 RESULT_UPDATE_INTERVAL = 5      # Cada 5%
 
-class Colors:
-    # Colores principales
-    BACKGROUND = "#f6f5f5"
-    TITLE_FG = "#424242"
-    INFO_FG = "#424242"
-    TREE_FG = "#424242"
-    TREE_BG = "#ffffff"
-    TREE_SELECT_BG = "#e3f2fd"
-    TREE_SELECT_FG = "#0d47a1"
-    
-    # Botones
-    BUTTON_BG = "#e0e0e0"
-    BUTTON_FG = "#424242"
-    BUTTON_ACTIVE_BG = "#d0d0d0"
-    
-    # Grises
-    DARK_GRAY = "#424242"
-    MEDIUM_GRAY = "#757575"
-    LIGHT_GRAY = "#e0e0e0"
-    VERY_LIGHT_GRAY = "#f5f5f5"
-    WHITE = "#ffffff"
-    
-    # Barras
-    BLUE_BAR = "#1976D2"
-    CACHE_BAR_BG = "#F0F8FF"
-    STATUS_BAR_BG = "SystemButtonFace"
-    
-    # Encabezados de tabla
-    TABLE_HEADER = "#f8f9fa"
-    TABLE_ALT_ROW = "#f8f9fa"
+# NOTA: Colores ahora se obtienen desde theme_manager.py
+# La clase Colors fue eliminada para evitar duplicación
 
 class Fonts:
     BUTTONS = ("Segoe UI", 9)
@@ -76,18 +48,19 @@ class Messages:
     NUMERIC_MODE = "[123] Numérico"
     ALPHA_MODE = "[ABC] Alfanumérico"
 
-# Constantes legacy para compatibilidad
+# Constantes legacy para compatibilidad (valores temporales)
+# TODO: Migrar código existente a usar theme_manager
 COLORS = {
-    'background': Colors.BACKGROUND,
-    'dark_gray': Colors.DARK_GRAY,
-    'medium_gray': Colors.MEDIUM_GRAY,
-    'light_gray': Colors.LIGHT_GRAY,
-    'very_light_gray': Colors.VERY_LIGHT_GRAY,
-    'white': Colors.WHITE,
-    'blue_bar': Colors.BLUE_BAR,
-    'cache_bar': Colors.CACHE_BAR_BG,
-    'table_header': Colors.TABLE_HEADER,
-    'table_alt_row': Colors.TABLE_ALT_ROW
+    'background': "#f6f5f5",
+    'dark_gray': "#424242",
+    'medium_gray': "#757575",
+    'light_gray': "#e0e0e0",
+    'very_light_gray': "#f5f5f5",
+    'white': "#ffffff",
+    'blue_bar': "#1976D2",
+    'cache_bar': "#F0F8FF",
+    'table_header': "#f8f9fa",
+    'table_alt_row': "#f8f9fa"
 }
 
 FONT_NORMAL = Fonts.NORMAL
