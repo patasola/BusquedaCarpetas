@@ -24,6 +24,12 @@ class UIStateManager:
                 self._actualizar_boton_buscar(False)
                 return True
             
+            # VALIDACIÓN EN MODO NUMÉRICO: Solo permitir números y guión
+            if self.app.modo_numerico:
+                # Permitir solo dígitos y guión (para formato AAAA-NNNNN)
+                if not all(c.isdigit() or c == '-' for c in nuevo_texto):
+                    return False  # Rechazar el carácter
+            
             if len(nuevo_texto.strip()) >= 1:
                 self._actualizar_boton_buscar(True)
             else:

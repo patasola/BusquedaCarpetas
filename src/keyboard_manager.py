@@ -43,6 +43,9 @@ class KeyboardManager:
         self.app.master.bind('<Control-Shift-E>', lambda e: self.toggle_explorador())
         self.app.master.bind('<Control-Shift-Key-e>', lambda e: self.toggle_explorador())
 
+        # F12: Toggle tema
+        self.app.master.bind('<F12>', lambda e: self._toggle_tema())
+
         print("[DEBUG] Atajos de paneles configurados:")
         print("  - Ctrl+Shift+H: Historial")
         print("  - Ctrl+Shift+E: Explorador")
@@ -296,3 +299,9 @@ class KeyboardManager:
             print(f"[DEBUG] Error validando estado del teclado: {e}")
         
         return validation_result
+
+    def _toggle_tema(self):
+        """Toggle entre modo claro y oscuro"""
+        if hasattr(self.app, 'theme_manager'):
+            self.app.theme_manager.toggle_tema()
+            return "break"

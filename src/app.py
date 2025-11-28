@@ -24,6 +24,8 @@ from .keyboard_manager import KeyboardManager
 from .multi_location_search import MultiLocationSearch
 from .search_methods import SearchMethods
 from .results_display import ResultsDisplay
+from .theme_manager import ThemeManager
+from .tree_column_config import TreeColumnConfig
 
 class LocationTooltip:
     """Tooltip para la barra de ubicaciones"""
@@ -205,17 +207,32 @@ class BusquedaCarpetaApp:
         self.ui_callbacks = UICallbacks(self)
         self.ui_manager = UIManager(self)
         self.ui_state_manager = UIStateManager(self)
+        self.ui_state_manager.configurar_validacion()
+
+        # Inicializar gestor de temas
+        self.theme_manager = ThemeManager(self, tema_inicial="claro")
+        self.theme_manager.aplicar_tema()
+        
         self.search_manager = SearchManager(self.cache_manager, self.search_engine, None, self.ui_callbacks)
         self.search_coordinator = SearchCoordinator(self)
         self.event_manager = EventManager(self)
         self.navigation_manager = NavigationManager(self)
         self.file_manager = FileManager(self.config, self.ui_callbacks)
         self.historial_manager = HistorialManager(self)
+        # Inicializar columnas del historial cuando el TreeView esté listo
+        if hasattr(self.historial_manager, 'tree') and self.historial_manager.tree:
+            self.historial_column_config.initialize_when_ready(self.historial_manager.tree)
+        # Configurar columnas para TreeView de historial (inicializar cuando esté listo)
+        self.historial_column_config = TreeColumnConfig(None, "historial")
+        # Se inicializará cuando el historial se muestre por primera vez
         self.file_explorer_manager = FileExplorerManager(self)
         self.keyboard_manager = KeyboardManager(self)
         self.menu_manager = MenuManager(self)
         from .tree_expansion_handler import TreeExpansionHandler
         self.tree_expansion_handler = TreeExpansionHandler(self)
+        # Configurar columnas para TreeView de resultados
+        if hasattr(self, 'tree') and self.tree:
+            self.results_column_config = TreeColumnConfig(self.tree, "results")
 
     def _configure_app(self):
         """Configuración final"""
@@ -426,6 +443,7 @@ class BusquedaCarpetaApp:
             ("F7", "Abrir Archivo", "#e74c3c"),
             ("Ctrl+Shift+E", "Explorador", "#2ecc71"),
             ("Ctrl+Shift+H", "Historial", "#f39c12"),
+            ("F12", "Cambiar Tema", "#8e44ad"),
         ]
         
         for i, (key, desc, color) in enumerate(shortcuts):

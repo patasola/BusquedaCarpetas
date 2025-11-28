@@ -74,6 +74,13 @@ class MenuManager:
             variable=self.app.mostrar_barra_estado,
             command=self.app.toggle_barra_estado
         )
+       
+        ver_menu.add_separator()
+        ver_menu.add_command(
+            label="🌓 Cambiar Tema",
+            command=lambda: self.app.theme_manager.toggle_tema(),
+            accelerator="F12"
+        )
     
     def _create_ayuda_menu(self, menubar):
         """Crea menú Ayuda"""
