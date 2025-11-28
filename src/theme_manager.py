@@ -44,21 +44,21 @@ class ThemeManager:
             "entry_bg": "#252526",
             "entry_fg": "#d4d4d4",
             "entry_border": "#3e3e42",
-            # TreeView - Colores mejorados para legibilidad
-            "tree_bg": "#252526",
-            "tree_fg": "#e8e8e8",  # MÁS BRILLANTE para mejor legibilidad
+            # TreeView - Colores EXACTOS según especificación
+            "tree_bg": "#333333",  # Fondo contenido
+            "tree_fg": "#cccccc",  # Texto items
             "tree_selected_bg": "#0974bc",
             "tree_selected_fg": "#ffffff",
-            "tree_field_bg": "#252526",
-            "tree_heading_bg": "#2d2d30",
-            "tree_heading_fg": "#b0b0b0",  # GRIS SUAVE para headers, no negro
+            "tree_field_bg": "#333333",  # Mismo que tree_bg
+            "tree_heading_bg": "#2d2f32",  # Headers columnas
+            "tree_heading_fg": "#cccccc",  # Texto headers
             "frame_bg": "#1e1e1e",
             "border": "#3e3e42",
             "status_bg": "#007acc",
             "status_fg": "#ffffff",
-            # Menú mejorado
-            "menu_bg": "#2d2d30",  # Más claro
-            "menu_fg": "#e0e0e0",  # Más brillante
+            # Menú
+            "menu_bg": "#2d2d30",
+            "menu_fg": "#e0e0e0",
             "menu_active_bg": "#0974bc",
             "menu_active_fg": "#ffffff",
         }
