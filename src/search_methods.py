@@ -27,6 +27,7 @@ class SearchMethods:
             resultados = self._buscar_cache(criterio)
             if resultados:
                 from .results_display import ResultsDisplay
+                resultados = self._enriquecer_con_bd(resultados, criterio)
                 ResultsDisplay(self.app).mostrar_instantaneos(resultados, criterio, "Cache")
                 return
         
@@ -52,6 +53,8 @@ class SearchMethods:
                         break
                 except Exception as e:
                     continue
+            
+            all_results = self._enriquecer_con_bd(all_results, criterio)
             
             from .results_display import ResultsDisplay
             self.app.master.after(0, lambda: 
@@ -112,6 +115,7 @@ class SearchMethods:
             resultados = self._buscar_cache(criterio)
             if resultados:
                 from .results_display import ResultsDisplay
+                resultados = self._enriquecer_con_bd(resultados, criterio)
                 ResultsDisplay(self.app).mostrar_instantaneos(resultados, criterio, "Cache")
                 return
         
@@ -140,6 +144,8 @@ class SearchMethods:
                 if len(resultados) >= 100:
                     break
             
+            resultados = self._enriquecer_con_bd(resultados, criterio)
+            
             from .results_display import ResultsDisplay
             self.app.master.after(0, lambda: 
                 ResultsDisplay(self.app).mostrar_tradicionales(resultados, criterio))
@@ -162,3 +168,63 @@ class SearchMethods:
             return resultados[:50] if resultados else []
         except:
             return []
+
+    def _convertir_a_radicado(self, criterio):
+        """Convierte formato AAAA-EXP a radicado de 23 dígitos
+        
+        Formato: 110013105017 + AAAA (año) + NNNNN (expediente 5 dígitos) + 00
+        Ejemplo: 2025-10212 → 11001310501720251021200
+        """
+        import re
+        # Detectar formato AAAA-EXP (año-expediente)
+        match = re.match(r'(\d{4})-(\d+)$', criterio)
+        if not match:
+            return None
+        
+        año = match.group(1)  # 4 dígitos del año
+        exp = match.group(2).zfill(5)  # Expediente con padding a 5 dígitos
+        
+        # Formato completo: prefijo (12) + año (4) + exp (5) + sufijo (2) = 23 dígitos
+        radicado = f"110013105017{año}{exp}00"
+        
+        # Verificar que sea exactamente 23 dígitos
+        return radicado if len(radicado) == 23 else None
+    
+    def _enriquecer_con_bd(self, resultados, criterio):
+        """Enriquece resultados con datos de la base de datos"""
+        if not hasattr(self.app, 'database_manager') or not self.app.database_manager:
+            # Sin database manager, retornar con valores vacíos
+            return [(r[0], r[1], r[2], "", "") if len(r) == 3 else 
+                    (r[0], r[1], r[2], r[3], "", "") if len(r) == 4 else r 
+                    for r in resultados]
+        
+        # Intentar convertir criterio a radicado
+        radicado = self._convertir_a_radicado(criterio)
+        if not radicado:
+            # Si no es formato AAAA-EXP, retornar con valores vacíos
+            return [(r[0], r[1], r[2], "", "") if len(r) == 3 else 
+                    (r[0], r[1], r[2], r[3], "", "") if len(r) == 4 else r 
+                    for r in resultados]
+        
+        # Consultar base de datos
+        demandante, demandado = self.app.database_manager.obtener_info_proceso(radicado)
+        
+        # Enriquecer resultados
+        # Tuplas pueden ser de 3 elementos (nombre, ruta_rel, ruta_abs) 
+        # o 4 elementos (nombre, ruta_rel, ruta_abs, ubicacion) para multi-ubicación
+        resultados_enriquecidos = []
+        for resultado in resultados:
+            if len(resultado) == 3:
+                # Búsqueda cache/tradicional: (nombre, ruta_rel, ruta_abs)
+                resultados_enriquecidos.append((
+                    resultado[0], resultado[1], resultado[2], demandante, demandado
+                ))
+            elif len(resultado) == 4:
+                # Búsqueda multi-ubicación: (nombre, ruta_rel, ruta_abs, ubicacion)
+                resultados_enriquecidos.append((
+                    resultado[0], resultado[1], resultado[2], resultado[3], demandante, demandado
+                ))
+            else:
+                resultados_enriquecidos.append(resultado)
+        
+        return resultados_enriquecidos

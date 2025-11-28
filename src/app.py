@@ -107,6 +107,27 @@ class BusquedaCarpetaApp:
         # Módulos extraídos
         self.search_methods = SearchMethods(self)
         self.results_display = ResultsDisplay(self)
+                
+        # ODBC Database Manager
+        try:
+            from .database_manager import DatabaseManager
+            self.database_manager = DatabaseManager(self)
+        except ImportError:
+            self.database_manager = None
+        
+        # ODBC Database Manager
+        try:
+            from .database_manager import DatabaseManager
+            self.database_manager = DatabaseManager(self)
+        except ImportError:
+            self.database_manager = None
+        
+        # ODBC Database Manager
+        try:
+            from .database_manager import DatabaseManager
+            self.database_manager = DatabaseManager(self)
+        except ImportError:
+            self.database_manager = None
         
         # Configurar ventana
         self.window_manager.configurar_ventana()
@@ -333,6 +354,22 @@ class BusquedaCarpetaApp:
             self.ui_manager.toggle_barra_estado()
 
     # Métodos de navegación
+    
+    def actualizar_info_carpeta(self):
+        """Actualiza información de la carpeta seleccionada en la UI"""
+        try:
+            if hasattr(self, 'ruta_carpeta') and self.ruta_carpeta:
+                # Aquí se actualizaría algún label o status con info de la carpeta
+                # Por ahora, solo logging
+                print(f"[INFO] Carpeta actualizada: {self.ruta_carpeta}")
+                
+                # Si existe un label de carpeta, actualizarlo
+                if hasattr(self, 'label_carpeta'):
+                    nombre_carpeta = os.path.basename(self.ruta_carpeta)
+                    self.label_carpeta.config(text=f"📁 {nombre_carpeta}")
+        except Exception as e:
+            print(f"[ERROR] actualizar_info_carpeta: {e}")
+
     def configurar_navegacion_completa(self):
         self.keyboard_manager.configurar_navegacion_completa()
 

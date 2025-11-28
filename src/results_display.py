@@ -106,25 +106,30 @@ class ResultsDisplay:
             print(f"[ERROR] Error en _agregar_batch: {e}")
     
     def _agregar_batch_multi(self, batch, start_index):
-        """Agrega batch multi-ubicaciones CON soporte de subcarpetas"""
+        """Agrega batch multi-ubicaciones CON soporte BD"""
         try:
             for i, resultado in enumerate(batch):
                 try:
                     actual_index = start_index + i
                     tag = 'evenrow' if actual_index % 2 == 0 else 'oddrow'
                     
+                    # Tuplas de 4 (sin BD) o 6 elementos (con BD enriquecido)
                     if isinstance(resultado, tuple) and len(resultado) >= 4:
-                        nombre, ruta_rel, ruta_abs, ubicacion = resultado[:4]
+                        nombre = resultado[0]
+                        ruta_rel = resultado[1]
+                        ruta_abs = resultado[2]
+                        ubicacion = resultado[3]
+                        demandante = resultado[4] if len(resultado) > 4 else ""
+                        demandado = resultado[5] if len(resultado) > 5 else ""
                         
-                        # Insertar item principal
                         item_id = self.app.tree.insert("", "end",
-                            text=f"📂 {nombre} [{ubicacion}]",
-                            values=("M", ruta_abs),
+                            text=f"📂 {nombre}",
+                            values=(ubicacion, ruta_abs, demandante, demandado),
                             tags=(tag,))
                         
-                        # NUEVO: Agregar dummy si tiene subcarpetas
+                        # Agregar dummy si tiene subcarpetas
                         if os.path.isdir(ruta_abs) and self._tiene_subcarpetas(ruta_abs):
-                            self.app.tree.insert(item_id, "end", text="Cargando...", values=("", ""))
+                            self.app.tree.insert(item_id, "end", text="Cargando...", values=("", "", "", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item multi: {e}")
