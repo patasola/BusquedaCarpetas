@@ -66,6 +66,9 @@ class TreeColumnConfig:
     
     def _initialize_columns(self):
         """Inicializa todas las columnas definidas en el TreeView"""
+        # Configurar heading de columna #0 (Carpeta)
+        self.tree.heading("#0", text="Carpeta", anchor="center")
+        
         # Obtener columnas actuales
         current_columns = list(self.tree["columns"])
         
