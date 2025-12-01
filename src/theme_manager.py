@@ -76,9 +76,14 @@ class ThemeManager:
     def apply_theme_to_item(self, tree, item_id):
         """Aplica tema a un item individual del TreeView (para items nuevos)"""
         try:
-            # Obtener tags existentes
+            # PRIMERO: Asegurar que tag esté configurada
+            tree.tag_configure('themed',
+                foreground=self.colores["tree_fg"],
+                background=self.colores["tree_bg"]
+            )
+            
+            # SEGUNDO: Obtener tags existentes y añadir 'themed'
             current_tags = list(tree.item(item_id, 'tags'))
-            # Añadir 'themed' si no existe
             if 'themed' not in current_tags:
                 current_tags.append('themed')
             tree.item(item_id, tags=current_tags)
