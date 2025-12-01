@@ -15,6 +15,7 @@ class TreeExpansionHandler:
         if hasattr(self.app, 'tree') and self.app.tree:
             # Bind del evento de expansión
             self.app.tree.bind('<<TreeviewOpen>>', self.on_tree_expand)
+            self.app.tree.bind('\u003c\u003cTreeviewClose\u003e\u003e', self.on_tree_collapse)
             print("[DEBUG] Evento de expansión configurado en TreeView")
     
     def on_tree_expand(self, event):
@@ -133,3 +134,11 @@ class TreeExpansionHandler:
         self.loaded_items.clear()
         self.loading_items.clear()
         print("[DEBUG] Caché de expansión limpiado")
+    
+    def on_tree_collapse(self, event):
+        """Maneja el evento cuando se colapsa un nodo"""
+        try:
+            if hasattr(self.app, 'ui_callbacks'):
+                self.app.ui_callbacks._ajustar_columnas_inmediato()
+        except Exception as e:
+            print(f"[ERROR] Error en collapse: {e}")
