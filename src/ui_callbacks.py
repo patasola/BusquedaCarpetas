@@ -108,7 +108,7 @@ class UICallbacks:
                                    tags=(tag,))
             
             self.actualizar_estado(f"{len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
-            self._ajustar_columnas_inmediato()
+            # self._ajustar_columnas_inmediato()
             
         except Exception as e:
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")

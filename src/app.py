@@ -117,20 +117,6 @@ class BusquedaCarpetaApp:
         except ImportError:
             self.database_manager = None
         
-        # ODBC Database Manager
-        try:
-            from .database_manager import DatabaseManager
-            self.database_manager = DatabaseManager(self)
-        except ImportError:
-            self.database_manager = None
-        
-        # ODBC Database Manager
-        try:
-            from .database_manager import DatabaseManager
-            self.database_manager = DatabaseManager(self)
-        except ImportError:
-            self.database_manager = None
-        
         # Configurar ventana
         self.window_manager.configurar_ventana()
         self.tree_explorer = None
