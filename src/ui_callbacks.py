@@ -83,6 +83,33 @@ class UICallbacks:
         self.limpiar_resultados()
         
         if not resultados:
+            # Restaurar botón de búsqueda cuando no hay resultados
+            self.app.btn_buscar.configure(state='normal', text='Buscar')
+            self.app.btn_cancelar.configure(state='disabled')
+            self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
+            return
+        
+        try:
+            for i, resultado in enumerate(resultados):
+                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                
+                if isinstance(resultado, tuple) and len(resultado) >= 3:
+                    nombre, ruta_rel, ruta_abs = resultado[:3]
+                elif isinstance(resultado, dict):
+                    nombre = resultado.get('name', 'Sin nombre')
+                    ruta_rel = resultado.get('path', '')
+                else:
+                    continue
+                
+                letra_metodo = metodo[0].upper() if metodo else 'C'
+                self.app.tree.insert("", "end",
+                                   text=f"📁 {nombre}",
+                                   values=(letra_metodo, ruta_rel),
+                                   tags=(tag,))
+            
+            self.actualizar_estado(f"{len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
+            self._ajustar_columnas_inmediato()
+            
         except Exception as e:
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
 
