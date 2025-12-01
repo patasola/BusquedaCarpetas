@@ -13,6 +13,10 @@ class DatabaseManager:
         self.user = ""
         self.password = ""
         self._lock = threading.Lock()
+
+        # Cache en memoria para optimizar búsquedas repetidas
+        self._cache = {}  # {radicado: (demandante, demandado)}
+        self._cache_max_size = 500    
         
     def conectar(self):
         """Establece conexión con la BD"""
@@ -36,6 +40,9 @@ class DatabaseManager:
         Busca información de partes para un radicado.
         Retorna: (demandante, demandado)
         """
+        # Verificar cache primero
+        if radicado in self._cache:
+            return self._cache[radicado]
         if not self.connection:
             if not self.conectar():
                 return None, None
@@ -78,12 +85,22 @@ class DatabaseManager:
             # Unir múltiples partes con " | "
             str_demandante = " | ".join(demandantes) if demandantes else "Desconocido"
             str_demandado = " | ".join(demandados) if demandados else "Desconocido"
-            
+
             # Si no se encontró nada, retornar None para no llenar con "Desconocido"
             if not demandantes and not demandados:
+                self._cache[radicado] = (None, None)
                 return None, None
-                
-            return str_demandante, str_demandado
+
+            # Guardar en cache
+            result = (str_demandante, str_demandado)
+            self._cache[radicado] = result
+
+            # Limpiar cache si excede tamaño máximo (FIFO simple)
+            if len(self._cache) > self._cache_max_size:
+                for _ in range(100):
+                    self._cache.pop(next(iter(self._cache)))
+
+            return result
             
         except pyodbc.Error as e:
             print(f"[DB Query Error] {e}")
@@ -109,3 +126,15 @@ class DatabaseManager:
             return True, "Conexión exitosa"
         except Exception as e:
             return False, str(e)
+        
+    def limpiar_cache(self):
+        """Limpia el cache de procesos"""
+        self._cache.clear()
+        print("[DB] Cache limpiado")
+
+    def get_cache_stats(self):
+        """Retorna estadísticas del cache"""
+        return {
+            'size': len(self._cache),
+            'max_size': self._cache_max_size
+        }
