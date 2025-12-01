@@ -16,7 +16,14 @@ class DatabaseManager:
 
         # Cache en memoria para optimizar búsquedas repetidas
         self._cache = {}  # {radicado: (demandante, demandado)}
-        self._cache_max_size = 500    
+        self._cache_max_size = 500
+
+        # Connection pooling - Keep-alive
+        self.last_query_time = 0
+        self.keep_alive_timer = None
+
+        # Auto-conectar al inicio
+        self._auto_connect()    
         
     def conectar(self):
         """Establece conexión con la BD"""
@@ -42,6 +49,7 @@ class DatabaseManager:
         """
         # Verificar cache primero
         if radicado in self._cache:
+            self.last_query_time = time.time()
             return self._cache[radicado]
         if not self.connection:
             if not self.conectar():
@@ -99,7 +107,7 @@ class DatabaseManager:
             if len(self._cache) > self._cache_max_size:
                 for _ in range(100):
                     self._cache.pop(next(iter(self._cache)))
-
+            self.last_query_time = time.time()
             return result
             
         except pyodbc.Error as e:
@@ -138,3 +146,21 @@ class DatabaseManager:
             'size': len(self._cache),
             'max_size': self._cache_max_size
         }
+      
+    def _auto_connect(self):
+        """Mantiene conexión viva con keep-alive timer"""
+        if not self.connection or self._connection_stale():
+            self.conectar()
+        
+        if self.keep_alive_timer:
+            self.keep_alive_timer.cancel()
+        
+        self.keep_alive_timer = threading.Timer(300, self._auto_connect)
+        self.keep_alive_timer.daemon = True
+        self.keep_alive_timer.start()
+
+    def _connection_stale(self):
+        """Verifica si conexión inactiva >10 min"""
+        if self.last_query_time == 0:
+            return False
+        return time.time() - self.last_query_time > 600
