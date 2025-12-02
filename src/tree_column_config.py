@@ -17,8 +17,8 @@ class TreeColumnConfig:
         "results": {
             "Método": {"title": "M", "width": 35, "anchor": "center", "default_visible": True},
             "Ruta": {"title": "Ruta Relativa", "width": 300, "anchor": "w", "default_visible": True},
-            "Demandante": {"title": "Demandante", "width": 200, "anchor": "w", "default_visible": True},
-            "Demandado": {"title": "Demandado", "width": 200, "anchor": "w", "default_visible": True},
+            "Demandante": {"title": "Demandante", "width": 200, "anchor": "w", "default_visible": False},
+            "Demandado": {"title": "Demandado", "width": 200, "anchor": "w", "default_visible": False},
             "Resultados": {"title": "Res.", "width": 60, "anchor": "center", "default_visible": False},
             "Hora": {"title": "Hora", "width": 80, "anchor": "center", "default_visible": False},
             "Tiempo": {"title": "Tiempo", "width": 70, "anchor": "center", "default_visible": False}
@@ -52,6 +52,7 @@ class TreeColumnConfig:
         if self.tree:
             self._initialize_columns()
             self.load_config()
+            self._reconfigure_all_headings()  # Asegurar headings visibles al inicio
             self.bind_context_menu()
         else:
             print(f"[TreeColumnConfig] Tree no existe aún para {config_id}")
@@ -69,22 +70,24 @@ class TreeColumnConfig:
         # Configurar heading de columna #0 (Carpeta)
         self.tree.heading("#0", text="Carpeta", anchor="center")
         
-        # Obtener columnas actuales
+        # Obtener columnas actuales (Método, Ruta)
         current_columns = list(self.tree["columns"])
         
-        # Añadir columnas faltantes
-        all_columns = list(self.column_defs.keys())
+        # all_available: todas las definidas en COLUMN_DEFINITIONS
+        all_available_columns = list(self.column_defs.keys())
         
-        # Combinar columnas actuales con nuevas (sin duplicados)
-        for col in current_columns:
-            if col not in all_columns:
-                all_columns.insert(current_columns.index(col), col)
+        # CRÍTICO: Crear lista de TODAS las columnas manteniendo orden
+        # Primero las que ya están, luego las adicionales
+        all_columns_ordered = current_columns.copy()
+        for col in all_available_columns:
+            if col not in all_columns_ordered:
+                all_columns_ordered.append(col)
         
-        # Configurar todas las columnas en el TreeView
-        self.tree.configure(columns=tuple(all_columns))
+        # Configurar TODAS las columnas en el tree (para que existan)
+        self.tree.configure(columns=tuple(all_columns_ordered))
         
-        # Configurar cada columna
-        for col_id in all_columns:
+        # Configurar headings y propiedades de TODAS las columnas
+        for col_id in all_columns_ordered:
             col_def = self.column_defs.get(col_id, {
                 "title": col_id,
                 "width": 100,
@@ -101,7 +104,8 @@ class TreeColumnConfig:
                 stretch=col_def.get("stretch", False)
             )
         
-        self.all_columns = all_columns
+        # Guardar todas las columnas disponibles
+        self.all_columns = all_columns_ordered
     
     def bind_context_menu(self):
         """Vincula menú contextual a las cabeceras del TreeView"""
@@ -156,30 +160,39 @@ class TreeColumnConfig:
     def _toggle_column_safe(self, column_id):
         """Toggle seguro de columna con verificación"""
         try:
-            current_columns = list(self.tree["columns"])
+            # CRÍTICO: Usar displaycolumns en lugar de columns
+            # Esto oculta columnas sin cambiar el mapeo de datos
+            all_columns = list(self.tree["columns"])
+            current_display = list(self.tree["displaycolumns"])
             
-            if column_id in current_columns:
+            # Si displaycolumns es '#all', obtener lista real
+            if current_display == ['#all']:
+                current_display = all_columns.copy()
+            
+            if column_id in current_display:
                 # Ocultar - pero mantener al menos 1 columna
-                if len(current_columns) > 1:
-                    current_columns.remove(column_id)
-                    self.tree.configure(columns=tuple(current_columns))
+                if len(current_display) > 1:
+                    current_display.remove(column_id)
+                    self.tree.configure(displaycolumns=tuple(current_display))
+                    self.tree.update_idletasks()
+                    # NO necesitamos reconfigure headings aquí
                     self.save_config()
                 else:
                     print(f"[TreeColumnConfig] No se puede ocultar la última columna")
             else:
                 # Mostrar - añadir en posición original
-                original_index = self.all_columns.index(column_id)
-                
                 # Encontrar posición correcta para mantener orden
-                insert_pos = len(current_columns)
-                for i, col in enumerate(self.all_columns):
+                insert_pos = len(current_display)
+                for col in all_columns:
                     if col == column_id:
                         break
-                    if col in current_columns:
-                        insert_pos = current_columns.index(col) + 1
+                    if col in current_display:
+                        insert_pos = current_display.index(col) + 1
                 
-                current_columns.insert(insert_pos, column_id)
-                self.tree.configure(columns=tuple(current_columns))
+                current_display.insert(insert_pos, column_id)
+                self.tree.configure(displaycolumns=tuple(current_display))
+                self.tree.update_idletasks()
+                # NO necesitamos reconfigure headings aquí
                 self.save_config()
                 
         except Exception as e:
@@ -199,7 +212,7 @@ class TreeColumnConfig:
                     # Filtrar solo columnas que existen
                     valid_columns = [c for c in visible_columns if c in self.all_columns]
                     if valid_columns:
-                        self.tree.configure(columns=tuple(valid_columns))
+                        self.tree.configure(displaycolumns=tuple(valid_columns))
                         return
             
             # Si no hay config guardada, usar defaults
@@ -219,14 +232,12 @@ class TreeColumnConfig:
                     default_visible.append(col_id)
             
             if default_visible:
-                self.tree.configure(columns=tuple(default_visible))
+                self.tree.configure(displaycolumns=tuple(default_visible))
             elif self.all_columns:
-                # Si no hay defaults, mostrar todas
-                self.tree.configure(columns=tuple(self.all_columns[:3]))  # Primeras 3
+                # Si no hay defaults, mostrar primeras 3
+                self.tree.configure(displaycolumns=tuple(self.all_columns[:3]))
             
-            # CRÍTICO: Re-configurar headings después de tree.configure
-            # porque tree.configure(columns=...) resetea headings
-            self._reconfigure_all_headings()
+            # NO necesitamos reconfigure headings aquí
                 
         except Exception as e:
             print(f"[TreeColumnConfig] Error aplicando defaults: {e}")
@@ -241,9 +252,14 @@ class TreeColumnConfig:
             else:
                 all_configs = {}
             
+            # Obtener displaycolumns actual
+            current_display = list(self.tree["displaycolumns"])
+            if current_display == ['#all']:
+                current_display = list(self.tree["columns"])
+            
             # Actualizar configuración de este TreeView
             all_configs[self.config_id] = {
-                'visible_columns': list(self.tree["columns"]),
+                'visible_columns': current_display,
                 'all_columns': self.all_columns
             }
             
