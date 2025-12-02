@@ -223,6 +223,10 @@ class TreeColumnConfig:
             elif self.all_columns:
                 # Si no hay defaults, mostrar todas
                 self.tree.configure(columns=tuple(self.all_columns[:3]))  # Primeras 3
+            
+            # CRÍTICO: Re-configurar headings después de tree.configure
+            # porque tree.configure(columns=...) resetea headings
+            self._reconfigure_all_headings()
                 
         except Exception as e:
             print(f"[TreeColumnConfig] Error aplicando defaults: {e}")
@@ -250,6 +254,24 @@ class TreeColumnConfig:
         except Exception as e:
             print(f"[TreeColumnConfig] Error guardando config: {e}")
     
+    def _reconfigure_all_headings(self):
+        """Re-configura todos los headings (útil después de tree.configure)"""
+        try:
+            # Configurar heading #0
+            self.tree.heading("#0", text="Carpeta", anchor="center")
+            
+            # Configurar headings de todas las columnas visibles
+            current_columns = list(self.tree["columns"])
+            for col_id in current_columns:
+                col_def = self.column_defs.get(col_id, {})
+                self.tree.heading(
+                    col_id, 
+                    text=col_def.get("title", col_id), 
+                    anchor=col_def.get("anchor", "w")
+                )
+        except Exception as e:
+            print(f"[TreeColumnConfig] Error reconfigurando headings: {e}")
+    
     def _reset_to_defaults(self):
         """Restaura columnas a configuración por defecto"""
         try:
@@ -258,3 +280,4 @@ class TreeColumnConfig:
             print(f"[TreeColumnConfig] Columnas restauradas a defaults para {self.config_id}")
         except Exception as e:
             print(f"[TreeColumnConfig] Error en reset: {e}")
+
