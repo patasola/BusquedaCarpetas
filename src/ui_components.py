@@ -378,8 +378,8 @@ class UIComponents:
         
         
         # Empaquetar scrollbars ANTES del tree
-        # Inicialmente oculto - configurar_scrollbars lo mostrar· si necesario
-        x_scroll.pack_forget()
+        # Empaquetar tree
+        tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 
         # Tags para filas y m√©todos
         tree.tag_configure('oddrow', background='#f8f9fa')
