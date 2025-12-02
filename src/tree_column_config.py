@@ -140,14 +140,51 @@ class TreeColumnConfig:
                 self._drag_data["column"] = column
                 self._drag_data["start_x"] = event.x
                 self.tree.config(cursor="hand2")
+                
+                # Crear línea guía visual
+                self._create_drop_indicator()
         except:
             pass
+    
+    def _create_drop_indicator(self):
+        """Crea línea vertical guía para drag & drop"""
+        try:
+            # Frame delgado para línea vertical
+            self._drop_line = tk.Frame(
+                self.tree.master,
+                bg="#007ACC",  # Azul
+                width=3,
+                height=self.tree.winfo_height()
+            )
+            # Inicialmente oculto
+            self._drop_line.place_forget()
+        except:
+            self._drop_line = None
     
     def _on_drag_motion(self, event):
         """Maneja movimiento durante drag"""
         if self._drag_data["dragging"]:
             # Visual feedback: cambiar cursor
             self.tree.config(cursor="exchange")
+            
+            # Actualizar posición de línea guía
+            try:
+                region = self.tree.identify_region(event.x, event.y)
+                if region == "heading":
+                    target_col = self.tree.identify_column(event.x)
+                    if target_col:
+                        # Obtener bbox de la columna target
+                        bbox = self.tree.bbox(self.tree.get_children()[0] if self.tree.get_children() else "", target_col)
+                        if bbox and self._drop_line:
+                            # Posicionar línea al inicio de la columna target
+                            x_pos = bbox[0]
+                            self._drop_line.place(
+                                x=x_pos,
+                                y=0,
+                                height=self.tree.winfo_height()
+                            )
+            except:
+                pass
     
     def _on_drag_release(self, event):
         """Maneja soltar columna para reordenar"""
@@ -156,30 +193,51 @@ class TreeColumnConfig:
                 return
             
             region = self.tree.identify_region(event.x, event.y)
+            print(f"[DEBUG] Release - Region: {region}, X: {event.x}, Y: {event.y}")
+            
             if region == "heading":
                 source_col = self._drag_data["column"]
                 target_col = self.tree.identify_column(event.x)
                 
+                print(f"[DEBUG] Source: {source_col}, Target: {target_col}")
+                
                 if source_col and target_col and source_col != target_col:
                     self._reorder_columns(source_col, target_col)
+                else:
+                    print(f"[DEBUG] No reorder - Same column or invalid")
             
         finally:
             # Reset drag state
             self._drag_data["dragging"] = False
             self._drag_data["column"] = None
             self.tree.config(cursor="")
+            
+            # Destruir línea guía
+            if hasattr(self, '_drop_line') and self._drop_line:
+                try:
+                    self._drop_line.destroy()
+                    self._drop_line = None
+                except:
+                    pass
     
     def _reorder_columns(self, source_col, target_col):
         """Reordena columnas moviendo source_col a posición de target_col"""
         try:
+            print(f"[DEBUG] _reorder_columns called - Source: {source_col}, Target: {target_col}")
+            
             # Convertir #N a índice
             source_idx = int(source_col.replace("#", "")) - 1
             target_idx = int(target_col.replace("#", "")) - 1
+            
+            print(f"[DEBUG] Indices - Source: {source_idx}, Target: {target_idx}")
             
             # Obtener displaycolumns actual
             current_display = list(self.tree["displaycolumns"])
             if current_display == ['#all']:
                 current_display = list(self.tree["columns"])
+            
+            print(f"[DEBUG] Current display: {current_display}")
+            print(f"[DEBUG] Display length: {len(current_display)}")
             
             # Reordenar
             if 0 <= source_idx < len(current_display) and 0 <= target_idx < len(current_display):
@@ -187,12 +245,18 @@ class TreeColumnConfig:
                 current_display.pop(source_idx)
                 current_display.insert(target_idx, col_to_move)
                 
+                print(f"[DEBUG] New display order: {current_display}")
+                
                 # Aplicar nuevo orden
                 self.tree.configure(displaycolumns=tuple(current_display))
                 self.save_config()
                 print(f"[TreeColumnConfig] Columna '{col_to_move}' movida de posición {source_idx} a {target_idx}")
+            else:
+                print(f"[DEBUG] Index out of range - Source: {source_idx}, Target: {target_idx}, Length: {len(current_display)}")
         except Exception as e:
             print(f"[TreeColumnConfig] Error reordenando: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _on_right_click(self, event):
         """Maneja clic derecho - muestra menú si es en cabecera"""
