@@ -380,6 +380,7 @@ class UIComponents:
         tree.bind('<<TreeviewSelect>>', lambda e: tree.after_idle(configurar_scrollbars))
         tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
         
+        x_scroll.pack(side=tk.BOTTOM, fill=tk.X)
         # Tags para filas y métodos
         tree.tag_configure('oddrow', background='#f8f9fa')
         tree.tag_configure('evenrow', background='#ffffff')
