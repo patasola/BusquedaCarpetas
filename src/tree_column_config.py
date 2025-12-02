@@ -111,6 +111,88 @@ class TreeColumnConfig:
         """Vincula menú contextual a las cabeceras del TreeView"""
         if self.tree:
             self.tree.bind("<Button-3>", self._on_right_click)
+            self.configure_drag_drop()
+    
+    def configure_drag_drop(self):
+        """Configura drag & drop para reordenar columnas"""
+        if not self.tree:
+            return
+        
+        # Variables para tracking de drag
+        self._drag_data = {
+            "dragging": False,
+            "column": None,
+            "start_x": 0
+        }
+        
+        # Bindings para drag & drop
+        self.tree.bind("<ButtonPress-1>", self._on_drag_start, add="+")
+        self.tree.bind("<B1-Motion>", self._on_drag_motion, add="+")
+        self.tree.bind("<ButtonRelease-1>", self._on_drag_release, add="+")
+    
+    def _on_drag_start(self, event):
+        """Detecta inicio de arrastre en heading"""
+        try:
+            region = self.tree.identify_region(event.x, event.y)
+            if region == "heading":
+                column = self.tree.identify_column(event.x)
+                self._drag_data["dragging"] = True
+                self._drag_data["column"] = column
+                self._drag_data["start_x"] = event.x
+                self.tree.config(cursor="hand2")
+        except:
+            pass
+    
+    def _on_drag_motion(self, event):
+        """Maneja movimiento durante drag"""
+        if self._drag_data["dragging"]:
+            # Visual feedback: cambiar cursor
+            self.tree.config(cursor="exchange")
+    
+    def _on_drag_release(self, event):
+        """Maneja soltar columna para reordenar"""
+        try:
+            if not self._drag_data["dragging"]:
+                return
+            
+            region = self.tree.identify_region(event.x, event.y)
+            if region == "heading":
+                source_col = self._drag_data["column"]
+                target_col = self.tree.identify_column(event.x)
+                
+                if source_col and target_col and source_col != target_col:
+                    self._reorder_columns(source_col, target_col)
+            
+        finally:
+            # Reset drag state
+            self._drag_data["dragging"] = False
+            self._drag_data["column"] = None
+            self.tree.config(cursor="")
+    
+    def _reorder_columns(self, source_col, target_col):
+        """Reordena columnas moviendo source_col a posición de target_col"""
+        try:
+            # Convertir #N a índice
+            source_idx = int(source_col.replace("#", "")) - 1
+            target_idx = int(target_col.replace("#", "")) - 1
+            
+            # Obtener displaycolumns actual
+            current_display = list(self.tree["displaycolumns"])
+            if current_display == ['#all']:
+                current_display = list(self.tree["columns"])
+            
+            # Reordenar
+            if 0 <= source_idx < len(current_display) and 0 <= target_idx < len(current_display):
+                col_to_move = current_display[source_idx]
+                current_display.pop(source_idx)
+                current_display.insert(target_idx, col_to_move)
+                
+                # Aplicar nuevo orden
+                self.tree.configure(displaycolumns=tuple(current_display))
+                self.save_config()
+                print(f"[TreeColumnConfig] Columna '{col_to_move}' movida de posición {source_idx} a {target_idx}")
+        except Exception as e:
+            print(f"[TreeColumnConfig] Error reordenando: {e}")
     
     def _on_right_click(self, event):
         """Maneja clic derecho - muestra menú si es en cabecera"""
@@ -147,12 +229,12 @@ class TreeColumnConfig:
             var = tk.BooleanVar(value=is_visible)
             self._menu_vars[col_id] = var
             
-            # CRÍTICO: indicatedon=True muestra checkbox visual
+            # CRÍTICO: indicatoron=True muestra checkbox visual
             menu.add_checkbutton(
                 label=f"  {col_title}",
                 command=lambda c=col_id: self._toggle_column_safe(c),
                 variable=var,
-                indicatedon=True
+                indicatoron=True
             )
         
         menu.add_separator()
