@@ -1,10 +1,10 @@
 {
   "results": {
     "visible_columns": [
-      "Método",
       "Ruta",
       "Demandante",
-      "Demandado"
+      "Demandado",
+      "Método"
     ],
     "all_columns": [
       "Método",

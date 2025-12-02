@@ -193,18 +193,13 @@ class TreeColumnConfig:
                 return
             
             region = self.tree.identify_region(event.x, event.y)
-            print(f"[DEBUG] Release - Region: {region}, X: {event.x}, Y: {event.y}")
             
             if region == "heading":
                 source_col = self._drag_data["column"]
                 target_col = self.tree.identify_column(event.x)
                 
-                print(f"[DEBUG] Source: {source_col}, Target: {target_col}")
-                
                 if source_col and target_col and source_col != target_col:
                     self._reorder_columns(source_col, target_col)
-                else:
-                    print(f"[DEBUG] No reorder - Same column or invalid")
             
         finally:
             # Reset drag state
@@ -223,21 +218,14 @@ class TreeColumnConfig:
     def _reorder_columns(self, source_col, target_col):
         """Reordena columnas moviendo source_col a posición de target_col"""
         try:
-            print(f"[DEBUG] _reorder_columns called - Source: {source_col}, Target: {target_col}")
-            
             # Convertir #N a índice
             source_idx = int(source_col.replace("#", "")) - 1
             target_idx = int(target_col.replace("#", "")) - 1
-            
-            print(f"[DEBUG] Indices - Source: {source_idx}, Target: {target_idx}")
             
             # Obtener displaycolumns actual
             current_display = list(self.tree["displaycolumns"])
             if current_display == ['#all']:
                 current_display = list(self.tree["columns"])
-            
-            print(f"[DEBUG] Current display: {current_display}")
-            print(f"[DEBUG] Display length: {len(current_display)}")
             
             # Reordenar
             if 0 <= source_idx < len(current_display) and 0 <= target_idx < len(current_display):
@@ -245,18 +233,12 @@ class TreeColumnConfig:
                 current_display.pop(source_idx)
                 current_display.insert(target_idx, col_to_move)
                 
-                print(f"[DEBUG] New display order: {current_display}")
-                
                 # Aplicar nuevo orden
                 self.tree.configure(displaycolumns=tuple(current_display))
                 self.save_config()
-                print(f"[TreeColumnConfig] Columna '{col_to_move}' movida de posición {source_idx} a {target_idx}")
-            else:
-                print(f"[DEBUG] Index out of range - Source: {source_idx}, Target: {target_idx}, Length: {len(current_display)}")
+                print(f"[TreeColumnConfig] Columna '{col_to_move}' reordenada: posición {source_idx} → {target_idx}")
         except Exception as e:
-            print(f"[TreeColumnConfig] Error reordenando: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[TreeColumnConfig] Error reordenando columnas: {e}")
     
     def _on_right_click(self, event):
         """Maneja clic derecho - muestra menú si es en cabecera"""
