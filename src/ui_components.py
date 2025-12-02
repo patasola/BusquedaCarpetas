@@ -368,7 +368,7 @@ class UIComponents:
                 content_width = sum(tree.column(col, "width") for col in tree["columns"])
                 if content_width > tree_width - 20:
                     if not x_scroll.winfo_viewable():
-                        x_scroll.pack(side=tk.BOTTOM, fill=tk.X, pady=(1, 0))
+                        x_scroll.pack(side=tk.BOTTOM, fill=tk.X, before=tree)
                 else:
                     if x_scroll.winfo_viewable():
                         x_scroll.pack_forget()
@@ -378,8 +378,8 @@ class UIComponents:
         
         
         # Empaquetar scrollbars ANTES del tree
-        x_scroll.pack(side=tk.BOTTOM, fill=tk.X)
-        tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+        # Inicialmente oculto - configurar_scrollbars lo mostrar· si necesario
+        x_scroll.pack_forget()
 
         # Tags para filas y m√©todos
         tree.tag_configure('oddrow', background='#f8f9fa')
