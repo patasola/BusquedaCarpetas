@@ -129,22 +129,30 @@ class TreeColumnConfig:
                         font=('Segoe UI', 9, 'bold'))
         menu.add_separator()
         
-        # Obtener columnas actualmente visibles
-        visible_columns = list(self.tree["columns"])
+        # Obtener columnas visibles actualmente
+        current_display = list(self.tree["displaycolumns"])
+        if current_display == ['#all']:
+            current_display = list(self.tree["columns"])
+        
+        # Crear variables para cada columna (para persistir estado)
+        self._menu_vars = {}
         
         # Checkbuttons para cada columna disponible
         for col_id in self.all_columns:
-            is_visible = col_id in visible_columns
+            is_visible = col_id in current_display
             col_def = self.column_defs.get(col_id, {})
             col_title = col_def.get("title", col_id)
             
-            # CRÍTICO: Usar indicatedon=1 para que funcione el checkbutton
+            # Crear variable booleana para esta columna
+            var = tk.BooleanVar(value=is_visible)
+            self._menu_vars[col_id] = var
+            
+            # CRÍTICO: indicatedon=True muestra checkbox visual
             menu.add_checkbutton(
                 label=f"  {col_title}",
                 command=lambda c=col_id: self._toggle_column_safe(c),
-                onvalue=1,
-                offvalue=0,
-                variable=tk.IntVar(value=1 if is_visible else 0)
+                variable=var,
+                indicatedon=True
             )
         
         menu.add_separator()
