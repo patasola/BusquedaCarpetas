@@ -376,11 +376,11 @@ class UIComponents:
         y_scroll.config(command=tree.yview)
         x_scroll.config(command=tree.xview)
         
-        tree.bind('<Configure>', lambda e: tree.after_idle(configurar_scrollbars))
-        tree.bind('<<TreeviewSelect>>', lambda e: tree.after_idle(configurar_scrollbars))
-        tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
         
+        # Empaquetar scrollbars ANTES del tree
         x_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+        tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+
         # Tags para filas y métodos
         tree.tag_configure('oddrow', background='#f8f9fa')
         tree.tag_configure('evenrow', background='#ffffff')
