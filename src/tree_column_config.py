@@ -449,13 +449,7 @@ class TreeColumnConfig:
             if region == 'heading':
                 column = self.tree.identify_column(event.x)
                 if column:                
-                    pass
-                # Detectar si esta cerca del borde derecho (separator)
-                column_x = self.tree.bbox(self.tree.get_children()[0] if self.tree.get_children() else '', column)
-                if column_x:
-                    col_right = column_x[0] + column_x[2]
-                    if abs(event.x - col_right) > 5:
-                        return  # No esta en separator, permitir propagacion
+                    
                     self._autofit_column(column)
         except Exception as e:
             print(f'[TreeColumnConfig] Error en doble click: {e}')
