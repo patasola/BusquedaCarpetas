@@ -433,3 +433,56 @@ class TreeColumnConfig:
         except Exception as e:
             print(f"[TreeColumnConfig] Error en reset: {e}")
 
+
+    def configure_doubleclick_resize(self):
+        """Configura doble click en headings para autoajustar ancho"""
+        if not self.tree:
+            return
+        
+        self.tree.bind('<Double-Button-1>', self._on_heading_doubleclick, add='+')
+    
+    def _on_heading_doubleclick(self, event):
+        """Autoajusta ancho de columna al hacer doble click en heading"""
+        try:
+            region = self.tree.identify_region(event.x, event.y)
+            if region == 'heading':
+                column = self.tree.identify_column(event.x)
+                if column:
+                    self._autofit_column(column)
+        except Exception as e:
+            print(f'[TreeColumnConfig] Error en doble click: {e}')
+    
+    def _autofit_column(self, column_id):
+        """Ajusta ancho de columna al contenido mas ancho"""
+        try:
+            items = self.tree.get_children()
+            if not items:
+                return
+            
+            max_width = 100
+            
+            # Ancho del heading
+            heading_text = self.tree.heading(column_id, 'text')
+            if heading_text:
+                max_width = max(max_width, len(str(heading_text)) * 8)
+            
+            # Ancho del contenido
+            if column_id == '#0':
+                for item in items:
+                    text = self.tree.item(item, 'text')
+                    if text:
+                        max_width = max(max_width, len(str(text)) * 7)
+            else:
+                col_index = list(self.tree['columns']).index(column_id)
+                for item in items:
+                    values = self.tree.item(item, 'values')
+                    if values and col_index < len(values):
+                        text = str(values[col_index])
+                        max_width = max(max_width, len(text) * 7)
+            
+            new_width = min(max_width + 20, 600)
+            self.tree.column(column_id, width=new_width)
+            print(f'[TreeColumnConfig] Columna {column_id} ajustada a {new_width}px')
+            
+        except Exception as e:
+            print(f'[TreeColumnConfig] Error autoajustando: {e}')
