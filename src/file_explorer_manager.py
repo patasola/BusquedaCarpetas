@@ -127,6 +127,16 @@ class FileExplorerManager:
             self.ui.tree.bind('<Control-n>', lambda e: self.create_new_folder_inline())
             self.ui.tree.bind('<Control-N>', lambda e: self.create_new_folder_inline())
             
+            # Ctrl+C/X/V para copiar/cortar/pegar
+            self.ui.tree.bind('<Control-c>', lambda e: self.copy_item())
+            self.ui.tree.bind('<Control-C>', lambda e: self.copy_item())
+            self.ui.tree.bind('<Control-x>', lambda e: self.cut_item())
+            self.ui.tree.bind('<Control-X>', lambda e: self.cut_item())
+            self.ui.tree.bind('<Control-v>', lambda e: self.paste_item())
+            self.ui.tree.bind('<Control-V>', lambda e: self.paste_item())
+            
+            print("[DEBUG] Bindings Ctrl+C/X/V configurados")
+            print(f"[DEBUG] Tree existe: {self.ui.tree is not None}")
             print("[DEBUG] Atajo Ctrl+N configurado para crear carpetas inline")
     
     def create_new_folder_inline(self):
@@ -864,6 +874,7 @@ class FileExplorerManager:
     # ==================== CLIPBOARD METHODS (Ctrl+X/C/V) ====================
     
     def copy_item(self):
+        print('[FileExplorer] copy_item() LLAMADO')
         """Copia el item seleccionado al clipboard"""
         selection = self.ui.tree.selection()
         if not selection:
@@ -881,6 +892,7 @@ class FileExplorerManager:
             print('[FileExplorer] Error: no se pudo obtener ruta')
     
     def cut_item(self):
+        print('[FileExplorer] cut_item() LLAMADO')
         """Corta el item seleccionado al clipboard (para mover)"""
         selection = self.ui.tree.selection()
         if not selection:
@@ -898,6 +910,7 @@ class FileExplorerManager:
             print('[FileExplorer] Error: no se pudo obtener ruta')
     
     def paste_item(self):
+        print('[FileExplorer] paste_item() LLAMADO')
         """Pega el item del clipboard en la ubicación seleccionada"""
         import shutil
         
