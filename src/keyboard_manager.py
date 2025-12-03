@@ -16,7 +16,7 @@ class KeyboardManager:
         
         # TreeView eventos
         self.app.tree.bind('<<TreeviewSelect>>', self.app.on_tree_select)
-        self.app.tree.bind("<Double-1>", lambda e: self.app.event_manager.abrir_carpeta_seleccionada())
+        self.app.tree.bind("<Double-1>", lambda e: self.app.event_manager.abrir_carpeta_seleccionada()), add="+"
         
         # Atajos principales REMAPEADOS
         shortcuts = {
