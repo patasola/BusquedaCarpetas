@@ -488,7 +488,8 @@ class TreeColumnConfig:
         """Handle double click on heading to autofit column"""
         try:
             region = self.tree.identify_region(event.x, event.y)
-            if region == 'heading':
+            print(f'[DEBUG] Region: {region}')
+            if region == 'separator':
                 column_id = self.tree.identify_column(event.x)
                 if column_id:
                     self._autofit_column_width(column_id)
