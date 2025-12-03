@@ -535,7 +535,7 @@ class TreeColumnConfig:
             # Medir heading
             heading = str(self.tree.heading(column_id, 'text'))
             if font:
-                max_width = max(max_width, font.measure(heading) + 30)
+                max_width = max(max_width, font.measure(heading) + 50)
             else:
                 max_width = max(max_width, len(heading) * 10 + 20)
             
@@ -549,14 +549,14 @@ class TreeColumnConfig:
                     text = str(values[col_num]) if col_num < len(values) else ''
                 
                 if font:
-                    text_width = font.measure(text) + 40
+                    text_width = font.measure(text) + 50
                 else:
                     text_width = len(text) * 8 + 40
                     
                 max_width = max(max_width, text_width)
             
-            # Aplicar (max 800px)
-            new_width = min(max_width, 800)
+            # Aplicar con 10% margen (max 800px)
+            new_width = int(min(max_width * 1.1, 800))
             self.tree.column(column_id, width=new_width)
             print(f'[TreeColumnConfig] Column {column_id} autofitted: {new_width}px (was {current_width}px)')
             
