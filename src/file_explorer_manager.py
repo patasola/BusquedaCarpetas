@@ -124,8 +124,8 @@ class FileExplorerManager:
         """Configura atajos de teclado para el explorador"""
         if self.tree:
             # Ctrl+N para crear nueva carpeta
-            self.tree.bind('<Control-n>', lambda e: self.create_new_folder_inline())
-            self.tree.bind('<Control-N>', lambda e: self.create_new_folder_inline())
+            self.ui.tree.bind('<Control-n>', lambda e: self.create_new_folder_inline())
+            self.ui.tree.bind('<Control-N>', lambda e: self.create_new_folder_inline())
             
             print("[DEBUG] Atajo Ctrl+N configurado para crear carpetas inline")
     
@@ -135,7 +135,7 @@ class FileExplorerManager:
             # Determinar el directorio donde crear la carpeta
             target_dir = None
             parent_item = None
-            selection = self.tree.selection()
+            selection = self.ui.tree.selection()
             
             if selection:
                 # Si hay algo seleccionado, verificar si es una carpeta
@@ -507,7 +507,7 @@ class FileExplorerManager:
     
     def on_double_click(self, event):
         """Maneja doble clic"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             return
         
@@ -526,7 +526,7 @@ class FileExplorerManager:
     
     def on_enter_key(self, event):
         """Maneja tecla Enter"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             return "break"
         
@@ -549,7 +549,7 @@ class FileExplorerManager:
     
     def handle_f2(self):
         """Inicia edición para renombrar"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             return
         
@@ -723,7 +723,7 @@ class FileExplorerManager:
     
     def copy_selected_path(self):
         """Copia ruta del elemento seleccionado"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             return
         
@@ -737,7 +737,7 @@ class FileExplorerManager:
     
     def open_selected_item(self):
         """Abre el elemento seleccionado con F7"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             return
         
@@ -766,7 +766,7 @@ class FileExplorerManager:
     
     def delete_selected_item(self):
         """Elimina el elemento seleccionado (archivo o carpeta)"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             messagebox.showinfo(
                 "Sin selección",
@@ -844,7 +844,7 @@ class FileExplorerManager:
         if not self.ui or not hasattr(self.ui, 'update_shortcuts_bar'):
             return
         
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             self.ui.update_shortcuts_bar('none')
             return
@@ -865,7 +865,7 @@ class FileExplorerManager:
     
     def copy_item(self):
         """Copia el item seleccionado al clipboard"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             print('[FileExplorer] No hay selección para copiar')
             return
@@ -882,7 +882,7 @@ class FileExplorerManager:
     
     def cut_item(self):
         """Corta el item seleccionado al clipboard (para mover)"""
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if not selection:
             print('[FileExplorer] No hay selección para cortar')
             return
@@ -906,7 +906,7 @@ class FileExplorerManager:
             return
         
         # Obtener destino
-        selection = self.tree.selection()
+        selection = self.ui.tree.selection()
         if selection:
             dest_item = selection[0]
             dest_path = self.item_to_path.get(dest_item)
