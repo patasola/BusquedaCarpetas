@@ -484,11 +484,11 @@ class TreeColumnConfig:
             self.tree.bind('<Double-Button-1>', self._handle_doubleclick_autofit, add='+')
     
     def _handle_doubleclick_autofit(self, event):
-        print(f'[DEBUG] Doubleclick at ({event.x}, {event.y})')
+        
         """Handle double click on heading to autofit column"""
         try:
             region = self.tree.identify_region(event.x, event.y)
-            print(f'[DEBUG] Region: {region}')
+            
             if region == 'separator':
                 column_id = self.tree.identify_column(event.x)
                 if column_id:
@@ -500,24 +500,45 @@ class TreeColumnConfig:
     def _autofit_column_width(self, column_id):
         """Auto-fit column width to content"""
         try:
-            max_width = 100
-            heading = str(self.tree.heading(column_id, 'text'))
-            max_width = max(max_width, len(heading) * 10)
+            items = self.tree.get_children()
+            if not items:
+                return
             
-            for item in self.tree.get_children():
+            max_width = 50  # Mínimo absoluto
+            
+            # Ancho del heading
+            heading = str(self.tree.heading(column_id, 'text'))
+            max_width = max(max_width, len(heading) * 10 + 20)
+            
+            # Obtener índice de columna
+            if column_id != '#0':
+                try:
+                    col_index = list(self.tree['columns']).index(column_id)
+                except ValueError:
+                    print(f'[TreeColumnConfig] Column {column_id} not found in columns')
+                    return
+            
+            # Calcular ancho máximo del contenido
+            for item in items:
                 if column_id == '#0':
                     text = str(self.tree.item(item, 'text'))
                 else:
-                    try:
-                        idx = list(self.tree['columns']).index(column_id)
-                        values = self.tree.item(item, 'values')
-                        text = str(values[idx]) if idx < len(values) else ''
-                    except:
+                    values = self.tree.item(item, 'values')
+                    if col_index < len(values):
+                        text = str(values[col_index])
+                    else:
                         text = ''
-                max_width = max(max_width, len(text) * 8)
+                
+                # Calcular ancho en píxeles (aproximado: 1 carácter = 8px)
+                text_width = len(text) * 8 + 40  # +40 para padding
+                max_width = max(max_width, text_width)
             
-            new_width = min(max_width + 30, 600)
+            # Aplicar nuevo ancho (máximo 800px para evitar columnas demasiado anchas)
+            new_width = min(max_width, 800)
             self.tree.column(column_id, width=new_width)
-            print(f'[TreeColumnConfig] Column {column_id} autofitted to {new_width}px')
+            print(f'[TreeColumnConfig] Column {column_id} autofitted: {new_width}px (content: {max_width}px)')
+            
         except Exception as e:
             print(f'[TreeColumnConfig] Autofit error: {e}')
+            import traceback
+            traceback.print_exc()
