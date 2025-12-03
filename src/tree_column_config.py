@@ -440,19 +440,6 @@ class TreeColumnConfig:
         if not self.tree:
             return
         
-        self.tree.bind('<Double-Button-1>', self._on_heading_doubleclick, add='+')
-    
-    def _on_heading_doubleclick(self, event):
-        """Autoajusta ancho de columna al hacer doble click en heading"""
-        try:
-            region = self.tree.identify_region(event.x, event.y)
-            if region == 'heading':
-                column = self.tree.identify_column(event.x)
-                if column:                
-                    
-                    self._autofit_column(column)
-        except Exception as e:
-            print(f'[TreeColumnConfig] Error en doble click: {e}')
     
     def _autofit_column(self, column_id):
         """Ajusta ancho de columna al contenido mas ancho"""
