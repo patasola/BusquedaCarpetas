@@ -504,19 +504,35 @@ class TreeColumnConfig:
             if not items:
                 return
             
-            max_width = 50  # Mínimo absoluto
+            max_width = 50
             
             # Ancho del heading
             heading = str(self.tree.heading(column_id, 'text'))
             max_width = max(max_width, len(heading) * 10 + 20)
             
-            # Obtener índice de columna
-            if column_id != '#0':
-                try:
-                    col_index = list(self.tree['columns']).index(column_id)
-                except ValueError:
-                    print(f'[TreeColumnConfig] Column {column_id} not found in columns')
-                    return
+            # Calcular ancho del contenido
+            for item in items:
+                if column_id == '#0':
+                    text = str(self.tree.item(item, 'text'))
+                else:
+                    # column_id es #1, #2, etc - convertir a indice
+                    col_num = int(column_id.replace('#', '')) - 1
+                    values = self.tree.item(item, 'values')
+                    text = str(values[col_num]) if col_num < len(values) else ''
+                
+                # 1 caracter = 8px aprox
+                text_width = len(text) * 8 + 40
+                max_width = max(max_width, text_width)
+            
+            # Aplicar (max 800px)
+            new_width = min(max_width, 800)
+            self.tree.column(column_id, width=new_width)
+            print(f'[TreeColumnConfig] Column {column_id} autofitted: {new_width}px')
+            
+        except Exception as e:
+            print(f'[TreeColumnConfig] Autofit error: {e}')
+            import traceback
+            traceback.print_exc()
             
             # Calcular ancho máximo del contenido
             for item in items:
