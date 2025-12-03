@@ -113,7 +113,6 @@ class TreeColumnConfig:
             self.tree.bind("<Button-3>", self._on_right_click)
             self.configure_drag_drop()
         self.setup_doubleclick_autofit()
-        self.configure_doubleclick_resize()
     
     def configure_drag_drop(self):
         """Configura drag & drop para reordenar columnas"""
@@ -492,11 +491,13 @@ class TreeColumnConfig:
 
     
     def setup_doubleclick_autofit(self):
+        print('[TreeColumnConfig] Setting up doubleclick autofit...')
         """Setup double click to autofit column width"""
         if self.tree:
             self.tree.bind('<Double-Button-1>', self._handle_doubleclick_autofit, add='+')
     
     def _handle_doubleclick_autofit(self, event):
+        print(f'[DEBUG] Doubleclick at ({event.x}, {event.y})')
         """Handle double click on heading to autofit column"""
         try:
             region = self.tree.identify_region(event.x, event.y)
