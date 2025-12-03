@@ -942,10 +942,17 @@ class FileExplorerManager:
             new_path = os.path.join(dest_path, item_name)
             
             if os.path.exists(new_path):
-                response = messagebox.askyesno("Conflicto", 
-                    f"{item_name} ya existe\\n¿Sobrescribir?")
-                if not response:
-                    return
+                # Auto-renombrar si existe (sin preguntar)
+                base, ext = os.path.splitext(item_name)
+                counter = 1
+                while os.path.exists(new_path):
+                    if ext:
+                        new_name = f"{base}_{counter}{ext}"
+                    else:
+                        new_name = f"{item_name}_{counter}"
+                    new_path = os.path.join(dest_path, new_name)
+                    counter += 1
+                print(f'[FileExplorer] Auto-renombrado a: {os.path.basename(new_path)}')
             
             if mode == 'copy':
                 if os.path.isdir(source_path):
