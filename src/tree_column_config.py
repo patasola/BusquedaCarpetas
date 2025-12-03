@@ -446,7 +446,7 @@ class TreeColumnConfig:
         """Autoajusta ancho de columna al hacer doble click en heading"""
         try:
             region = self.tree.identify_region(event.x, event.y)
-            if region == 'heading':
+            if region == 'separator':
                 column = self.tree.identify_column(event.x)
                 if column:
                     self._autofit_column(column)
