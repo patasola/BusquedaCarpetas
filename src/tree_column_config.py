@@ -112,6 +112,7 @@ class TreeColumnConfig:
         if self.tree:
             self.tree.bind("<Button-3>", self._on_right_click)
             self.configure_drag_drop()
+        self.configure_doubleclick_resize()
     
     def configure_drag_drop(self):
         """Configura drag & drop para reordenar columnas"""
