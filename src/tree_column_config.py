@@ -112,6 +112,7 @@ class TreeColumnConfig:
         if self.tree:
             self.tree.bind("<Button-3>", self._on_right_click)
             self.configure_drag_drop()
+        self.setup_doubleclick_autofit()
         self.configure_doubleclick_resize()
     
     def configure_drag_drop(self):
@@ -488,3 +489,46 @@ class TreeColumnConfig:
             
         except Exception as e:
             print(f'[TreeColumnConfig] Error autoajustando: {e}')
+
+    
+    def setup_doubleclick_autofit(self):
+        """Setup double click to autofit column width"""
+        if self.tree:
+            self.tree.bind('<Double-Button-1>', self._handle_doubleclick_autofit, add='+')
+    
+    def _handle_doubleclick_autofit(self, event):
+        """Handle double click on heading to autofit column"""
+        try:
+            region = self.tree.identify_region(event.x, event.y)
+            if region == 'heading':
+                column_id = self.tree.identify_column(event.x)
+                if column_id:
+                    self._autofit_column_width(column_id)
+                    return 'break'
+        except:
+            pass
+    
+    def _autofit_column_width(self, column_id):
+        """Auto-fit column width to content"""
+        try:
+            max_width = 100
+            heading = str(self.tree.heading(column_id, 'text'))
+            max_width = max(max_width, len(heading) * 10)
+            
+            for item in self.tree.get_children():
+                if column_id == '#0':
+                    text = str(self.tree.item(item, 'text'))
+                else:
+                    try:
+                        idx = list(self.tree['columns']).index(column_id)
+                        values = self.tree.item(item, 'values')
+                        text = str(values[idx]) if idx < len(values) else ''
+                    except:
+                        text = ''
+                max_width = max(max_width, len(text) * 8)
+            
+            new_width = min(max_width + 30, 600)
+            self.tree.column(column_id, width=new_width)
+            print(f'[TreeColumnConfig] Column {column_id} autofitted to {new_width}px')
+        except Exception as e:
+            print(f'[TreeColumnConfig] Autofit error: {e}')
