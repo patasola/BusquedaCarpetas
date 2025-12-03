@@ -463,7 +463,7 @@ class TreeColumnConfig:
                         max_width = max(max_width, len(str(text)) * 7)
                     values = self.tree.item(item, 'values')
                     # identify_column devuelve #N, necesitamos convertir a indice
-                    col_num = int(column_id.replace('#', ')) - 1
+                    col_num = int(column_id.replace('#', '')) - 1
                     if col_num < len(values):
                         text = str(values[col_num])
                     else:
