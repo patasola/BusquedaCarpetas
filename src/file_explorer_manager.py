@@ -39,6 +39,9 @@ class FileExplorerManager:
         self.loading_items = set()
         self.loaded_items = set()
         self.expanding_items = set()
+
+        # Clipboard para Ctrl+X/C/V
+        self._clipboard = {'path': None, 'mode': None}
     
     @property
     def frame(self):
@@ -858,3 +861,100 @@ class FileExplorerManager:
                 self.ui.update_shortcuts_bar('none')
         else:
             self.ui.update_shortcuts_bar('none')
+    # ==================== CLIPBOARD METHODS (Ctrl+X/C/V) ====================
+    
+    def copy_item(self):
+        """Copia el item seleccionado al clipboard"""
+        selection = self.tree.selection()
+        if not selection:
+            print('[FileExplorer] No hay selección para copiar')
+            return
+        
+        item = selection[0]
+        path = self.item_to_path.get(item)
+        
+        if path:
+            self._clipboard['path'] = path
+            self._clipboard['mode'] = 'copy'
+            print(f'[FileExplorer] Copiado: {path}')
+        else:
+            print('[FileExplorer] Error: no se pudo obtener ruta')
+    
+    def cut_item(self):
+        """Corta el item seleccionado al clipboard (para mover)"""
+        selection = self.tree.selection()
+        if not selection:
+            print('[FileExplorer] No hay selección para cortar')
+            return
+        
+        item = selection[0]
+        path = self.item_to_path.get(item)
+        
+        if path:
+            self._clipboard['path'] = path
+            self._clipboard['mode'] = 'cut'
+            print(f'[FileExplorer] Cortado: {path}')
+        else:
+            print('[FileExplorer] Error: no se pudo obtener ruta')
+    
+    def paste_item(self):
+        """Pega el item del clipboard en la ubicación seleccionada"""
+        import shutil
+        
+        if not self._clipboard.get('path'):
+            print('[FileExplorer] Clipboard vacío')
+            return
+        
+        # Obtener destino
+        selection = self.tree.selection()
+        if selection:
+            dest_item = selection[0]
+            dest_path = self.item_to_path.get(dest_item)
+        else:
+            dest_path = self.current_path
+        
+        if not dest_path or not os.path.isdir(dest_path):
+            messagebox.showerror("Error", "Destino debe ser una carpeta")
+            return
+        
+        source_path = self._clipboard['path']
+        mode = self._clipboard['mode']
+        
+        try:
+            if not os.path.exists(source_path):
+                messagebox.showerror("Error", f"Origen no existe:\\n{source_path}")
+                return
+            
+            item_name = os.path.basename(source_path)
+            new_path = os.path.join(dest_path, item_name)
+            
+            if os.path.exists(new_path):
+                response = messagebox.askyesno("Conflicto", 
+                    f"{item_name} ya existe\\n¿Sobrescribir?")
+                if not response:
+                    return
+            
+            if mode == 'copy':
+                if os.path.isdir(source_path):
+                    shutil.copytree(source_path, new_path, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(source_path, new_path)
+                print(f'[FileExplorer] Copiado: {source_path} → {new_path}')
+                messagebox.showinfo("Éxito", f"Copiado a:\\n{new_path}")
+                
+            elif mode == 'cut':
+                shutil.move(source_path, new_path)
+                print(f'[FileExplorer] Movido: {source_path} → {new_path}')
+                messagebox.showinfo("Éxito", f"Movido a:\\n{new_path}")
+                self._clipboard = {'path': None, 'mode': None}
+            
+            self.refresh_tree()
+            
+        except PermissionError:
+            messagebox.showerror("Error", "Sin permisos para realizar la operación")
+        except OSError as e:
+            messagebox.showerror("Error", f"Error:\\n{str(e)}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado:\\n{str(e)}")
+            import traceback
+            traceback.print_exc()
