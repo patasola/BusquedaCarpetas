@@ -449,6 +449,7 @@ class TreeColumnConfig:
             if region == 'heading':
                 column = self.tree.identify_column(event.x)
                 if column:                
+                    pass
                 # Detectar si esta cerca del borde derecho (separator)
                 column_x = self.tree.bbox(self.tree.get_children()[0] if self.tree.get_children() else '', column)
                 if column_x:
