@@ -3,8 +3,8 @@
     "visible_columns": [
       "Ruta",
       "Demandante",
-      "Demandado",
-      "Método"
+      "Método",
+      "Demandado"
     ],
     "all_columns": [
       "Método",

@@ -42,6 +42,8 @@ class TreeColumnConfig:
             config_id: ID único para persistencia ('results' o 'historial')
         """
         self.tree = tree
+        # Track de anchos originales para toggle
+        self._original_widths = {}
         self.config_id = config_id
         self.config_file = "tree_column_config.json"
         
@@ -60,6 +62,8 @@ class TreeColumnConfig:
     def initialize_when_ready(self, tree):
         """Inicializa cuando el TreeView esté listo (para historial)"""
         self.tree = tree
+        # Track de anchos originales para toggle
+        self._original_widths = {}
         if self.tree:
             self._initialize_columns()
             self.load_config()
@@ -498,36 +502,63 @@ class TreeColumnConfig:
             pass
     
     def _autofit_column_width(self, column_id):
-        """Auto-fit column width to content"""
+        """Auto-fit column width to content (toggle entre autofit y restore)"""
         try:
+            # Obtener ancho actual
+            current_width = self.tree.column(column_id, 'width')
+            
+            # Si ya guardamos el ancho original, restaurarlo (toggle)
+            if column_id in self._original_widths:
+                original = self._original_widths[column_id]
+                self.tree.column(column_id, width=original)
+                del self._original_widths[column_id]
+                print(f'[TreeColumnConfig] Column {column_id} restored to {original}px')
+                return
+            
+            # Guardar ancho actual para poder restaurar
+            self._original_widths[column_id] = current_width
+            
             items = self.tree.get_children()
             if not items:
                 return
             
+            # Obtener fuente del treeview para medicion real
+            try:
+                import tkinter.font as tkfont
+                font = tkfont.Font(font=self.tree.cget("font"))
+            except:
+                # Fallback: usar fuente por defecto
+                font = None
+            
             max_width = 50
             
-            # Ancho del heading
+            # Medir heading
             heading = str(self.tree.heading(column_id, 'text'))
-            max_width = max(max_width, len(heading) * 10 + 20)
+            if font:
+                max_width = max(max_width, font.measure(heading) + 30)
+            else:
+                max_width = max(max_width, len(heading) * 10 + 20)
             
-            # Calcular ancho del contenido
+            # Medir contenido
             for item in items:
                 if column_id == '#0':
                     text = str(self.tree.item(item, 'text'))
                 else:
-                    # column_id es #1, #2, etc - convertir a indice
                     col_num = int(column_id.replace('#', '')) - 1
                     values = self.tree.item(item, 'values')
                     text = str(values[col_num]) if col_num < len(values) else ''
                 
-                # 1 caracter = 8px aprox
-                text_width = len(text) * 8 + 40
+                if font:
+                    text_width = font.measure(text) + 40
+                else:
+                    text_width = len(text) * 8 + 40
+                    
                 max_width = max(max_width, text_width)
             
             # Aplicar (max 800px)
             new_width = min(max_width, 800)
             self.tree.column(column_id, width=new_width)
-            print(f'[TreeColumnConfig] Column {column_id} autofitted: {new_width}px')
+            print(f'[TreeColumnConfig] Column {column_id} autofitted: {new_width}px (was {current_width}px)')
             
         except Exception as e:
             print(f'[TreeColumnConfig] Autofit error: {e}')
