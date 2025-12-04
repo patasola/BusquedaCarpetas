@@ -1105,8 +1105,8 @@ class FileExplorerManager:
             shutil.move(source_path, new_path)
             print(f'[FileExplorer] Movido (drag): {source_path} → {new_path}')
             
-            # Actualizar UI
-            self.refresh_tree()
+            # Actualizar UI en background (no bloquear)
+            self.ui.tree.after(100, self.refresh_tree)
             
         except PermissionError:
             messagebox.showerror("Error", "Sin permisos para mover")
