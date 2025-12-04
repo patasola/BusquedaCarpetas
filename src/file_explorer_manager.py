@@ -1017,49 +1017,16 @@ class FileExplorerManager:
                     self._drag_state['source_path'] = self.item_to_path.get(item)
                     print(f'[FileExplorer] Drag iniciado: {self._drag_state["source_path"]}')
         
-        # Si drag activo, mostrar guía visual
+        # Si drag activo, mostrar guía visual (validación al soltar)
         if self._drag_state['active']:
             target_item = self.ui.tree.identify_row(event.y)
             if target_item and target_item != self._drag_state['source_item']:
-                target_path = self.item_to_path.get(target_item)
-                
-                # Validar destino
-                if target_path:
-                    # Si es archivo, usar su carpeta padre como destino
-                    if os.path.isfile(target_path):
-                        target_path = os.path.dirname(target_path)
-                    
-                    source_path = self._drag_state['source_path']
-                    # Obtener carpeta padre (donde reside el source)
-                    source_dir = os.path.dirname(source_path)
-                    
-                    # DEBUG
-                    print(f'[DEBUG] source_path: {source_path}')
-                    print(f'[DEBUG] source_dir (padre): {source_dir}')
-                    print(f'[DEBUG] target_path: {target_path}')
-                    print(f'[DEBUG] target != source_dir: {target_path != source_dir}')
-                    print(f'[DEBUG] target.startswith(source): {target_path.startswith(source_path + os.sep)}')
-                    
-                    # Destino válido si:
-                    # 1. Es diferente a carpeta origen
-                    # 2. No es subcarpeta del origen (evitar loops)
-                    is_valid = (
-                        target_path != source_dir and
-                        not target_path.startswith(source_path + os.sep)
-                    )
-                    
-                    if is_valid:
-                        self._show_drop_indicator(target_item)
-                        self.ui.tree.config(cursor='exchange')
-                    else:
-                        self._hide_drop_indicator()
-                        self.ui.tree.config(cursor='no')
-                else:
-                    self._hide_drop_indicator()
-                    self.ui.tree.config(cursor='no')
+                # Siempre mostrar como válido, validar al soltar
+                self._show_drop_indicator(target_item)
+                self.ui.tree.config(cursor='exchange')
             else:
                 self._hide_drop_indicator()
-                self.ui.tree.config(cursor='no')
+                self.ui.tree.config(cursor='')
     
     def _on_drag_release(self, event):
         """Ejecuta drop al soltar"""
@@ -1082,27 +1049,27 @@ class FileExplorerManager:
                 source_path = self._drag_state['source_path']
                 dest_path = self.item_to_path.get(target_item)
                 
-                print(f'[FileExplorer] Drop target: {dest_path}')
-                
                 # Si destino es archivo, usar su carpeta padre
                 if dest_path and os.path.isfile(dest_path):
                     dest_path = os.path.dirname(dest_path)
-                    print(f'[FileExplorer] Destino es archivo, usando padre: {dest_path}')
                 
-                # Validar que destino sea diferente al origen
-                source_dir = os.path.dirname(source_path)
-                
-                if source_path and dest_path and os.path.isdir(dest_path):
-                    # No mover a misma carpeta
+                # Validar que sea carpeta y diferente
+                if dest_path and os.path.isdir(dest_path):
+                    source_dir = os.path.dirname(source_path)
+                    
+                    # Rechazar si: misma carpeta O subcarpeta del origen
                     if dest_path == source_dir:
-                        print('[FileExplorer] Drop inválido: misma carpeta de origen')
+                        print('[FileExplorer] Drop rechazado: misma carpeta origen')
                         return
                     
-                    # Validar no mover a subcarpeta propia
-                    if not dest_path.startswith(source_path + os.sep):
-                        self._drag_paste(source_path, dest_path)
-                    else:
-                        print('[FileExplorer] Drop inválido: no mover a subcarpeta propia')
+                    if dest_path.startswith(source_path + os.sep):
+                        print('[FileExplorer] Drop rechazado: subcarpeta del origen')
+                        return
+                    
+                    # Drop válido: ejecutar movimiento
+                    self._drag_paste(source_path, dest_path)
+                else:
+                    print('[FileExplorer] Drop rechazado: destino no es carpeta válida')
         
         finally:
             # Reset drag state
