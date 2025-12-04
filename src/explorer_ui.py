@@ -72,37 +72,6 @@ class ExplorerUI:
         btn_config = {
             'font': ('Segoe UI', 10),
             'bd': 1,
-            'padx': 8,
-            'pady': 4,
-            'cursor': 'hand2',
-            'relief': 'raised'
-        }
-        
-        # Botón home
-        self.btn_home = tk.Button(
-            nav_frame, 
-            text="🏠", 
-            bg='#e3f2fd', 
-            fg='#1565c0',
-            command=self.explorer_manager.go_home,
-            **btn_config
-        )
-        self.btn_home.pack(side='left', padx=2)
-        
-        # Botón refresh
-        self.btn_refresh = tk.Button(
-            nav_frame, 
-            text="🔄", 
-            bg='#fff3e0', 
-            fg='#e65100',
-            command=self.explorer_manager.refresh_tree,
-            **btn_config
-        )
-        self.btn_refresh.pack(side='left', padx=2)
-        
-        # Botón nueva carpeta
-        self.btn_new_folder = tk.Button(
-            nav_frame, 
             text="📁", 
             bg='#e8f5e9', 
             fg='#2e7d32',
@@ -116,21 +85,6 @@ class ExplorerUI:
             nav_frame, 
             text="🗑", 
             bg='#ffebee', 
-            fg='#c62828',
-            command=self.explorer_manager.delete_selected_item,
-            **btn_config
-        )
-        self.btn_delete.pack(side='left', padx=2)
-        
-        # Tooltips
-        self._create_tooltip(self.btn_home, "Ir a carpeta personal")
-        self._create_tooltip(self.btn_refresh, "Actualizar árbol")
-        self._create_tooltip(self.btn_new_folder, "Nueva carpeta (Ctrl+N)")
-        self._create_tooltip(self.btn_delete, "Eliminar selección (Supr)")
-    
-    def _create_tooltip(self, widget, text):
-        """Crea un tooltip simple para un widget"""
-        def show_tooltip(event):
             tooltip = tk.Toplevel()
             tooltip.wm_overrideredirect(True)
             tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")

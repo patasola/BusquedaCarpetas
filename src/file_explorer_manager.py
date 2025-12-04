@@ -529,6 +529,20 @@ class FileExplorerManager:
         home_path = os.path.expanduser("~")
         self.load_directory(home_path)
     
+    def go_up(self):
+        """Sube un nivel en la jerarquía de carpetas"""
+        if not self.current_path:
+            return
+        
+        parent_path = os.path.dirname(self.current_path)
+        
+        # Evitar subir de la raíz del sistema
+        if parent_path and parent_path != self.current_path:
+            self.load_directory(parent_path)
+            print(f'[FileExplorer] Subiendo a: {parent_path}')
+        else:
+            print('[FileExplorer] Ya estás en la raíz')
+    
     def on_double_click(self, event):
         """Doble click: abre carpeta/archivo en Windows Explorer"""
         selection = self.ui.tree.selection()
