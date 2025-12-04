@@ -1,4 +1,4 @@
-﻿# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
+# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
@@ -41,7 +41,7 @@ class FileExplorerManager:
         self.expanding_items = set()
 
         # Clipboard para Ctrl+X/C/V
-        self._clipboard = {'path': None, 'mode': None}
+        self._clipboard = {'paths': [], 'mode': None}
         
         # Drag & Drop state
         self._drag_state = {
@@ -888,47 +888,44 @@ class FileExplorerManager:
     # ==================== CLIPBOARD METHODS (Ctrl+X/C/V) ====================
     
     def copy_item(self):
-        print('[FileExplorer] copy_item() LLAMADO')
-        """Copia el item seleccionado al clipboard"""
+        """Copia los items seleccionados al clipboard"""
         selection = self.ui.tree.selection()
         if not selection:
             print('[FileExplorer] No hay selección para copiar')
             return
         
-        item = selection[0]
-        path = self.item_to_path.get(item)
+        paths = [self.item_to_path.get(item) for item in selection if self.item_to_path.get(item)]
         
-        if path:
-            self._clipboard['path'] = path
+        if paths:
+            self._clipboard['paths'] = paths
             self._clipboard['mode'] = 'copy'
-            print(f'[FileExplorer] Copiado: {path}')
+            print(f'[FileExplorer] Copiados {len(paths)} items')
         else:
-            print('[FileExplorer] Error: no se pudo obtener ruta')
-    
+            print('[FileExplorer] Error: no se pudo obtener rutas')
+        
     def cut_item(self):
         print('[FileExplorer] cut_item() LLAMADO')
-        """Corta el item seleccionado al clipboard (para mover)"""
+        """Corta los items seleccionados al clipboard (para mover)"""
         selection = self.ui.tree.selection()
         if not selection:
             print('[FileExplorer] No hay selección para cortar')
             return
-        
-        item = selection[0]
-        path = self.item_to_path.get(item)
-        
-        if path:
-            self._clipboard['path'] = path
+
+        paths = [self.item_to_path.get(item) for item in selection if self.item_to_path.get(item)]
+
+        if paths:
+            self._clipboard['paths'] = paths
             self._clipboard['mode'] = 'cut'
-            print(f'[FileExplorer] Cortado: {path}')
+            print(f'[FileExplorer] Cortados {len(paths)} items')
         else:
-            print('[FileExplorer] Error: no se pudo obtener ruta')
+            print('[FileExplorer] Error: no se pudo obtener rutas')
     
     def paste_item(self):
         print('[FileExplorer] paste_item() LLAMADO')
         """Pega el item del clipboard en la ubicación seleccionada"""
         import shutil
         
-        if not self._clipboard.get('path'):
+        if not self._clipboard.get('paths'):
             print('[FileExplorer] Clipboard vacío')
             return
         
@@ -944,45 +941,44 @@ class FileExplorerManager:
             messagebox.showerror("Error", "Destino debe ser una carpeta")
             return
         
-        source_path = self._clipboard['path']
+        source_paths = self._clipboard['paths']
         mode = self._clipboard['mode']
         
         try:
-            if not os.path.exists(source_path):
-                messagebox.showerror("Error", f"Origen no existe:\\n{source_path}")
-                return
-            
-            item_name = os.path.basename(source_path)
-            new_path = os.path.join(dest_path, item_name)
-            
-            if os.path.exists(new_path):
-                # Auto-renombrar si existe (sin preguntar)
-                base, ext = os.path.splitext(item_name)
-                counter = 1
-                while os.path.exists(new_path):
-                    if ext:
-                        new_name = f"{base}_{counter}{ext}"
-                    else:
-                        new_name = f"{item_name}_{counter}"
-                    new_path = os.path.join(dest_path, new_name)
-                    counter += 1
-                print(f'[FileExplorer] Auto-renombrado a: {os.path.basename(new_path)}')
-            
-            if mode == 'copy':
-                if os.path.isdir(source_path):
-                    shutil.copytree(source_path, new_path, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(source_path, new_path)
-                print(f'[FileExplorer] Copiado: {source_path} -> {new_path}')
-                messagebox.showinfo("Éxito", f"Copiado a:\\n{new_path}")
+            successful = 0
+            for source_path in source_paths:
+                if not os.path.exists(source_path):
+                    continue
                 
-            elif mode == 'cut':
-                shutil.move(source_path, new_path)
-                print(f'[FileExplorer] Movido: {source_path} -> {new_path}')
-                messagebox.showinfo("Éxito", f"Movido a:\\n{new_path}")
-                self._clipboard = {'path': None, 'mode': None}
+                item_name = os.path.basename(source_path)
+                new_path = os.path.join(dest_path, item_name)
+                
+                # Auto-renombrar si existe
+                if os.path.exists(new_path):
+                    base, ext = os.path.splitext(item_name)
+                    counter = 1
+                    while os.path.exists(new_path):
+                        new_name = f"{base}_{counter}{ext}" if ext else f"{item_name}_{counter}"
+                        new_path = os.path.join(dest_path, new_name)
+                        counter += 1
+                
+                # Copiar o mover
+                if mode == 'copy':
+                    if os.path.isdir(source_path):
+                        shutil.copytree(source_path, new_path, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(source_path, new_path)
+                    successful += 1
+                elif mode == 'cut':
+                    shutil.move(source_path, new_path)
+                    successful += 1
             
-            self.refresh_tree()
+            if mode == 'cut':
+                self._clipboard = {'paths': [], 'mode': None}
+            
+            # Refresh en background para no congelar UI
+            self.ui.tree.after(100, self.refresh_tree)
+            print(f'[FileExplorer] {successful} items procesados')
             
         except PermissionError:
             messagebox.showerror("Error", "Sin permisos para realizar la operación")

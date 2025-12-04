@@ -168,7 +168,8 @@ class ExplorerUI:
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
         
         # TreeView con el MISMO estilo que el TreeView principal
-        self.tree = ttk.Treeview(tree_frame, columns=("Fecha",), show="tree headings", style="Custom.Treeview")
+        self.tree = ttk.Treeview(tree_frame, columns=("Fecha",), show="tree headings", 
+                         style="Custom.Treeview", selectmode="extended")
         
         # Asegurar que use exactamente el mismo estilo
         style = ttk.Style()
