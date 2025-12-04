@@ -1,4 +1,4 @@
-# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
+﻿# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
@@ -973,12 +973,12 @@ class FileExplorerManager:
                     shutil.copytree(source_path, new_path, dirs_exist_ok=True)
                 else:
                     shutil.copy2(source_path, new_path)
-                print(f'[FileExplorer] Copiado: {source_path} → {new_path}')
+                print(f'[FileExplorer] Copiado: {source_path} -> {new_path}')
                 messagebox.showinfo("Éxito", f"Copiado a:\\n{new_path}")
                 
             elif mode == 'cut':
                 shutil.move(source_path, new_path)
-                print(f'[FileExplorer] Movido: {source_path} → {new_path}')
+                print(f'[FileExplorer] Movido: {source_path} -> {new_path}')
                 messagebox.showinfo("Éxito", f"Movido a:\\n{new_path}")
                 self._clipboard = {'path': None, 'mode': None}
             
@@ -1021,8 +1021,34 @@ class FileExplorerManager:
         if self._drag_state['active']:
             target_item = self.ui.tree.identify_row(event.y)
             if target_item and target_item != self._drag_state['source_item']:
-                self._show_drop_indicator(target_item)
-                self.ui.tree.config(cursor='exchange')
+                target_path = self.item_to_path.get(target_item)
+                
+                # Validar destino
+                if target_path:
+                    # Si es archivo, usar su carpeta padre como destino
+                    if os.path.isfile(target_path):
+                        target_path = os.path.dirname(target_path)
+                    
+                    source_path = self._drag_state['source_path']
+                    source_dir = os.path.dirname(source_path) if os.path.isfile(source_path) else source_path
+                    
+                    # Destino válido si:
+                    # 1. Es diferente a carpeta origen
+                    # 2. No es subcarpeta del origen (evitar loops)
+                    is_valid = (
+                        target_path != source_dir and
+                        not target_path.startswith(source_path + os.sep)
+                    )
+                    
+                    if is_valid:
+                        self._show_drop_indicator(target_item)
+                        self.ui.tree.config(cursor='exchange')
+                    else:
+                        self._hide_drop_indicator()
+                        self.ui.tree.config(cursor='no')
+                else:
+                    self._hide_drop_indicator()
+                    self.ui.tree.config(cursor='no')
             else:
                 self._hide_drop_indicator()
                 self.ui.tree.config(cursor='no')
@@ -1103,7 +1129,7 @@ class FileExplorerManager:
             
             # Drag & Drop siempre mueve
             shutil.move(source_path, new_path)
-            print(f'[FileExplorer] Movido (drag): {source_path} → {new_path}')
+            print(f'[FileExplorer] Movido (drag): {source_path} -> {new_path}')
             
             # Actualizar UI en background (no bloquear)
             self.ui.tree.after(100, self.refresh_tree)
