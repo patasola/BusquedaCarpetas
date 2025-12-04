@@ -1008,7 +1008,7 @@ class FileExplorerManager:
             dx = abs(event.x - self._drag_state['start_x'])
             dy = abs(event.y - self._drag_state['start_y'])
             
-            if dx > 30 or dy > 30:
+            if dx > 10 or dy > 10:
                 # Iniciar drag
                 item = self.ui.tree.identify_row(event.y)
                 if item:
@@ -1016,6 +1016,8 @@ class FileExplorerManager:
                     self._drag_state['source_item'] = item
                     self._drag_state['source_path'] = self.item_to_path.get(item)
                     print(f'[FileExplorer] Drag iniciado: {self._drag_state["source_path"]}')
+                else:
+                    print(f'[DEBUG] Drag threshold alcanzado pero no hay item en y={event.y}')
         
         # Si drag activo, mostrar guía visual (validación al soltar)
         if self._drag_state['active']:
