@@ -43,11 +43,11 @@ class FileExplorerManager:
         # Clipboard para Ctrl+X/C/V
         self._clipboard = {'paths': [], 'mode': None}
         
-        # Drag & Drop state
+        # Drag & Drop state (soporta múltiples items)
         self._drag_state = {
             'active': False,
-            'source_item': None,
-            'source_path': None,
+            'source_items': [],
+            'source_paths': [],
             'start_x': 0,
             'start_y': 0
         }
@@ -530,7 +530,7 @@ class FileExplorerManager:
         self.load_directory(home_path)
     
     def on_double_click(self, event):
-        """Maneja doble clic"""
+        """Doble click: navega a carpeta o abre archivo"""
         selection = self.ui.tree.selection()
         if not selection:
             return
@@ -538,15 +538,16 @@ class FileExplorerManager:
         item = selection[0]
         path = self.item_to_path.get(item)
         
-        if path:
-            if os.path.isdir(path):
-                is_open = self.tree.item(item, 'open')
-                self.tree.item(item, open=not is_open)
-                
-                if not is_open:
-                    self.handle_node_expansion_immediate(item)
-            else:
-                self.file_ops.open_item(path)
+        if not path:
+            return
+        
+        if os.path.isdir(path):
+            # Navegar a la carpeta
+            self.load_directory(path)
+            print(f'[FileExplorer] Navegando a: {path}')
+        elif os.path.isfile(path):
+            # Abrir archivo
+            self.file_ops.open_item(path)
     
     def on_enter_key(self, event):
         """Maneja tecla Enter"""
@@ -1005,18 +1006,21 @@ class FileExplorerManager:
             dy = abs(event.y - self._drag_state['start_y'])
             
             if dx > 10 or dy > 10:
-                # Iniciar drag
-                item = self.ui.tree.identify_row(event.y)
-                if item:
+                # Iniciar drag con selección múltiple
+                selection = self.ui.tree.selection()
+                if selection:
                     self._drag_state['active'] = True
-                    self._drag_state['source_item'] = item
-                    self._drag_state['source_path'] = self.item_to_path.get(item)
-                    print(f'[FileExplorer] Drag iniciado: {self._drag_state["source_path"]}')
+                    self._drag_state['source_items'] = list(selection)
+                    self._drag_state['source_paths'] = [
+                        self.item_to_path.get(item) for item in selection 
+                        if self.item_to_path.get(item)
+                    ]
+                    print(f'[FileExplorer] Drag iniciado: {len(self._drag_state["source_paths"])} items')
         
         # Si drag activo, mostrar guía visual (validación al soltar)
         if self._drag_state['active']:
             target_item = self.ui.tree.identify_row(event.y)
-            if target_item and target_item != self._drag_state['source_item']:
+            if target_item and target_item not in self._drag_state['source_items']:
                 # Siempre mostrar como válido, validar al soltar
                 self._show_drop_indicator(target_item)
                 self.ui.tree.config(cursor='exchange')
@@ -1041,29 +1045,30 @@ class FileExplorerManager:
             # Obtener destino
             target_item = self.ui.tree.identify_row(event.y)
             
-            if target_item and target_item != self._drag_state['source_item']:
-                source_path = self._drag_state['source_path']
+            if target_item and target_item not in self._drag_state['source_items']:
                 dest_path = self.item_to_path.get(target_item)
                 
                 # Si destino es archivo, usar su carpeta padre
                 if dest_path and os.path.isfile(dest_path):
                     dest_path = os.path.dirname(dest_path)
                 
-                # Validar que sea carpeta y diferente
+                # Validar carpeta válida
                 if dest_path and os.path.isdir(dest_path):
-                    source_dir = os.path.dirname(source_path)
-                    
-                    # Rechazar si: misma carpeta O subcarpeta del origen
-                    if dest_path == source_dir:
-                        print('[FileExplorer] Drop rechazado: misma carpeta origen')
-                        return
-                    
-                    if dest_path.startswith(source_path + os.sep):
-                        print('[FileExplorer] Drop rechazado: subcarpeta del origen')
-                        return
-                    
-                    # Drop válido: ejecutar movimiento
-                    self._drag_paste(source_path, dest_path)
+                    # Mover cada item válido
+                    for source_path in self._drag_state['source_paths']:
+                        source_dir = os.path.dirname(source_path)
+                        
+                        # Rechazar si: misma carpeta O subcarpeta del origen
+                        if dest_path == source_dir:
+                            print(f'[FileExplorer] Saltando: {source_path}')
+                            continue
+                        
+                        if dest_path.startswith(source_path + os.sep):
+                            print(f'[FileExplorer] Saltando subcarpeta: {source_path}')
+                            continue
+                        
+                        # Drop válido: ejecutar movimiento
+                        self._drag_paste(source_path, dest_path)
                 else:
                     print('[FileExplorer] Drop rechazado: destino no es carpeta válida')
         
@@ -1071,8 +1076,8 @@ class FileExplorerManager:
             # Reset drag state
             self._drag_state = {
                 'active': False,
-                'source_item': None,
-                'source_path': None,
+                'source_items': [],
+                'source_paths': [],
                 'start_x': 0,
                 'start_y': 0
             }
