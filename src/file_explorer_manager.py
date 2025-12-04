@@ -1016,8 +1016,6 @@ class FileExplorerManager:
                     self._drag_state['source_item'] = item
                     self._drag_state['source_path'] = self.item_to_path.get(item)
                     print(f'[FileExplorer] Drag iniciado: {self._drag_state["source_path"]}')
-                else:
-                    print(f'[DEBUG] Drag threshold alcanzado pero no hay item en y={event.y}')
         
         # Si drag activo, mostrar guía visual (validación al soltar)
         if self._drag_state['active']:
