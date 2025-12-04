@@ -1030,7 +1030,15 @@ class FileExplorerManager:
                         target_path = os.path.dirname(target_path)
                     
                     source_path = self._drag_state['source_path']
-                    source_dir = os.path.dirname(source_path) if os.path.isfile(source_path) else source_path
+                    # Obtener carpeta padre (donde reside el source)
+                    source_dir = os.path.dirname(source_path)
+                    
+                    # DEBUG
+                    print(f'[DEBUG] source_path: {source_path}')
+                    print(f'[DEBUG] source_dir (padre): {source_dir}')
+                    print(f'[DEBUG] target_path: {target_path}')
+                    print(f'[DEBUG] target != source_dir: {target_path != source_dir}')
+                    print(f'[DEBUG] target.startswith(source): {target_path.startswith(source_path + os.sep)}')
                     
                     # Destino válido si:
                     # 1. Es diferente a carpeta origen
@@ -1082,7 +1090,7 @@ class FileExplorerManager:
                     print(f'[FileExplorer] Destino es archivo, usando padre: {dest_path}')
                 
                 # Validar que destino sea diferente al origen
-                source_dir = os.path.dirname(source_path) if os.path.isfile(source_path) else source_path
+                source_dir = os.path.dirname(source_path)
                 
                 if source_path and dest_path and os.path.isdir(dest_path):
                     # No mover a misma carpeta
