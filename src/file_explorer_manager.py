@@ -42,6 +42,16 @@ class FileExplorerManager:
 
         # Clipboard para Ctrl+X/C/V
         self._clipboard = {'path': None, 'mode': None}
+        
+        # Drag & Drop state
+        self._drag_state = {
+            'active': False,
+            'source_item': None,
+            'source_path': None,
+            'start_x': 0,
+            'start_y': 0
+        }
+        self._drop_indicator = None
     
     @property
     def frame(self):
@@ -134,6 +144,10 @@ class FileExplorerManager:
             self.ui.tree.bind('<Control-X>', lambda e: self.cut_item())
             self.ui.tree.bind('<Control-v>', lambda e: self.paste_item())
             self.ui.tree.bind('<Control-V>', lambda e: self.paste_item())
+            
+            # Drag & Drop visual
+            self.ui.tree.bind('<B1-Motion>', self._on_drag_motion, add='+')
+            self.ui.tree.bind('<ButtonRelease-1>', self._on_drag_release, add='+')
             
             print("[DEBUG] Bindings Ctrl+C/X/V configurados")
             print(f"[DEBUG] Tree existe: {self.ui.tree is not None}")
@@ -978,3 +992,141 @@ class FileExplorerManager:
             messagebox.showerror("Error", f"Error inesperado:\\n{str(e)}")
             import traceback
             traceback.print_exc()
+
+    # ==================== DRAG & DROP METHODS ====================
+    
+    def _on_drag_motion(self, event):
+        """Detecta movimiento y activa drag si threshold > 30px"""
+        # Inicializar start position en primer motion
+        if not self._drag_state.get('start_x'):
+            self._drag_state['start_x'] = event.x
+            self._drag_state['start_y'] = event.y
+            return
+        
+        # Activar drag solo si movimiento > 30px
+        if not self._drag_state['active']:
+            dx = abs(event.x - self._drag_state['start_x'])
+            dy = abs(event.y - self._drag_state['start_y'])
+            
+            if dx > 30 or dy > 30:
+                # Iniciar drag
+                item = self.ui.tree.identify_row(event.y)
+                if item:
+                    self._drag_state['active'] = True
+                    self._drag_state['source_item'] = item
+                    self._drag_state['source_path'] = self.item_to_path.get(item)
+                    print(f'[FileExplorer] Drag iniciado: {self._drag_state["source_path"]}')
+        
+        # Si drag activo, mostrar guía visual
+        if self._drag_state['active']:
+            target_item = self.ui.tree.identify_row(event.y)
+            if target_item and target_item != self._drag_state['source_item']:
+                self._show_drop_indicator(target_item)
+                self.ui.tree.config(cursor='exchange')
+            else:
+                self._hide_drop_indicator()
+                self.ui.tree.config(cursor='no')
+    
+    def _on_drag_release(self, event):
+        """Ejecuta drop al soltar"""
+        try:
+            # Reset start position
+            self._drag_state['start_x'] = 0
+            self._drag_state['start_y'] = 0
+            
+            # Limpiar UI
+            self.ui.tree.config(cursor='')
+            self._hide_drop_indicator()
+            
+            if not self._drag_state['active']:
+                return
+            
+            # Obtener destino
+            target_item = self.ui.tree.identify_row(event.y)
+            
+            if target_item and target_item != self._drag_state['source_item']:
+                source_path = self._drag_state['source_path']
+                dest_path = self.item_to_path.get(target_item)
+                
+                if source_path and dest_path and os.path.isdir(dest_path):
+                    # Validar
+                    if not dest_path.startswith(source_path + os.sep):
+                        # Usar paste_item logic
+                        self._drag_paste(source_path, dest_path)
+                    else:
+                        print('[FileExplorer] Drop inválido: no mover a subcarpeta propia')
+        
+        finally:
+            # Reset drag state
+            self._drag_state = {
+                'active': False,
+                'source_item': None,
+                'source_path': None,
+                'start_x': 0,
+                'start_y': 0
+            }
+    
+    def _drag_paste(self, source_path, dest_path):
+        """Ejecuta paste durante drag & drop (siempre mueve)"""
+        import shutil
+        
+        try:
+            item_name = os.path.basename(source_path)
+            new_path = os.path.join(dest_path, item_name)
+            
+            # Auto-renombrar si existe
+            if os.path.exists(new_path):
+                base, ext = os.path.splitext(item_name)
+                counter = 1
+                while os.path.exists(new_path):
+                    if ext:
+                        new_name = f"{base}_{counter}{ext}"
+                    else:
+                        new_name = f"{item_name}_{counter}"
+                    new_path = os.path.join(dest_path, new_name)
+                    counter += 1
+                print(f'[FileExplorer] Auto-renombrado a: {os.path.basename(new_path)}')
+            
+            # Drag & Drop siempre mueve
+            shutil.move(source_path, new_path)
+            print(f'[FileExplorer] Movido (drag): {source_path} → {new_path}')
+            
+            # Actualizar UI
+            self.refresh_tree()
+            
+        except PermissionError:
+            messagebox.showerror("Error", "Sin permisos para mover")
+        except OSError as e:
+            messagebox.showerror("Error", f"Error moviendo:\\n{str(e)}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error inesperado:\\n{str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def _show_drop_indicator(self, target_item):
+        """Muestra línea guía azul en item destino"""
+        try:
+            if not self._drop_indicator:
+                self._drop_indicator = tk.Frame(
+                    self.ui.tree.master,
+                    bg='#007ACC',
+                    height=2
+                )
+            
+            bbox = self.ui.tree.bbox(target_item)
+            if bbox:
+                x, y, width, height = bbox
+                self._drop_indicator.place(
+                    x=0,
+                    y=y + height,
+                    width=self.ui.tree.winfo_width(),
+                    height=2
+                )
+        except:
+            pass
+    
+    def _hide_drop_indicator(self):
+        """Oculta línea guía"""
+        if self._drop_indicator:
+            self._drop_indicator.place_forget()
+
