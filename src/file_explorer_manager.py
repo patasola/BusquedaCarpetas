@@ -530,7 +530,7 @@ class FileExplorerManager:
         self.load_directory(home_path)
     
     def on_double_click(self, event):
-        """Doble click: navega a carpeta o abre archivo"""
+        """Doble click: abre carpeta/archivo en Windows Explorer"""
         selection = self.ui.tree.selection()
         if not selection:
             return
@@ -538,15 +538,8 @@ class FileExplorerManager:
         item = selection[0]
         path = self.item_to_path.get(item)
         
-        if not path:
-            return
-        
-        if os.path.isdir(path):
-            # Navegar a la carpeta
-            self.load_directory(path)
-            print(f'[FileExplorer] Navegando a: {path}')
-        elif os.path.isfile(path):
-            # Abrir archivo
+        if path:
+            # Abrir en Windows Explorer o app predeterminada
             self.file_ops.open_item(path)
     
     def on_enter_key(self, event):
