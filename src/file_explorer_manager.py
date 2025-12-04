@@ -1048,10 +1048,24 @@ class FileExplorerManager:
                 source_path = self._drag_state['source_path']
                 dest_path = self.item_to_path.get(target_item)
                 
+                print(f'[FileExplorer] Drop target: {dest_path}')
+                
+                # Si destino es archivo, usar su carpeta padre
+                if dest_path and os.path.isfile(dest_path):
+                    dest_path = os.path.dirname(dest_path)
+                    print(f'[FileExplorer] Destino es archivo, usando padre: {dest_path}')
+                
+                # Validar que destino sea diferente al origen
+                source_dir = os.path.dirname(source_path) if os.path.isfile(source_path) else source_path
+                
                 if source_path and dest_path and os.path.isdir(dest_path):
-                    # Validar
+                    # No mover a misma carpeta
+                    if dest_path == source_dir:
+                        print('[FileExplorer] Drop inválido: misma carpeta de origen')
+                        return
+                    
+                    # Validar no mover a subcarpeta propia
                     if not dest_path.startswith(source_path + os.sep):
-                        # Usar paste_item logic
                         self._drag_paste(source_path, dest_path)
                     else:
                         print('[FileExplorer] Drop inválido: no mover a subcarpeta propia')
