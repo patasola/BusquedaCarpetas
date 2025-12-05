@@ -212,6 +212,10 @@ class BusquedaCarpetaApp:
         self.historial_column_config = TreeColumnConfig(None, "historial")
         # Se inicializará cuando el historial se muestre por primera vez
         self.file_explorer_manager = FileExplorerManager(self)
+        
+        # Configurar callback para sincronizar TreeView
+        self.file_explorer_manager.on_file_change_callback = self._on_explorer_file_change
+        
         self.keyboard_manager = KeyboardManager(self)
         self.menu_manager = MenuManager(self)
         from .tree_expansion_handler import TreeExpansionHandler
@@ -340,6 +344,41 @@ class BusquedaCarpetaApp:
         """Actualiza ubicaciones de búsqueda"""
         self.multi_location_search.reload_locations()
         self.label_carpeta_info.config(text=self.multi_location_search.get_rotation_text())
+
+    def _on_explorer_file_change(self, operation, paths):
+        """Maneja cambios de archivos del explorador"""
+        print(f'[App] Cambio en explorador: {operation} - {paths}')
+        
+        if not hasattr(self, 'tree') or not self.tree:
+            return
+        
+        # Solo procesar si hay resultados en TreeView
+        if not self.tree.get_children():
+            return
+        
+        if operation in ['delete', 'move']:
+            # Remover items del TreeView
+            self._remove_paths_from_tree(paths if isinstance(paths, list) else [paths])
+        elif operation in ['create', 'copy']:
+            # Re-ejecutar última búsqueda
+            self._refresh_last_search()
+    
+    def _remove_paths_from_tree(self, paths):
+        """Remueve rutas específicas del TreeView"""
+        for path in paths:
+            # Buscar item en TreeView que contenga esta ruta
+            for item in self.tree.get_children():
+                item_values = self.tree.item(item, 'values')
+                if item_values and path in str(item_values[1]):  # Columna 'Ruta Relativa'
+                    self.tree.delete(item)
+                    print(f'[App] Removido del TreeView: {path}')
+                    break
+    
+    def _refresh_last_search(self):
+        """Re-ejecuta la última búsqueda"""
+        # TODO: guardar último criterio de búsqueda
+        print('[App] Re-ejecutando última búsqueda...')
+        # Por ahora solo mensaje, implementar según necesidad
 
     # Toggle methods
     def toggle_historial(self):

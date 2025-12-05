@@ -53,6 +53,9 @@ class FileExplorerManager:
         }
         self._drop_indicator = None
     
+        # Callback para notificar cambios al TreeView principal
+        self.on_file_change_callback = None
+
     @property
     def frame(self):
         return self.ui.frame if self.ui else None
@@ -319,6 +322,10 @@ class FileExplorerManager:
                 self.app.label_estado.config(text=f"Carpeta creada: {new_name}")
             
             print(f"[DEBUG] Carpeta creada exitosamente: {nueva_ruta}")
+            
+            # Notificar al TreeView principal
+            if self.on_file_change_callback:
+                self.on_file_change_callback('create', nueva_ruta)
             
         except PermissionError:
             messagebox.showerror(
@@ -867,10 +874,14 @@ class FileExplorerManager:
                 )
             
             print(f"[DEBUG] Eliminado exitosamente: {path}")
+            
+            # Notificar al TreeView principal
+            if self.on_file_change_callback:
+                self.on_file_change_callback('delete', path)
         else:
             # El error ya fue mostrado por file_ops.delete_item
             pass
-
+    
     def update_shortcuts_context(self):
         """Actualiza la barra de atajos según la selección actual"""
         if not self.ui or not hasattr(self.ui, 'update_shortcuts_bar'):
@@ -987,6 +998,11 @@ class FileExplorerManager:
             # Refresh en background para no congelar UI
             self.ui.tree.after(100, self.refresh_tree)
             print(f'[FileExplorer] {successful} items procesados')
+            
+            # Notificar al TreeView principal
+            if self.on_file_change_callback:
+                operation = 'move' if mode == 'cut' else 'copy'
+                self.on_file_change_callback(operation, source_paths)
             
         except PermissionError:
             messagebox.showerror("Error", "Sin permisos para realizar la operación")
