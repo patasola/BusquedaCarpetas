@@ -347,60 +347,15 @@ class BusquedaCarpetaApp:
 
     def _on_explorer_file_change(self, operation, paths):
         """Maneja cambios de archivos del explorador"""
-        print(f'[App] Cambio en explorador: {operation} - {paths}')
+        print(f'[App] Cambio en explorador: {operation}')
         
-        if not hasattr(self, 'tree') or not self.tree:
-            return
-        
-        # Solo procesar si hay resultados en TreeView
-        if not self.tree.get_children():
-            return
-        
-        if operation in ['delete', 'move']:
-            # Remover items del TreeView
-            self._remove_paths_from_tree(paths if isinstance(paths, list) else [paths])
-        elif operation in ['create', 'copy']:
-            # Re-ejecutar última búsqueda
-            self._refresh_last_search()
-    
-    def _remove_paths_from_tree(self, paths):
-        """Remueve rutas específicas del TreeView"""
-        import os
-        for path in paths:
-            basename = os.path.basename(path)
-            print(f'[App] Buscando: {basename} (ruta: {path})')
-            
-            # Buscar item en TreeView que contenga esta ruta
-            found = False
-            for item in self.tree.get_children():
-                item_text = self.tree.item(item, 'text')
-                item_values = self.tree.item(item, 'values')
-                
-                # DEBUG: mostrar contenido
-                print(f'[App]   Item text: {item_text}')
-                print(f'[App]   Item values: {item_values}')
-                
-                if not item_values:
-                    continue
-                
-                # Convertir todas las values a string y buscar
-                all_values_str = ' '.join(str(v) for v in item_values)
-                
-                # Buscar por basename (nombre carpeta) es más seguro
-                if basename in item_text or basename in all_values_str:
-                    self.tree.delete(item)
-                    print(f'[App] ✓ Removido del TreeView: {basename}')
-                    found = True
-                    break
-            
-            if not found:
-                print(f'[App] ✗ NO encontrado en TreeView: {basename}')
-    
-    def _refresh_last_search(self):
-        """Re-ejecuta la última búsqueda"""
-        # TODO: guardar último criterio de búsqueda
-        print('[App] Re-ejecutando última búsqueda...')
-        # Por ahora solo mensaje, implementar según necesidad
+        # Mostrar warning de resultados desactualizados
+        if hasattr(self, 'label_estado'):
+            self.label_estado.config(
+                text="⚠️ Resultados de búsqueda pueden estar desactualizados - Presiona F5 para actualizar",
+                fg='#ff6b00'  # Naranja
+            )
+
 
     # Toggle methods
     def toggle_historial(self):
