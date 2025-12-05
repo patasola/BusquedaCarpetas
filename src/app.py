@@ -365,14 +365,36 @@ class BusquedaCarpetaApp:
     
     def _remove_paths_from_tree(self, paths):
         """Remueve rutas específicas del TreeView"""
+        import os
         for path in paths:
+            basename = os.path.basename(path)
+            print(f'[App] Buscando: {basename} (ruta: {path})')
+            
             # Buscar item en TreeView que contenga esta ruta
+            found = False
             for item in self.tree.get_children():
+                item_text = self.tree.item(item, 'text')
                 item_values = self.tree.item(item, 'values')
-                if item_values and path in str(item_values[1]):  # Columna 'Ruta Relativa'
+                
+                # DEBUG: mostrar contenido
+                print(f'[App]   Item text: {item_text}')
+                print(f'[App]   Item values: {item_values}')
+                
+                if not item_values:
+                    continue
+                
+                # Convertir todas las values a string y buscar
+                all_values_str = ' '.join(str(v) for v in item_values)
+                
+                # Buscar por basename (nombre carpeta) es más seguro
+                if basename in item_text or basename in all_values_str:
                     self.tree.delete(item)
-                    print(f'[App] Removido del TreeView: {path}')
+                    print(f'[App] ✓ Removido del TreeView: {basename}')
+                    found = True
                     break
+            
+            if not found:
+                print(f'[App] ✗ NO encontrado en TreeView: {basename}')
     
     def _refresh_last_search(self):
         """Re-ejecuta la última búsqueda"""
