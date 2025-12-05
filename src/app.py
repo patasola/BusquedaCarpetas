@@ -340,6 +340,25 @@ class BusquedaCarpetaApp:
     def release_panel_position(self, panel_type):
         return self.dual_panel_manager.release_panel_position(panel_type)
 
+    def update_search_locations(self, locations):
+        """Actualiza ubicaciones de búsqueda"""
+        self.multi_location_search.reload_locations()
+        self.label_carpeta_info.config(text=self.multi_location_search.get_rotation_text())
+
+    def _on_explorer_file_change(self, operation, paths):
+        """Maneja cambios de archivos del explorador"""
+        print(f'[App] Cambio en explorador: {operation}')
+        
+        # Mostrar warning de resultados desactualizados
+        if hasattr(self, 'label_estado'):
+            self.label_estado.config(
+                text="⚠️ Los resultados mostrados pueden estar desactualizados",
+                fg='#ff6b00'  # Naranja
+            )
+
+    # Toggle methods
+    def toggle_historial(self):
+        return self.keyboard_manager.toggle_historial()
 
     def toggle_explorador(self):
         return self.keyboard_manager.toggle_explorador()
