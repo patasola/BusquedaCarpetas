@@ -153,38 +153,45 @@ class MenuManager:
             messagebox.showerror("Error", f"No se pudo abrir la configuración: {str(e)}")
     
     def mostrar_manual(self):
-        """Muestra manual de usuario"""
-        try:
-            print("INTENTANDO ABRIR MANUAL...")
-            from .manual_viewer import ManualViewer
-            manual = ManualViewer(self.app.master)
-            manual.mostrar_manual()
-            print("LLAMADA AL MANUAL COMPLETADA")
-        except Exception as e:
-            print(f"Error mostrando manual: {e}")
-            import traceback
-            traceback.print_exc()
-            messagebox.showerror("Error", f"No se pudo abrir el manual: {str(e)}")
+            """Abre el manual en el navegador del sistema"""
+            try:
+                import webbrowser
+                import os
+                manual_path = os.path.join(os.path.dirname(__file__), '..', 'docs', 'manual.html')
+                if os.path.exists(manual_path):
+                    webbrowser.open(f'file:///{os.path.abspath(manual_path)}')
+                else:
+                    messagebox.showinfo("Manual", "Manual no disponible")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error abriendo manual: {e}")
     
     def mostrar_changelog(self):
-        """Muestra registro de cambios"""
+        """Abre el changelog con Notepad"""
         try:
-            from .changelog_viewer import ChangelogViewer
-            changelog = ChangelogViewer(self.app.master)
-            changelog.mostrar_changelog()
+            import subprocess
+            import os
+            changelog_path = os.path.join(os.path.dirname(__file__), '..', 'CHANGELOG.md')
+            if os.path.exists(changelog_path):
+                subprocess.Popen(['notepad.exe', changelog_path])
+            else:
+                messagebox.showinfo("Changelog", "No hay registro de cambios disponible")
         except Exception as e:
-            print(f"Error mostrando changelog: {e}")
-            messagebox.showerror("Error", f"No se pudo abrir el changelog: {str(e)}")
+            messagebox.showerror("Error", f"Error abriendo changelog: {e}")
     
     def mostrar_acerca_de(self):
-        """Muestra diálogo Acerca de"""
+        """Muestra información sobre la aplicación con messagebox nativo"""
         try:
-            from .about_dialog import AboutDialog
-            about = AboutDialog(self.app.master, self.app.version)
-            about.mostrar_acerca_de()
+            version_info = f"Versión {self.app.version}" if hasattr(self.app, 'version') else "Versión desconocida"
+            messagebox.showinfo(
+                "Búsqueda de Carpetas",
+                f"Búsqueda Rápida de Carpetas\n\n"
+                f"{version_info}\n\n"
+                f"Desarrollado por: Consejo Superior de la Judicatura\n"
+                f"© 2024\n\n"
+                f"Una herramienta para búsqueda eficiente de carpetas."
+            )
         except Exception as e:
-            print(f"Error mostrando acerca de: {e}")
-            messagebox.showerror("Error", f"No se pudo abrir el diálogo: {str(e)}")
+            messagebox.showerror("Error", f"Error inesperado: {e}")
     
     def get_menu_state(self):
         """Obtiene el estado actual de las opciones del menú"""
