@@ -4,20 +4,29 @@ from tkinter import ttk
 from datetime import datetime
 import json
 import os
-
 from .column_manager import ColumnManager
+from .managers.base_tree_manager import BaseTreeManager
 
-class HistorialManager:
+class HistorialManager(BaseTreeManager):
     """Gestiona el historial de búsquedas con registro automático y posicionamiento dual"""
     
     def __init__(self, app):
-        self.app = app
-        self.visible = False
-        self.frame = None
-        self.tree = None
+        # Configuración para BaseTreeManager
+        config = {
+            'title': 'Historial de Búsquedas',
+            'columns': [
+                ('Criterio', 150),
+                ('Método', 80),
+                ('Resultados', 70),
+                ('Tiempo', 80),
+                ('Fecha', 100)
+            ]
+        }
+        super().__init__(app, config)
+        
+        # Atributos específicos del historial
         self.historial_data = []
         self.historial_file = "historial_busquedas.json"
-        self.assigned_column = None  # Columna asignada para posicionamiento dual
         
         # Variables para redimensionamiento
         self.resize_start_x = 0
@@ -25,14 +34,7 @@ class HistorialManager:
         
         # Cargar historial existente
         self.cargar_historial()
-    
-    def toggle_visibility(self):
-        """Alterna la visibilidad del historial"""
-        if self.visible:
-            self.hide()
-        else:
-            self.show()
-    
+  
     def show(self):
         """Muestra el panel de historial con posicionamiento dual"""
         if not self.frame:
