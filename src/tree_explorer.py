@@ -4,222 +4,26 @@ from tkinter import ttk
 import os
 import threading
 import time
+from .managers.base_tree_manager import BaseTreeManager
 
-class TreeExplorerTooltip:
-    """Tooltip para explorador de árbol con error corregido"""
-    
-    def __init__(self, treeview, tree_explorer_instance):
-        self.treeview = treeview
-        self.tree_explorer = tree_explorer_instance
-        self.tooltip_window = None
-        self.current_item = None
-        self.after_id = None
-        
-        # Configurar eventos
-        self.treeview.bind("<Motion>", self._on_motion)
-        self.treeview.bind("<Leave>", self._on_leave)
-        self.treeview.bind("<Button-1>", self._hide_tooltip)
-        
-    def _on_motion(self, event):
-        """Maneja movimiento del mouse"""
-        item = self.treeview.identify_row(event.y)
-        
-        if item != self.current_item:
-            self.current_item = item
-            self._hide_tooltip()
-            
-            if item:
-                self.after_id = self.treeview.after(500, 
-                    lambda: self._show_tooltip(event.x_root, event.y_root, item))
-    
-    def _on_leave(self, event):
-        """Mouse salió del TreeView"""
-        self._hide_tooltip()
-        self.current_item = None
-    
-    def _show_tooltip(self, x, y, item):
-        """Muestra tooltip simple con wraplength"""
-        if self.current_item != item:
-            return
-            
-        # Obtener ruta completa
-        ruta_completa = self._get_full_path(item)
-        if not ruta_completa:
-            return
-        
-        # Formatear ruta
-        texto_tooltip = self._format_path_smart(ruta_completa)
-        
-        # Crear tooltip
-        self.tooltip_window = tk.Toplevel(self.treeview)
-        self.tooltip_window.wm_overrideredirect(True)
-        self.tooltip_window.configure(bg="#ffffe0", relief="solid", bd=1)
-        
-        label = tk.Label(
-            self.tooltip_window,
-            text=texto_tooltip,
-            bg="#ffffe0",
-            fg="#000000",
-            font=("Segoe UI", 9),
-            padx=6,
-            pady=4,
-            wraplength=300,  # FORZAR WRAP A 300 PIXELS
-            justify='left'
-        )
-        label.pack()
-        
-        # Posicionar tooltip
-        self._position_tooltip(x, y)
-    
-    def _format_path_smart(self, ruta):
-        """Formatea ruta dividida por niveles/carpetas"""
-        if len(ruta) <= 50:
-            return ruta
-        
-        # Dividir por niveles
-        niveles = self._dividir_por_niveles(ruta)
-        if len(niveles) > 1:
-            return "\n".join(niveles)
-        else:
-            return ruta
-    
-    def _dividir_por_niveles(self, ruta):
-        """Divide ruta en niveles (una carpeta por línea)"""
-        if "\\" in ruta:
-            separador = "\\"
-        elif "/" in ruta:
-            separador = "/"
-        else:
-            return [ruta]  # Sin separadores
-        
-        partes = ruta.split(separador)
-        niveles = []
-        
-        # Primer nivel (raíz)
-        if partes[0]:
-            niveles.append(partes[0])
-        else:
-            niveles.append(separador)  # Para rutas que empiezan con /
-        
-        # Niveles siguientes
-        for parte in partes[1:]:
-            if parte:  # Ignorar partes vacías
-                if len(niveles) == 1:
-                    # Segundo nivel: agregar directamente
-                    niveles.append(f"{separador}{parte}")
-                else:
-                    # Niveles siguientes: solo el nombre de la carpeta
-                    niveles.append(f"{separador}{parte}")
-        
-        return niveles
-    
-    def _get_full_path(self, item):
-        """Obtiene ruta completa del explorador de árbol"""
-        try:
-            values = self.treeview.item(item, 'values')
-            if values and len(values) >= 2:
-                metodo = values[0]
-                ruta = values[1]
-                
-                # Si es método directo (C, T, E) y tiene ruta
-                if metodo in ["C", "T", "E"] and ruta:
-                    return ruta
-                
-                # Para rutas relativas, intentar construir ruta absoluta
-                if ruta and hasattr(self.tree_explorer.app, 'file_manager'):
-                    try:
-                        ruta_base = getattr(self.tree_explorer.app, 'ruta_carpeta', '')
-                        if ruta_base:
-                            full_path = self.tree_explorer.app.file_manager.obtener_ruta_absoluta(ruta_base, ruta)
-                            return full_path if full_path else ruta
-                    except:
-                        pass
-                
-                return ruta if ruta else self._build_path_from_hierarchy(item)
-            
-            # Fallback: construir desde jerarquía
-            return self._build_path_from_hierarchy(item)
-            
-        except:
-            return None
-    
-    def _build_path_from_hierarchy(self, item):
-        """Construye ruta desde la jerarquía del árbol"""
-        try:
-            path_parts = []
-            current = item
-            
-            while current:
-                text = self.treeview.item(current, 'text')
-                if text and not text.startswith(('🔄', '⛔', 'Cargando')):
-                    # Limpiar emojis y texto extra
-                    clean_text = text.replace('📁 ', '').replace('📂 ', '').replace('🗂 ', '')
-                    if clean_text and clean_text != '':
-                        path_parts.append(clean_text)
-                current = self.treeview.parent(current)
-            
-            if path_parts:
-                path_parts.reverse()
-                # Si hay una ruta base conocida, usarla
-                if hasattr(self.tree_explorer.app, 'ruta_carpeta') and self.tree_explorer.app.ruta_carpeta:
-                    base_path = self.tree_explorer.app.ruta_carpeta
-                    for part in path_parts[1:]:  # Saltar el primer elemento si es la raíz
-                        base_path = os.path.join(base_path, part)
-                    return base_path
-                else:
-                    return os.path.join(*path_parts)
-            
-            return None
-        except:
-            return None
-    
-    def _position_tooltip(self, x, y):
-        """Posiciona tooltip evitando bordes"""
-        if not self.tooltip_window:
-            return
-            
-        self.tooltip_window.update_idletasks()
-        tooltip_width = self.tooltip_window.winfo_reqwidth()
-        tooltip_height = self.tooltip_window.winfo_reqheight()
-        
-        screen_width = self.tooltip_window.winfo_screenwidth()
-        screen_height = self.tooltip_window.winfo_screenheight()
-        
-        tooltip_x = x + 15
-        tooltip_y = y + 10
-        
-        if tooltip_x + tooltip_width > screen_width:
-            tooltip_x = x - tooltip_width - 15
-            
-        if tooltip_y + tooltip_height > screen_height:
-            tooltip_y = y - tooltip_height - 10
-            
-        tooltip_x = max(0, min(tooltip_x, screen_width - tooltip_width))
-        tooltip_y = max(0, min(tooltip_y, screen_height - tooltip_height))
-        
-        self.tooltip_window.geometry(f"+{tooltip_x}+{tooltip_y}")
-    
-    def _hide_tooltip(self, event=None):  # CORREGIDO: agregado event=None
-        """Oculta tooltip"""
-        if self.after_id:
-            self.treeview.after_cancel(self.after_id)
-            self.after_id = None
-            
-        if self.tooltip_window:
-            self.tooltip_window.destroy()
-            self.tooltip_window = None
-
-
-class TreeExplorer:
+class TreeExplorer(BaseTreeManager):
     def __init__(self, master, app_reference):
+        # Configuración para BaseTreeManager
+        config = {
+            'title': 'Navegador de Árbol',
+            'columns': [
+                ('Carpeta', 200),
+                ('Items', 60),
+                ('Tamaño', 80)
+            ]
+        }
+        super().__init__(app_reference, config)
+        
+        # Atributos específicos del navegador
         self.master = master
-        self.app = app_reference
         self.temp_cache = {}
         self.loading_nodes = set()
         self.expanded_nodes = set()
-        self.tooltip = None  # Referencia al tooltip
-        
-        self.setup_explorer_mode()
         
     def setup_explorer_mode(self):
         """Configura el TreeView existente para modo explorador"""
