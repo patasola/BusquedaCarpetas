@@ -3,19 +3,30 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import os
 from datetime import datetime
-
 # Importar componentes separados
 from .explorer_ui import ExplorerUI
 from .file_monitor import FileMonitor
 from .file_operations import FileOperations
+from .managers.base_tree_manager import BaseTreeManager
 
-class FileExplorerManager:
+class FileExplorerManager(BaseTreeManager):
     """Gestor principal del explorador de archivos - Con crear carpeta inline"""
     
     def __init__(self, app):
-        self.app = app
+        # Configuración para BaseTreeManager
+        config = {
+            'title': 'Explorador de Archivos',
+            'columns': [
+                ('Nombre', 200),
+                ('Tipo', 100),
+                ('Tamaño', 80),
+                ('Modificado', 120)
+            ]
+        }
+        super().__init__(app, config)
+        
+        # Atributos específicos del explorador
         self.current_path = os.path.expanduser("~")
-        self.assigned_column = None
         
         # Componentes del explorador
         self.ui = None
@@ -39,7 +50,6 @@ class FileExplorerManager:
         self.loading_items = set()
         self.loaded_items = set()
         self.expanding_items = set()
-
         # Clipboard para Ctrl+X/C/V
         self._clipboard = {'paths': [], 'mode': None}
         
@@ -67,22 +77,6 @@ class FileExplorerManager:
     @property
     def path_label(self):
         return self.ui.path_label if self.ui else None
-    
-    def is_visible(self):
-        """Verifica si el explorador está visible"""
-        if not self.frame:
-            return False
-        try:
-            return bool(self.frame.grid_info())
-        except:
-            return False
-    
-    def toggle_visibility(self):
-        """Alterna la visibilidad del explorador"""
-        if self.is_visible():
-            self.hide()
-        else:
-            self.show()
     
     def show(self):
         """Muestra el explorador de archivos con posicionamiento dual"""
