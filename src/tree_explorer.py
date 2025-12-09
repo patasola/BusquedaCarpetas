@@ -31,9 +31,6 @@ class TreeExplorer(BaseTreeManager):
         
         tree.configure(show="tree headings")
         
-        # AGREGAR TOOLTIP AL TREE EXPLORER
-        self.tooltip = TreeExplorerTooltip(tree, self)
-        
         # Eventos principales
         tree.bind("<<TreeviewOpen>>", self.on_node_expand)
         tree.bind("<<TreeviewClose>>", self.on_node_collapse)
