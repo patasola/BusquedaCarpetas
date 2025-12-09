@@ -27,6 +27,8 @@ class FileExplorerManager(BaseTreeManager):
         
         # Atributos específicos del explorador
         self.current_path = os.path.expanduser("~")
+        self.path_label = None  # Path label widget
+
         
         # Componentes del explorador
         self.ui = None
@@ -66,18 +68,6 @@ class FileExplorerManager(BaseTreeManager):
         # Callback para notificar cambios al TreeView principal
         self.on_file_change_callback = None
 
-    @property
-    def frame(self):
-        return self.ui.frame if self.ui else None
-    
-    @property
-    def tree(self):
-        return self.ui.tree if self.ui else None
-    
-    @property
-    def path_label(self):
-        return self.ui.path_label if self.ui else None
-    
     def show(self):
         """Muestra el explorador de archivos con posicionamiento dual"""
         if not self.ui:
