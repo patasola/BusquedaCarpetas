@@ -157,11 +157,13 @@ class MenuManager:
             try:
                 import webbrowser
                 import os
-                manual_path = os.path.join(os.path.dirname(__file__), '..', 'docs', 'manual.html')
-                if os.path.exists(manual_path):
-                    webbrowser.open(f'file:///{os.path.abspath(manual_path)}')
+                # Buscar README.md como manual
+                base_dir = os.path.dirname(os.path.dirname(__file__))
+                readme_path = os.path.join(base_dir, 'README.md')
+                if os.path.exists(readme_path):
+                    webbrowser.open(f'file:///{os.path.abspath(readme_path)}')
                 else:
-                    messagebox.showinfo("Manual", "Manual no disponible")
+                    messagebox.showinfo("Manual", "Manual no encontrado (README.md)")
             except Exception as e:
                 messagebox.showerror("Error", f"Error abriendo manual: {e}")
     
@@ -186,7 +188,7 @@ class MenuManager:
                 "Búsqueda de Carpetas",
                 f"Búsqueda Rápida de Carpetas\n\n"
                 f"{version_info}\n\n"
-                f"Desarrollado por: Consejo Superior de la Judicatura\n"
+                f"Desarrollado por: Elkin Darío Pérez Puyana\n"
                 f"© 2024\n\n"
                 f"Una herramienta para búsqueda eficiente de carpetas."
             )
