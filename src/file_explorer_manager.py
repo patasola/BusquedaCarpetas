@@ -1,34 +1,21 @@
-# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
+﻿# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
 from datetime import datetime
+
 # Importar componentes separados
 from .explorer_ui import ExplorerUI
 from .file_monitor import FileMonitor
 from .file_operations import FileOperations
-from .managers.base_tree_manager import BaseTreeManager
 
-class FileExplorerManager(BaseTreeManager):
+class FileExplorerManager:
     """Gestor principal del explorador de archivos - Con crear carpeta inline"""
     
     def __init__(self, app):
-        # Configuración para BaseTreeManager
-        config = {
-            'title': 'Explorador de Archivos',
-            'columns': [
-                ('Nombre', 200),
-                ('Tipo', 100),
-                ('Tamaño', 80),
-                ('Modificado', 120)
-            ]
-        }
-        super().__init__(app, config)
-        
-        # Atributos específicos del explorador
+        self.app = app
         self.current_path = os.path.expanduser("~")
-        self.path_label = None  # Path label widget
-
+        self.assigned_column = None
         
         # Componentes del explorador
         self.ui = None
@@ -44,7 +31,7 @@ class FileExplorerManager(BaseTreeManager):
         self.is_creating_new = False  # Flag para distinguir crear vs renombrar
         self.new_folder_parent = None  # Directorio padre para nueva carpeta
         
-        # Mapeo de rutas a items del árbol
+        # Mapeo de rutas a items del ├írbol
         self.path_to_item = {}
         self.item_to_path = {}
         
@@ -52,10 +39,11 @@ class FileExplorerManager(BaseTreeManager):
         self.loading_items = set()
         self.loaded_items = set()
         self.expanding_items = set()
+
         # Clipboard para Ctrl+X/C/V
         self._clipboard = {'paths': [], 'mode': None}
         
-        # Drag & Drop state (soporta múltiples items)
+        # Drag & Drop state (soporta m├║ltiples items)
         self._drag_state = {
             'active': False,
             'source_items': [],
@@ -68,6 +56,34 @@ class FileExplorerManager(BaseTreeManager):
         # Callback para notificar cambios al TreeView principal
         self.on_file_change_callback = None
 
+    @property
+    def frame(self):
+        return self.ui.frame if self.ui else None
+    
+    @property
+    def tree(self):
+        return self.ui.tree if self.ui else None
+    
+    @property
+    def path_label(self):
+        return self.ui.path_label if self.ui else None
+    
+    def is_visible(self):
+        """Verifica si el explorador est├í visible"""
+        if not self.frame:
+            return False
+        try:
+            return bool(self.frame.grid_info())
+        except:
+            return False
+    
+    def toggle_visibility(self):
+        """Alterna la visibilidad del explorador"""
+        if self.is_visible():
+            self.hide()
+        else:
+            self.show()
+    
     def show(self):
         """Muestra el explorador de archivos con posicionamiento dual"""
         if not self.ui:
@@ -87,7 +103,7 @@ class FileExplorerManager(BaseTreeManager):
             print(f"[DEBUG] Explorador mostrado en columna {self.assigned_column}")
     
     def hide(self):
-        """Oculta el explorador de archivos y libera su posición"""
+        """Oculta el explorador de archivos y libera su posici├│n"""
         if self.frame:
             self.frame.grid_forget()
             self.file_monitor.stop()
@@ -141,7 +157,7 @@ class FileExplorerManager(BaseTreeManager):
             print("[DEBUG] Atajo Ctrl+N configurado para crear carpetas inline")
     
     def create_new_folder_inline(self):
-        """Crea una nueva carpeta con edición inline (como F2)"""
+        """Crea una nueva carpeta con edici├│n inline (como F2)"""
         try:
             # Determinar el directorio donde crear la carpeta
             target_dir = None
@@ -158,7 +174,7 @@ class FileExplorerManager(BaseTreeManager):
                     target_dir = selected_path
                     parent_item = selected_item
                     
-                    # Expandir la carpeta si no está expandida
+                    # Expandir la carpeta si no est├í expandida
                     if not self.tree.item(selected_item, 'open'):
                         self.tree.item(selected_item, open=True)
                         self.handle_node_expansion_immediate(selected_item)
@@ -168,15 +184,15 @@ class FileExplorerManager(BaseTreeManager):
                     # Encontrar el parent_item del directorio
                     parent_item = self.tree.parent(selected_item)
             
-            # Si no hay selección o no se pudo determinar, usar directorio raíz
+            # Si no hay selecci├│n o no se pudo determinar, usar directorio ra├¡z
             if not target_dir or not parent_item:
                 target_dir = self.current_path
-                # El primer item es siempre la raíz
+                # El primer item es siempre la ra├¡z
                 root_items = self.tree.get_children()
                 if root_items:
                     parent_item = root_items[0]
                 else:
-                    messagebox.showerror("Error", "No se encontró el directorio raíz")
+                    messagebox.showerror("Error", "No se encontr├│ el directorio ra├¡z")
                     return
             
             # Validar permisos de escritura
@@ -187,7 +203,7 @@ class FileExplorerManager(BaseTreeManager):
                 )
                 return
             
-            # Generar nombre único temporal
+            # Generar nombre ├║nico temporal
             base_name = "Nueva carpeta"
             temp_name = base_name
             counter = 1
@@ -202,11 +218,11 @@ class FileExplorerManager(BaseTreeManager):
             existing_items = len(self.tree.get_children(parent_item))
             tag = 'evenrow' if existing_items % 2 == 0 else 'oddrow'
             
-            # Crear item temporal en el árbol (sin crear carpeta física aún)
+            # Crear item temporal en el ├írbol (sin crear carpeta f├¡sica a├║n)
             temp_item = self.tree.insert(
                 parent_item,
                 'end',
-                text=f"📁 {temp_name}",
+                text=f"­ƒôü {temp_name}",
                 values=(datetime.now().strftime("%d/%m/%Y %H:%M"),),
                 tags=(tag,)
             )
@@ -216,21 +232,21 @@ class FileExplorerManager(BaseTreeManager):
             self.tree.focus(temp_item)
             self.tree.see(temp_item)
             
-            # Guardar información para la creación
+            # Guardar informaci├│n para la creaci├│n
             self.new_folder_parent = target_dir
             self.editing_item = temp_item
             self.original_name = temp_name
             self.is_creating_new = True
             
-            # Iniciar edición inline
+            # Iniciar edici├│n inline
             self._start_inline_edit_for_creation(temp_item, temp_name)
             
         except Exception as e:
-            messagebox.showerror("Error", f"Error preparando creación de carpeta:\n{str(e)}")
+            messagebox.showerror("Error", f"Error preparando creaci├│n de carpeta:\n{str(e)}")
             print(f"[ERROR] Error en create_new_folder_inline: {e}")
     
     def _start_inline_edit_for_creation(self, item, initial_name):
-        """Inicia edición inline para creación de carpeta"""
+        """Inicia edici├│n inline para creaci├│n de carpeta"""
         bbox = self.tree.bbox(item, column='#0')
         if not bbox:
             # Si no hay bbox, cancelar
@@ -246,13 +262,13 @@ class FileExplorerManager(BaseTreeManager):
         self.edit_entry.select_range(0, len(initial_name))
         self.edit_entry.focus_set()
         
-        # Bindings específicos
+        # Bindings espec├¡ficos
         self.edit_entry.bind('<Return>', self._finish_create_folder)
         self.edit_entry.bind('<Escape>', self._cancel_create_folder)
         self.edit_entry.bind('<FocusOut>', self._finish_create_folder)
     
     def _finish_create_folder(self, event=None):
-        """Finaliza creación de carpeta (crea físicamente)"""
+        """Finaliza creaci├│n de carpeta (crea f├¡sicamente)"""
         if not self.edit_entry or not self.is_creating_new:
             return
         
@@ -260,16 +276,16 @@ class FileExplorerManager(BaseTreeManager):
         self.edit_entry.destroy()
         self.edit_entry = None
         
-        # Si está vacío o es igual al nombre temporal, cancelar
+        # Si est├í vac├¡o o es igual al nombre temporal, cancelar
         if not new_name:
             self._cancel_create_folder_cleanup()
             return
         
-        # Validar caracteres inválidos
+        # Validar caracteres inv├ílidos
         caracteres_invalidos = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
         if any(char in new_name for char in caracteres_invalidos):
             messagebox.showwarning(
-                "Nombre inválido",
+                "Nombre inv├ílido",
                 f"El nombre no puede contener: {' '.join(caracteres_invalidos)}"
             )
             self._cancel_create_folder_cleanup()
@@ -288,20 +304,20 @@ class FileExplorerManager(BaseTreeManager):
             return
         
         try:
-            # CREAR LA CARPETA FÍSICAMENTE
+            # CREAR LA CARPETA F├ìSICAMENTE
             os.makedirs(nueva_ruta, exist_ok=False)
             
-            # Actualizar el item temporal con la información real
-            self.tree.item(self.editing_item, text=f"📁 {new_name}")
+            # Actualizar el item temporal con la informaci├│n real
+            self.tree.item(self.editing_item, text=f"­ƒôü {new_name}")
             
             # Agregar al mapeo
             self.path_to_item[nueva_ruta] = self.editing_item
             self.item_to_path[self.editing_item] = nueva_ruta
             
-            # Agregar dummy si es necesario (para que muestre flecha de expansión)
-            # Aunque esté vacía, dejamos que el usuario pueda crear subcarpetas
+            # Agregar dummy si es necesario (para que muestre flecha de expansi├│n)
+            # Aunque est├® vac├¡a, dejamos que el usuario pueda crear subcarpetas
             
-            # Mensaje de éxito
+            # Mensaje de ├®xito
             if hasattr(self.app, 'label_estado'):
                 self.app.label_estado.config(text=f"Carpeta creada: {new_name}")
             
@@ -314,7 +330,7 @@ class FileExplorerManager(BaseTreeManager):
         except PermissionError:
             messagebox.showerror(
                 "Error de permisos",
-                "No tiene permisos para crear carpetas en esta ubicación"
+                "No tiene permisos para crear carpetas en esta ubicaci├│n"
             )
             self._cancel_create_folder_cleanup()
         except OSError as e:
@@ -335,7 +351,7 @@ class FileExplorerManager(BaseTreeManager):
             self.editing_item = None
     
     def _cancel_create_folder(self, event=None):
-        """Cancela creación de carpeta (ESC)"""
+        """Cancela creaci├│n de carpeta (ESC)"""
         if self.edit_entry:
             self.edit_entry.destroy()
             self.edit_entry = None
@@ -343,9 +359,9 @@ class FileExplorerManager(BaseTreeManager):
         self._cancel_create_folder_cleanup()
     
     def _cancel_create_folder_cleanup(self):
-        """Limpia después de cancelar creación"""
+        """Limpia despu├®s de cancelar creaci├│n"""
         if self.is_creating_new and self.editing_item:
-            # Eliminar el item temporal del árbol
+            # Eliminar el item temporal del ├írbol
             try:
                 self.tree.delete(self.editing_item)
             except:
@@ -357,38 +373,38 @@ class FileExplorerManager(BaseTreeManager):
         self.original_name = None
         
         if hasattr(self.app, 'label_estado'):
-            self.app.label_estado.config(text="Creación de carpeta cancelada")
+            self.app.label_estado.config(text="Creaci├│n de carpeta cancelada")
     
     def load_directory(self, path):
-        """Carga el contenido de un directorio en estructura de árbol"""
+        """Carga el contenido de un directorio en estructura de ├írbol"""
         if not os.path.exists(path) or not os.path.isdir(path):
             return
         
         self.current_path = os.path.normpath(path)
-        self.path_label.configure(text=f"Raíz: {self.current_path}")
+        self.path_label.configure(text=f"Ra├¡z: {self.current_path}")
         
         print(f"[DEBUG] Cargando directorio: {self.current_path}")
         
-        # Limpiar árbol y mapeos
+        # Limpiar ├írbol y mapeos
         for item in self.tree.get_children():
             self.tree.delete(item)
         self._clear_state()
         
-        # Crear nodo raíz
+        # Crear nodo ra├¡z
         root_name = os.path.basename(self.current_path) or self.current_path
         try:
             root_fecha = datetime.fromtimestamp(os.path.getmtime(self.current_path)).strftime("%d/%m/%Y %H:%M")
         except:
             root_fecha = "N/A"
             
-        root_item = self.tree.insert('', 'end', text=f"📁 {root_name}", 
+        root_item = self.tree.insert('', 'end', text=f"­ƒôü {root_name}", 
                                     values=(root_fecha,),
                                     open=True, tags=('evenrow',))
         
         self.path_to_item[self.current_path] = root_item
         self.item_to_path[root_item] = self.current_path
         
-        # Cargar contenido del directorio raíz
+        # Cargar contenido del directorio ra├¡z
         self._load_directory_children_sync(root_item, self.current_path)
         
         # Iniciar monitoreo
@@ -421,11 +437,11 @@ class FileExplorerManager(BaseTreeManager):
             
             items = self.file_ops.get_directory_contents(directory_path)
             if items is None:
-                self._add_error_node(parent_item, "⚠ Acceso denegado")
+                self._add_error_node(parent_item, "ÔÜá Acceso denegado")
                 return
             
             if not items:
-                print(f"[DEBUG] Directorio vacío: {directory_path}")
+                print(f"[DEBUG] Directorio vac├¡o: {directory_path}")
                 return
             
             self._add_directory_items(parent_item, items)
@@ -433,7 +449,7 @@ class FileExplorerManager(BaseTreeManager):
                     
         except Exception as e:
             print(f"[ERROR] Error cargando directorio {directory_path}: {e}")
-            self._add_error_node(parent_item, f'❌ Error: {str(e)}')
+            self._add_error_node(parent_item, f'ÔØî Error: {str(e)}')
         finally:
             self.loading_items.discard(parent_item)
     
@@ -454,12 +470,12 @@ class FileExplorerManager(BaseTreeManager):
                                     values=('',), tags=('evenrow',))
     
     def _add_directory_items(self, parent_item, items):
-        """Agrega items del directorio al árbol"""
+        """Agrega items del directorio al ├írbol"""
         for i, (name, is_dir, fecha_mod, full_path) in enumerate(items):
             row_tag = 'evenrow' if i % 2 == 0 else 'oddrow'
             
             if is_dir:
-                display_name = f"📁 {name}"
+                display_name = f"­ƒôü {name}"
                 item_id = self.tree.insert(parent_item, 'end', text=display_name,
                                          values=(fecha_mod,), tags=(row_tag,))
                 
@@ -469,7 +485,7 @@ class FileExplorerManager(BaseTreeManager):
                 if self.file_ops.has_subdirectories(full_path):
                     dummy = self.tree.insert(item_id, 'end', text='Cargando...', values=('',))
             else:
-                display_name = f"📄 {name}"
+                display_name = f"­ƒôä {name}"
                 item_id = self.tree.insert(parent_item, 'end', text=display_name,
                                          values=(fecha_mod,), tags=(row_tag,))
                 
@@ -477,7 +493,7 @@ class FileExplorerManager(BaseTreeManager):
                 self.item_to_path[item_id] = full_path
     
     def handle_node_expansion_immediate(self, item):
-        """Maneja expansión de nodo inmediatamente"""
+        """Maneja expansi├│n de nodo inmediatamente"""
         if item in self.expanding_items or item in self.loaded_items:
             return
         
@@ -502,8 +518,8 @@ class FileExplorerManager(BaseTreeManager):
             self.expanding_items.discard(item)
     
     def refresh_tree(self):
-        """Refresca todo el árbol"""
-        print("[DEBUG] Refrescando árbol completo")
+        """Refresca todo el ├írbol"""
+        print("[DEBUG] Refrescando ├írbol completo")
         self._clear_state()
         self.load_directory(self.current_path)
     
@@ -521,18 +537,18 @@ class FileExplorerManager(BaseTreeManager):
         self.load_directory(home_path)
     
     def go_up(self):
-        """Sube un nivel en la jerarquía de carpetas"""
+        """Sube un nivel en la jerarqu├¡a de carpetas"""
         if not self.current_path:
             return
         
         parent_path = os.path.dirname(self.current_path)
         
-        # Evitar subir de la raíz del sistema
+        # Evitar subir de la ra├¡z del sistema
         if parent_path and parent_path != self.current_path:
             self.load_directory(parent_path)
             print(f'[FileExplorer] Subiendo a: {parent_path}')
         else:
-            print('[FileExplorer] Ya estás en la raíz')
+            print('[FileExplorer] Ya est├ís en la ra├¡z')
     
     def on_double_click(self, event):
         """Doble click: abre carpeta/archivo en Windows Explorer"""
@@ -571,7 +587,7 @@ class FileExplorerManager(BaseTreeManager):
         return "break"
     
     def handle_f2(self):
-        """Inicia edición para renombrar"""
+        """Inicia edici├│n para renombrar"""
         selection = self.ui.tree.selection()
         if not selection:
             return
@@ -583,9 +599,9 @@ class FileExplorerManager(BaseTreeManager):
             self.start_inline_edit(item)
     
     def start_inline_edit(self, item):
-        """Inicia edición inline del nombre (SOLO para renombrar existentes)"""
+        """Inicia edici├│n inline del nombre (SOLO para renombrar existentes)"""
         name = self.tree.item(item, 'text')
-        clean_name = name.replace('📁 ', '').replace('📄 ', '')
+        clean_name = name.replace('­ƒôü ', '').replace('­ƒôä ', '')
         
         bbox = self.tree.bbox(item, column='#0')
         if not bbox:
@@ -608,7 +624,7 @@ class FileExplorerManager(BaseTreeManager):
         self.edit_entry.bind('<FocusOut>', self.finish_inline_edit)
     
     def finish_inline_edit(self, event=None):
-        """Finaliza edición y renombra (SOLO para archivos existentes)"""
+        """Finaliza edici├│n y renombra (SOLO para archivos existentes)"""
         if not self.edit_entry or self.is_creating_new:
             return
         
@@ -628,7 +644,7 @@ class FileExplorerManager(BaseTreeManager):
         return self.file_ops.rename_item(old_path, new_name)
     
     def _update_item_after_rename(self, old_path, new_name):
-        """Actualiza el item después del renombrado"""
+        """Actualiza el item despu├®s del renombrado"""
         old_dir = os.path.dirname(old_path)
         new_path = os.path.join(old_dir, new_name)
         
@@ -638,36 +654,36 @@ class FileExplorerManager(BaseTreeManager):
         self.item_to_path[self.editing_item] = new_path
         
         is_dir = os.path.isdir(new_path)
-        prefix = "📁 " if is_dir else "📄 "
+        prefix = "­ƒôü " if is_dir else "­ƒôä "
         self.tree.item(self.editing_item, text=f"{prefix}{new_name}")
         
         if hasattr(self.app, 'label_estado'):
             self.app.label_estado.config(text=f"Renombrado: {new_name}")
     
     def cancel_inline_edit(self, event=None):
-        """Cancela edición inline (SOLO para renombrar)"""
+        """Cancela edici├│n inline (SOLO para renombrar)"""
         if self.edit_entry:
             self.edit_entry.destroy()
             self.edit_entry = None
     
     def show_context_menu(self, event):
-        """Muestra menú contextual"""
+        """Muestra men├║ contextual"""
         region = self.tree.identify('region', event.x, event.y)
         
         if region != 'tree':
             context_menu = tk.Menu(self.tree, tearoff=0)
             context_menu.add_command(
-                label="📁 Nueva carpeta", 
+                label="­ƒôü Nueva carpeta", 
                 command=self.create_new_folder_inline,
                 accelerator="Ctrl+N"
             )
             context_menu.add_separator()
             context_menu.add_command(
-                label="🔄 Actualizar árbol", 
+                label="­ƒöä Actualizar ├írbol", 
                 command=self.refresh_tree
             )
             context_menu.add_command(
-                label="🏠 Ir a Home", 
+                label="­ƒÅá Ir a Home", 
                 command=self.go_home
             )
             
@@ -690,17 +706,17 @@ class FileExplorerManager(BaseTreeManager):
         
         context_menu.add_separator()
         context_menu.add_command(
-            label="📁 Nueva carpeta", 
+            label="­ƒôü Nueva carpeta", 
             command=self.create_new_folder_inline,
             accelerator="Ctrl+N"
         )
         context_menu.add_separator()
         context_menu.add_command(
-            label="🔄 Actualizar árbol", 
+            label="­ƒöä Actualizar ├írbol", 
             command=self.refresh_tree
         )
         context_menu.add_command(
-            label="🏠 Ir a Home", 
+            label="­ƒÅá Ir a Home", 
             command=self.go_home
         )
         
@@ -710,24 +726,24 @@ class FileExplorerManager(BaseTreeManager):
             context_menu.grab_release()
     
     def _add_context_menu_items(self, menu, path):
-        """Agrega items específicos al menú contextual"""
+        """Agrega items espec├¡ficos al men├║ contextual"""
         if os.path.isdir(path):
             menu.add_command(
-                label="📂 Expandir/Colapsar", 
+                label="­ƒôé Expandir/Colapsar", 
                 command=lambda: self.on_double_click(None)
             )
             menu.add_command(
-                label="✏️ Renombrar carpeta", 
+                label="Ô£Å´©Å Renombrar carpeta", 
                 command=self.handle_f2,
                 accelerator="F2"
             )
         elif os.path.isfile(path):
             menu.add_command(
-                label="📄 Abrir archivo", 
+                label="­ƒôä Abrir archivo", 
                 command=lambda: self.on_double_click(None)
             )
             menu.add_command(
-                label="✏️ Renombrar archivo", 
+                label="Ô£Å´©Å Renombrar archivo", 
                 command=self.handle_f2,
                 accelerator="F2"
             )
@@ -735,12 +751,12 @@ class FileExplorerManager(BaseTreeManager):
         menu.add_separator()
         # ELIMINAR sin espacios extra
         menu.add_command(
-            label="🗑 Eliminar",  # Sin variante de emoji
+            label="­ƒùæ Eliminar",  # Sin variante de emoji
             command=self.delete_selected_item,
             accelerator="Supr"
         )
         menu.add_command(
-            label="📋 Copiar ruta", 
+            label="­ƒôï Copiar ruta", 
             command=self.copy_selected_path
         )
     
@@ -792,7 +808,7 @@ class FileExplorerManager(BaseTreeManager):
         selection = self.ui.tree.selection()
         if not selection:
             messagebox.showinfo(
-                "Sin selección",
+                "Sin selecci├│n",
                 "Por favor selecciona un archivo o carpeta para eliminar"
             )
             return
@@ -800,37 +816,37 @@ class FileExplorerManager(BaseTreeManager):
         item = selection[0]
         path = self.item_to_path.get(item)
         
-        # No permitir eliminar la raíz
+        # No permitir eliminar la ra├¡z
         if not path or path == self.current_path:
             messagebox.showwarning(
-                "Operación no permitida",
-                "No se puede eliminar el directorio raíz"
+                "Operaci├│n no permitida",
+                "No se puede eliminar el directorio ra├¡z"
             )
             return
         
-        # Obtener información del elemento
+        # Obtener informaci├│n del elemento
         item_name = os.path.basename(path)
         is_dir = os.path.isdir(path)
         item_type = "carpeta" if is_dir else "archivo"
         
-        # Confirmar eliminación
+        # Confirmar eliminaci├│n
         if is_dir:
             # Contar elementos dentro
             try:
                 contents_count = len(os.listdir(path))
-                warning_msg = f"¿Estás seguro de eliminar la carpeta '{item_name}'?\n\n"
+                warning_msg = f"┬┐Est├ís seguro de eliminar la carpeta '{item_name}'?\n\n"
                 if contents_count > 0:
-                    warning_msg += f"⚠️ Contiene {contents_count} elemento(s)\n"
-                    warning_msg += "Todo su contenido será eliminado."
+                    warning_msg += f"ÔÜá´©Å Contiene {contents_count} elemento(s)\n"
+                    warning_msg += "Todo su contenido ser├í eliminado."
                 else:
-                    warning_msg += "La carpeta está vacía."
+                    warning_msg += "La carpeta est├í vac├¡a."
             except:
-                warning_msg = f"¿Estás seguro de eliminar la carpeta '{item_name}'?"
+                warning_msg = f"┬┐Est├ís seguro de eliminar la carpeta '{item_name}'?"
         else:
-            warning_msg = f"¿Estás seguro de eliminar el archivo '{item_name}'?"
+            warning_msg = f"┬┐Est├ís seguro de eliminar el archivo '{item_name}'?"
         
         response = messagebox.askyesno(
-            f"Confirmar eliminación de {item_type}",
+            f"Confirmar eliminaci├│n de {item_type}",
             warning_msg,
             icon='warning'
         )
@@ -842,7 +858,7 @@ class FileExplorerManager(BaseTreeManager):
         success = self.file_ops.delete_item(path)
         
         if success:
-            # Eliminar del árbol
+            # Eliminar del ├írbol
             self.tree.delete(item)
             
             # Limpiar mapeos
@@ -867,7 +883,7 @@ class FileExplorerManager(BaseTreeManager):
             pass
     
     def update_shortcuts_context(self):
-        """Actualiza la barra de atajos según la selección actual"""
+        """Actualiza la barra de atajos seg├║n la selecci├│n actual"""
         if not self.ui or not hasattr(self.ui, 'update_shortcuts_bar'):
             return
         
@@ -894,7 +910,7 @@ class FileExplorerManager(BaseTreeManager):
         """Copia los items seleccionados al clipboard"""
         selection = self.ui.tree.selection()
         if not selection:
-            print('[FileExplorer] No hay selección para copiar')
+            print('[FileExplorer] No hay selecci├│n para copiar')
             return
         
         paths = [self.item_to_path.get(item) for item in selection if self.item_to_path.get(item)]
@@ -911,7 +927,7 @@ class FileExplorerManager(BaseTreeManager):
         """Corta los items seleccionados al clipboard (para mover)"""
         selection = self.ui.tree.selection()
         if not selection:
-            print('[FileExplorer] No hay selección para cortar')
+            print('[FileExplorer] No hay selecci├│n para cortar')
             return
 
         paths = [self.item_to_path.get(item) for item in selection if self.item_to_path.get(item)]
@@ -925,11 +941,11 @@ class FileExplorerManager(BaseTreeManager):
     
     def paste_item(self):
         print('[FileExplorer] paste_item() LLAMADO')
-        """Pega el item del clipboard en la ubicación seleccionada"""
+        """Pega el item del clipboard en la ubicaci├│n seleccionada"""
         import shutil
         
         if not self._clipboard.get('paths'):
-            print('[FileExplorer] Clipboard vacío')
+            print('[FileExplorer] Clipboard vac├¡o')
             return
         
         # Obtener destino
@@ -989,7 +1005,7 @@ class FileExplorerManager(BaseTreeManager):
                 self.on_file_change_callback(operation, source_paths)
             
         except PermissionError:
-            messagebox.showerror("Error", "Sin permisos para realizar la operación")
+            messagebox.showerror("Error", "Sin permisos para realizar la operaci├│n")
         except OSError as e:
             messagebox.showerror("Error", f"Error:\\n{str(e)}")
         except Exception as e:
@@ -1013,7 +1029,7 @@ class FileExplorerManager(BaseTreeManager):
             dy = abs(event.y - self._drag_state['start_y'])
             
             if dx > 10 or dy > 10:
-                # Iniciar drag con selección múltiple
+                # Iniciar drag con selecci├│n m├║ltiple
                 selection = self.ui.tree.selection()
                 if selection:
                     self._drag_state['active'] = True
@@ -1024,11 +1040,11 @@ class FileExplorerManager(BaseTreeManager):
                     ]
                     print(f'[FileExplorer] Drag iniciado: {len(self._drag_state["source_paths"])} items')
         
-        # Si drag activo, mostrar guía visual (validación al soltar)
+        # Si drag activo, mostrar gu├¡a visual (validaci├│n al soltar)
         if self._drag_state['active']:
             target_item = self.ui.tree.identify_row(event.y)
             if target_item and target_item not in self._drag_state['source_items']:
-                # Siempre mostrar como válido, validar al soltar
+                # Siempre mostrar como v├ílido, validar al soltar
                 self._show_drop_indicator(target_item)
                 self.ui.tree.config(cursor='exchange')
             else:
@@ -1059,9 +1075,9 @@ class FileExplorerManager(BaseTreeManager):
                 if dest_path and os.path.isfile(dest_path):
                     dest_path = os.path.dirname(dest_path)
                 
-                # Validar carpeta válida
+                # Validar carpeta v├ílida
                 if dest_path and os.path.isdir(dest_path):
-                    # Mover cada item válido
+                    # Mover cada item v├ílido
                     for source_path in self._drag_state['source_paths']:
                         source_dir = os.path.dirname(source_path)
                         
@@ -1074,10 +1090,10 @@ class FileExplorerManager(BaseTreeManager):
                             print(f'[FileExplorer] Saltando subcarpeta: {source_path}')
                             continue
                         
-                        # Drop válido: ejecutar movimiento
+                        # Drop v├ílido: ejecutar movimiento
                         self._drag_paste(source_path, dest_path)
                 else:
-                    print('[FileExplorer] Drop rechazado: destino no es carpeta válida')
+                    print('[FileExplorer] Drop rechazado: destino no es carpeta v├ílida')
         
         finally:
             # Reset drag state
@@ -1127,7 +1143,7 @@ class FileExplorerManager(BaseTreeManager):
             traceback.print_exc()
     
     def _show_drop_indicator(self, target_item):
-        """Muestra línea guía azul en item destino"""
+        """Muestra l├¡nea gu├¡a azul en item destino"""
         try:
             if not self._drop_indicator:
                 self._drop_indicator = tk.Frame(
@@ -1149,7 +1165,7 @@ class FileExplorerManager(BaseTreeManager):
             pass
     
     def _hide_drop_indicator(self):
-        """Oculta línea guía"""
+        """Oculta l├¡nea gu├¡a"""
         if self._drop_indicator:
             self._drop_indicator.place_forget()
 
