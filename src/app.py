@@ -86,7 +86,7 @@ class BusquedaCarpetaApp:
         start_time = time.time()
         
         self.master = master
-        self.version = "V. 4.5 - Paneles Duales con Redimensión"
+        self.version = "V. 5.0 - Edición Definitiva"
         self.modo_numerico = True
         
         # Variables para menú Ver

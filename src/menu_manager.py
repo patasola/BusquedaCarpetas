@@ -153,32 +153,146 @@ class MenuManager:
             messagebox.showerror("Error", f"No se pudo abrir la configuración: {str(e)}")
     
     def mostrar_manual(self):
-            """Abre el manual en el navegador del sistema"""
-            try:
-                import webbrowser
-                import os
-                # Buscar README.md como manual
-                base_dir = os.path.dirname(os.path.dirname(__file__))
-                readme_path = os.path.join(base_dir, 'README.md')
-                if os.path.exists(readme_path):
-                    webbrowser.open(f'file:///{os.path.abspath(readme_path)}')
-                else:
-                    messagebox.showinfo("Manual", "Manual no encontrado (README.md)")
-            except Exception as e:
-                messagebox.showerror("Error", f"Error abriendo manual: {e}")
+        """Abre el manual renderizado como HTML"""
+        try:
+            import os
+            base_dir = os.path.dirname(os.path.dirname(__file__))
+            readme_path = os.path.join(base_dir, 'README.md')
+            
+            if os.path.exists(readme_path):
+                with open(readme_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self._abrir_como_html(content, "Manual de Usuario")
+            else:
+                messagebox.showinfo("Manual", "Manual no encontrado (README.md)")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error abriendo manual: {e}")
     
     def mostrar_changelog(self):
-        """Abre el changelog con Notepad"""
+        """Abre el changelog renderizado como HTML"""
         try:
-            import subprocess
             import os
-            changelog_path = os.path.join(os.path.dirname(__file__), '..', 'CHANGELOG.md')
+            changelog_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'CHANGELOG.md')
+            
             if os.path.exists(changelog_path):
-                subprocess.Popen(['notepad.exe', changelog_path])
+                with open(changelog_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self._abrir_como_html(content, "Registro de Cambios")
             else:
                 messagebox.showinfo("Changelog", "No hay registro de cambios disponible")
         except Exception as e:
             messagebox.showerror("Error", f"Error abriendo changelog: {e}")
+
+    def _abrir_como_html(self, markdown_text, title):
+        """Convierte Markdown a HTML temporal y lo abre"""
+        import tempfile
+        import webbrowser
+        import re
+        import html
+        import os
+        
+        # 1. Escapar HTML base
+        # No escapamos todo porque queremos insertar tags, pero sí caracteres especiales si fuera necesario
+        # En este caso simple, asumimos que el markdown es seguro y confiable
+        
+        # 2. Estilos CSS (Estilo GitHub Clean)
+        css = """
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; 
+                   line-height: 1.6; color: #24292e; max-width: 900px; margin: 0 auto; padding: 40px 20px; background: #ffffff; }
+            h1, h2, h3 { margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; color: #1b1f23; }
+            h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+            h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+            h3 { font-size: 1.25em; }
+            code { padding: .2em .4em; margin: 0; font-size: 85%; background-color: #f6f8fa; border-radius: 6px; font-family: Consolas, monospace; }
+            pre { padding: 16px; overflow: auto; font-size: 85%; line-height: 1.45; background-color: #f6f8fa; border-radius: 6px; }
+            ul { padding-left: 2em; margin-bottom: 16px; }
+            li { margin: 0.25em 0; }
+            p { margin-bottom: 16px; }
+            hr { height: .25em; padding: 0; margin: 24px 0; background-color: #e1e4e8; border: 0; }
+            strong { font-weight: 600; color: #24292e; }
+            blockquote { padding: 0 1em; color: #6a737d; border-left: 0.25em solid #dfe2e5; margin: 0 0 16px 0; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaecef; color: #586069; font-size: 12px; text-align: center; }
+        </style>
+        """
+        
+        # 3. Parser "Trucado" (Regex Simple)
+        html_content = markdown_text
+        
+        # Headers
+        html_content = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html_content, flags=re.MULTILINE)
+        html_content = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html_content, flags=re.MULTILINE)
+        html_content = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html_content, flags=re.MULTILINE)
+        
+        # Horizontal Rules
+        html_content = re.sub(r'^---$', r'<hr>', html_content, flags=re.MULTILINE)
+        html_content = re.sub(r'^={3,}$', r'<hr>', html_content, flags=re.MULTILINE)
+        
+        # Bold
+        html_content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html_content)
+        
+        # Lists (Naive: - item -> <li>item</li>)
+        # Primero detectamos bloques de lista para envolverlos en <ul>
+        lines = html_content.split('\n')
+        processed_lines = []
+        in_list = False
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Detectar item de lista
+            if stripped.startswith('- ') or stripped.startswith('• '):
+                content = stripped[2:]
+                if not in_list:
+                    processed_lines.append('<ul>')
+                    in_list = True
+                processed_lines.append(f'<li>{content}</li>')
+            else:
+                if in_list:
+                    processed_lines.append('</ul>')
+                    in_list = False
+                
+                # Párrafos simples (si no es tag HTML ya procesado)
+                if stripped and not stripped.startswith('<') and not stripped.startswith('='):
+                    processed_lines.append(f'<p>{stripped}</p>')
+                else:
+                    processed_lines.append(stripped)
+        
+        if in_list:
+            processed_lines.append('</ul>')
+            
+        body_content = '\n'.join(processed_lines)
+        
+        # 4. Armar HTML Final
+        full_html = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="utf-8">
+            <title>{title}</title>
+            {css}
+        </head>
+        <body>
+            {body_content}
+            <div class="footer">
+                Generado automáticamente por Búsqueda Rápida de Carpetas V.4.5<br>
+                {title}
+            </div>
+        </body>
+        </html>
+        """
+        
+        # 5. Guardar y Abrir
+        try:
+            fd, path = tempfile.mkstemp(suffix='.html')
+            with os.fdopen(fd, 'w', encoding='utf-8') as tmp:
+                tmp.write(full_html)
+            
+            webbrowser.open(f'file:///{path}')
+        except Exception as e:
+            print(f"Error generando HTML temporal: {e}")
+            # Fallback a abrir el archivo original si falla la conversión
+            pass
     
     def mostrar_acerca_de(self):
         """Muestra información sobre la aplicación con messagebox nativo"""
