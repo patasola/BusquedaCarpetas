@@ -397,7 +397,7 @@ class FileExplorerManager:
         except:
             root_fecha = "N/A"
             
-        root_item = self.tree.insert('', 'end', text=f"­ƒôü {root_name}", 
+        root_item = self.tree.insert('', 'end', text=f"📁 {root_name}", 
                                     values=(root_fecha,),
                                     open=True, tags=('evenrow',))
         
@@ -475,7 +475,7 @@ class FileExplorerManager:
             row_tag = 'evenrow' if i % 2 == 0 else 'oddrow'
             
             if is_dir:
-                display_name = f"­ƒôü {name}"
+                display_name = f"📁 {name}"
                 item_id = self.tree.insert(parent_item, 'end', text=display_name,
                                          values=(fecha_mod,), tags=(row_tag,))
                 
@@ -485,7 +485,7 @@ class FileExplorerManager:
                 if self.file_ops.has_subdirectories(full_path):
                     dummy = self.tree.insert(item_id, 'end', text='Cargando...', values=('',))
             else:
-                display_name = f"­ƒôä {name}"
+                display_name = f"📄 {name}"
                 item_id = self.tree.insert(parent_item, 'end', text=display_name,
                                          values=(fecha_mod,), tags=(row_tag,))
                 

@@ -175,13 +175,18 @@ class ExplorerUI:
         tree_frame = tk.Frame(self.content_frame)
         tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
         
+        # Configurar Grid Layout
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+        
         # Scrollbars
         vsb = ttk.Scrollbar(tree_frame, orient="vertical")
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
         
         # TreeView con el MISMO estilo que el TreeView principal
         self.tree = ttk.Treeview(tree_frame, columns=("Fecha",), show="tree headings", 
-                         style="Custom.Treeview", selectmode="extended")
+                         style="Custom.Treeview", selectmode="extended",
+                         yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         
         # Asegurar que use exactamente el mismo estilo
         style = ttk.Style()
@@ -207,16 +212,13 @@ class ExplorerUI:
         self.tree.tag_configure('evenrow', background='#ffffff')
         self.tree.tag_configure('oddrow', background='#f8f9fa')
         
-        # Configurar encabezados
-        self.tree.heading("#0", text="Carpeta", anchor=tk.CENTER)
-        self.tree.heading("Fecha", text="Modificación", anchor=tk.CENTER)
+        # Configurar columnas
+        self.tree.column("#0", width=250, minwidth=150, stretch=False)
+        self.tree.column("Fecha", width=120, minwidth=100, stretch=False)
         
-        # ANCHOS OPTIMIZADOS - Más compactos
-        self.tree.column("#0", width=180, anchor=tk.W, minwidth=100)
-        self.tree.column("Fecha", width=90, anchor=tk.CENTER, minwidth=85, stretch=False)
+        self.tree.heading("#0", text="Nombre", anchor=tk.W)
+        self.tree.heading("Fecha", text="Fecha Modificación", anchor=tk.W)
         
-        # Configurar scrollbars
-        self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         vsb.configure(command=self.tree.yview)
         hsb.configure(command=self.tree.xview)
         
@@ -226,8 +228,8 @@ class ExplorerUI:
         # Eventos (incluyendo navegación por flechas)
         self._bind_treeview_events()
         
-        # Empaquetar TreeView
-        self.tree.pack(side='left', fill='both', expand=True)
+        # TreeView en Grid
+        self.tree.grid(row=0, column=0, sticky='nsew')
     
     def _create_shortcuts_bar(self):
         """Crea la barra de atajos de teclado en la parte inferior"""
@@ -456,53 +458,19 @@ class ExplorerUI:
     def _update_scrollbars(self, vsb, hsb):
         """Actualiza la visibilidad de las scrollbars"""
         try:
-            self.tree.update_idletasks()
-            
-            tree_height = self.tree.winfo_height()
-            tree_width = self.tree.winfo_width()
-            
-            if tree_height <= 1 or tree_width <= 1:
-                self.tree.after(100, lambda: self._update_scrollbars(vsb, hsb))
-                return
-            
-            children = self.tree.get_children()
-            
             # Scrollbar vertical
-            if children:
-                total_items = len(self._get_visible_items())
-                visible_items = max(1, tree_height // 28)
-                
-                needs_vertical = total_items > visible_items
-                is_vertical_visible = vsb.winfo_viewable()
-                
-                if needs_vertical and not is_vertical_visible:
-                    vsb.pack(side='right', fill='y')
-                elif not needs_vertical and is_vertical_visible:
-                    vsb.pack_forget()
+            if self.tree.get_children():
+                vsb.grid(row=0, column=1, sticky='ns')
             else:
-                if vsb.winfo_viewable():
-                    vsb.pack_forget()
+                vsb.grid_remove()
             
             # Scrollbar horizontal
-            if children:
-                max_width = 0
-                for item in self._get_visible_items():
-                    bbox = self.tree.bbox(item, column='#0')
-                    if bbox:
-                        item_width = bbox[0] + bbox[2]
-                        max_width = max(max_width, item_width)
-                
-                needs_horizontal = max_width > tree_width
-                is_horizontal_visible = hsb.winfo_viewable()
-                
-                if needs_horizontal and not is_horizontal_visible:
-                    hsb.pack(side='bottom', fill='x')
-                elif not needs_horizontal and is_horizontal_visible:
-                    hsb.pack_forget()
+            # Usar xview directamente sin after_idle para evitar condiciones de carrera
+            xview = self.tree.xview()
+            if xview[0] > 0.0 or xview[1] < 1.0:
+                hsb.grid(row=1, column=0, sticky='ew')
             else:
-                if hsb.winfo_viewable():
-                    hsb.pack_forget()
+                hsb.grid_remove()
                     
         except Exception as e:
             print(f"Error actualizando scrollbars: {e}")
-            self.tree.after(200, lambda: self._update_scrollbars(vsb, hsb))

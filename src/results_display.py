@@ -19,6 +19,11 @@ class ResultsDisplay:
             if hasattr(self.app, 'historial_manager'):
                 self.app.master.after(50, lambda: self.app.historial_manager.agregar_busqueda(
                     criterio, metodo, len(resultados), 0.05))
+            
+            # Actualizar scrollbars
+            if hasattr(self.app, 'configurar_scrollbars'):
+                self.app.configurar_scrollbars()
+
         except Exception as e:
             self.app.ui_callbacks.habilitar_busqueda()
     
@@ -60,6 +65,11 @@ class ResultsDisplay:
             if hasattr(self.app, 'historial_manager'):
                 self.app.master.after(50, lambda: self.app.historial_manager.agregar_busqueda(
                     criterio, "Tradicional", len(resultados), 0.1))
+            
+            # Actualizar scrollbars
+            if hasattr(self.app, 'configurar_scrollbars'):
+                self.app.configurar_scrollbars()
+
         except Exception as e:
             self.app.ui_callbacks.habilitar_busqueda()
     
@@ -159,5 +169,10 @@ class ResultsDisplay:
             
             if hasattr(self.app, 'historial_manager'):
                 self.app.historial_manager.agregar_busqueda(criterio, "Multi", len(resultados), 0.2)
+            
+            # Actualizar scrollbars
+            if hasattr(self.app, 'configurar_scrollbars'):
+                self.app.configurar_scrollbars()
+
         except:
             self.app.ui_callbacks.habilitar_busqueda()

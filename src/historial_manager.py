@@ -211,7 +211,7 @@ class HistorialManager(BaseTreeManager):
             
             # Configurar columnas con anchos similares al TreeView principal
             self.tree.column("#0", width=35, anchor=tk.CENTER, minwidth=30, stretch=False)  # Reducido de 40
-            self.tree.column("Criterio", width=100, anchor=tk.W, minwidth=80, stretch=True)  # Reducido de 120 a 100
+            self.tree.column("Criterio", width=100, anchor=tk.W, minwidth=80, stretch=False)  # Reducido de 120 a 100
             self.tree.column("Metodo", width=30, anchor=tk.CENTER, minwidth=25, stretch=False)  # Reducido de 35
             self.tree.column("Resultados", width=50, anchor=tk.CENTER, minwidth=45, stretch=False)  # Reducido de 70
             self.tree.column("Tiempo", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 60
@@ -219,7 +219,7 @@ class HistorialManager(BaseTreeManager):
             
             # Definicion de columnas para ColumnManager
             column_definitions = {
-                "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "minwidth": 80, "stretch": True, "default_visible": True},
+                "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "minwidth": 80, "stretch": False, "default_visible": True},
                 "Metodo": {"title": "M", "width": 30, "anchor": "center", "minwidth": 25, "stretch": False, "default_visible": True},
                 "Resultados": {"title": "Res.", "width": 50, "anchor": "center", "minwidth": 45, "stretch": False, "default_visible": True},
                 "Tiempo": {"title": "Tiempo", "width": 55, "anchor": "center", "minwidth": 50, "stretch": False, "default_visible": True},
@@ -231,7 +231,6 @@ class HistorialManager(BaseTreeManager):
             
             # Inicializar ColumnManager
             self.column_manager = ColumnManager(self.tree, "historial_tree", column_definitions)
-            
             # Configurar scrollbars
             self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
             vsb.configure(command=self.tree.yview)
@@ -250,74 +249,6 @@ class HistorialManager(BaseTreeManager):
                                   foreground='#0d47a1', 
                                   background='#e3f2fd',
                                   font=('Segoe UI', 10, 'bold'))
-            self.tree.tag_configure('tree_method', 
-                                  foreground='#e65100', 
-                                  background='#fff3e0',
-                                  font=('Segoe UI', 10, 'bold'))
-            
-            # Función para actualizar scrollbars
-            def update_scrollbars():
-                try:
-                    self.tree.update_idletasks()
-                    
-                    # Scrollbar vertical
-                    if self.tree.get_children():
-                        total_items = len(self.tree.get_children())
-                        tree_height = self.tree.winfo_height()
-                        if tree_height > 1:
-                            visible_items = max(1, tree_height // 28)
-                            
-                            if total_items > visible_items:
-                                if not vsb.winfo_viewable():
-                                    vsb.pack(side='right', fill='y')
-                            else:
-                                if vsb.winfo_viewable():
-                                    vsb.pack_forget()
-                    else:
-                        if vsb.winfo_viewable():
-                            vsb.pack_forget()
-                    
-                    # Scrollbar horizontal
-                    if self.tree.get_children():
-                        max_width = 0
-                        for item in self.tree.get_children():
-                            try:
-                                bbox = self.tree.bbox(item, column='#0')
-                                if bbox:
-                                    item_width = bbox[0] + bbox[2]
-                                    max_width = max(max_width, item_width)
-                            except:
-                                pass
-                        
-                        tree_width = self.tree.winfo_width()
-                        if tree_width > 1 and max_width > tree_width:
-                            if not hsb.winfo_viewable():
-                                hsb.pack(side='bottom', fill='x')
-                        else:
-                            if hsb.winfo_viewable():
-                                hsb.pack_forget()
-                    else:
-                        if hsb.winfo_viewable():
-                            hsb.pack_forget()
-                
-                except Exception as e:
-                    print(f"Error actualizando scrollbars historial: {e}")
-            
-            self.update_scrollbars = update_scrollbars
-            
-            # Empaquetar TreeView
-            self.tree.pack(side='left', fill='both', expand=True)
-            
-            # Eventos
-            self.tree.bind('<Double-1>', self.on_double_click)
-            self.tree.bind('<Return>', self.on_enter_key)
-            self.tree.bind('<Button-3>', self.show_context_menu)
-            self.tree.bind('<Configure>', lambda e: self.tree.after_idle(self.update_scrollbars))
-            
-            # Configurar foco del TreeView
-            self.tree.configure(takefocus=True)
-            
-            # Cargar datos existentes
             self.actualizar_vista()
             
         except Exception as e:
