@@ -1,4 +1,4 @@
-# MANUAL DE USUARIO - BÚSQUEDA RÁPIDA DE CARPETAS V.5.0
+# MANUAL DE USUARIO - BÚSQUEDA RÁPIDA DE CARPETAS V.5.0 (Luce Intellettual)
 
 ## CÓMO USAR LA APLICACIÓN
 
@@ -214,5 +214,5 @@ Para funciones avanzadas, experimenta con los diferentes métodos de búsqueda y
 
 ---
 
-© 2025 - Búsqueda Rápida de Carpetas V.5.0
+© 2025 - Búsqueda Rápida de Carpetas V.5.0 (Luce Intellettual)
 ¡Encuentra tus carpetas más rápido que nunca!

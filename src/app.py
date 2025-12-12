@@ -86,7 +86,7 @@ class BusquedaCarpetaApp:
         start_time = time.time()
         
         self.master = master
-        self.version = "V. 5.0 - Edición Definitiva"
+        self.version = "V. 5.0 - Luce Intellettual"
         self.modo_numerico = True
         
         # Variables para menú Ver
