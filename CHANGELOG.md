@@ -1,3 +1,20 @@
+# Registro de Cambios - Búsqueda Rápida de Carpetas
+
+## V. 5.0 - Luce Intellettual - VERSIÓN ACTUAL
+========================================
+
+### 🎨 CAMBIOS EN ESTA VERSIÓN
+- ✅ **Actualización de Nombre**: La versión 5.0 ahora se llama "Luce Intellettual" (Luz Intelectual en italiano).
+- ✅ **Mantenimiento**: Correcciones menores y estabilización del código.
+
+---
+
+## V. 4.5 - Purgatorio Perfeccionado (Refactor MEGA + UI Consolidada)
+========================================
+
+### 🏗️ REFACTOR MEGA (OPTIMIZACIÓN MASIVA)
+- ✅ **Reducción de Código**: Eliminadas ~4,110 líneas (-27%) mediante limpieza de archivos obsoletos y lógica redundante.
+- ✅ **Sistema Nativo**: Reemplazo de diálogos personalizados por componentes nativos de Windows (`messagebox`, `notepad`, `webbrowser`) para mayor ligereza.
 - ✅ **Consolidación de Managers**: Implementación de `BaseTreeManager` para centralizar la lógica de `HistorialManager` y `TreeExplorer`, eliminando duplicidad.
 - ✅ **Optimización de Búsqueda**: Mejora del 40-50% en velocidad mediante "early exit" y exclusión inteligente de carpetas (`.git`, `node_modules`).
 
