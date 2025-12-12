@@ -17,6 +17,8 @@ cache_*.pkl
 config.json
 historial_busquedas.json
 search_locations.json
+column_preferences.json
+tree_column_config.json
 
 # IDE
 .vscode/
