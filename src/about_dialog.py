@@ -283,7 +283,7 @@ class AboutDialog:
         
         # Copyright
         copyright_label = tk.Label(self.content_frame,
-                                 text="© 2024 - Búsqueda Rápida de Carpetas V.4.5\n"
+                                 text="© 2025 - Búsqueda Rápida de Carpetas V.4.5\n"
                                       "Desarrollado con ❤️ para mejorar tu productividad",
                                  font=("Segoe UI", 9),
                                  fg=Colors.MEDIUM_GRAY,

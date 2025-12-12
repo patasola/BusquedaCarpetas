@@ -303,7 +303,7 @@ class MenuManager:
                 f"Búsqueda Rápida de Carpetas\n\n"
                 f"{version_info}\n\n"
                 f"Desarrollado por: Elkin Darío Pérez Puyana\n"
-                f"© 2024\n\n"
+                f"© 2025\n\n"
                 f"Una herramienta para búsqueda eficiente de carpetas."
             )
         except Exception as e:

@@ -297,7 +297,7 @@ Métodos de búsqueda:
 • T = Tradicional (completo)
 • E = Explorer (expandible)
 
-© 2024 - Sistema de Búsqueda de Carpetas"""
+© 2025 - Sistema de Búsqueda de Carpetas"""
         messagebox.showinfo("Acerca de", info.strip())
 
     # Métodos de compatibilidad simplificados
