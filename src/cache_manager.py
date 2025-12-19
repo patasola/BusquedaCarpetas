@@ -3,7 +3,9 @@ import os
 import pickle
 import time
 import threading
+import traceback
 from datetime import datetime, timedelta
+from .folder_indexer import FolderIndexer
 
 class CacheData:
     """Estructura de datos del cache"""
@@ -20,22 +22,28 @@ class CacheData:
 class CacheManager:
     """Gestor de cache de carpetas optimizado - CON CARGA AUTOMÁTICA AL INICIO"""
     
-    def __init__(self, ruta_base=None):
+    def __init__(self, ruta_base=None, auto_build_index=True):
         self.ruta_base = ruta_base
         self.cache_file = "carpetas_cache.pkl"
         self.cache = CacheData()
         self.construyendo = False
         self.callback_progreso = None
+        self.auto_build_index = auto_build_index # Controlar si se construye índice
+
+        # V.5.0: Índice Trie para búsqueda ultra-rápida
+        self.indexer = FolderIndexer()
+        self.index_ready = False
+        self.building_index = False # Flag para saber si se está construyendo
         
-        # CAMBIO PRINCIPAL: Cargar cache automáticamente al crear la instancia
-        self._cargar_cache_automatico()
-        
+        # self._cargar_cache_automatico() # DESHABILITADO: Causa lentitud en startup. Se carga en app.py
+
     def _cargar_cache_automatico(self):
         """Carga cache automáticamente al inicializar - NUEVO MÉTODO"""
         try:
             print("[CACHE] Iniciando carga automática...")
             
             # Intentar cargar cache existente
+            # NOTA: cargar_cache ya llama a _build_index internamente si auto_build_index es True
             cache_cargado = self.cargar_cache()
             
             if cache_cargado and self.cache.valido:
@@ -77,6 +85,9 @@ class CacheManager:
             carpetas_count = self.cache.directorios.get('total', 0)
             if carpetas_count > 0:
                 print(f"[CACHE] Cache válido cargado: {carpetas_count:,} directorios")
+                # V.5.0: Construir índice después de cargar SOLO SI SE SOLICITA
+                if self.auto_build_index:
+                    self._build_index()
                 return True
             else:
                 print("[CACHE] Cache cargado pero sin directorios")
@@ -100,6 +111,7 @@ class CacheManager:
         """Invalida el cache actual"""
         print("[CACHE] Invalidando cache...")
         self.cache = CacheData()
+        self.index_ready = False
         if os.path.exists(self.cache_file):
             try:
                 os.remove(self.cache_file)
@@ -210,6 +222,11 @@ class CacheManager:
                 self.callback_progreso(100, 100, mensaje_final)
             
             print(f"[CACHE] {mensaje_final}")
+            
+            # Construir índice después de crear cache SOLO SI SE SOLICITA
+            if self.auto_build_index:
+                self._build_index(force=True)
+            
             return True
             
         except Exception as e:
@@ -239,26 +256,99 @@ class CacheManager:
         except Exception:
             return 1000
     
-    def buscar_en_cache(self, criterio):
-        """Busca carpetas en el cache - OPTIMIZADO"""
+    def _build_index(self, force=False):
+        """Construye el índice Trie - V.5.0 (Threaded)"""
+        try:
+            # Evitar reconstrucción si ya está listo o construyéndose
+            if self.index_ready and not force:
+                print("[INDEXER] Índice ya está listo, omitiendo construcción.")
+                return True
+            
+            if self.building_index and not force:
+                print("[INDEXER] Índice ya se está construyendo.")
+                return True
+
+            carpetas = self.cache.directorios.get('directorios', [])
+            if not carpetas:
+                print("[INDEXER] No hay carpetas para indexar")
+                self.index_ready = False
+                return False
+            
+            self.building_index = True
+            # Ejecutar en hilo separado para no bloquear UI
+            threading.Thread(target=self._build_index_thread, args=(carpetas,), daemon=True).start()
+            return True
+            
+        except Exception as e:
+            print(f"[INDEXER] Error iniciando construcción de índice: {e}")
+            self.index_ready = False
+            self.building_index = False
+            return False
+
+    def _build_index_thread(self, carpetas):
+        """Construcción del índice en segundo plano"""
+        try:
+            print(f"[INDEXER] Construyendo índice para {len(carpetas):,} carpetas (Background)...")
+            build_time = self.indexer.build_index(carpetas)
+            self.index_ready = True
+            print(f"[INDEXER] Índice listo en {build_time:.3f}s")
+        except Exception as e:
+            print(f"[INDEXER] Error en hilo de indexación: {e}")
+            traceback.print_exc()
+            self.index_ready = False
+        finally:
+            self.building_index = False
+
+    def buscar_en_cache(self, criterio, use_prefix=True):
+        """
+        Busca carpetas en el cache - V.5.0 VELOCE CON ÍNDICE TRIE
+        
+        Args:
+            criterio: Texto a buscar
+            use_prefix: Si True usa búsqueda por prefijo (más rápida)
+        """
         if not self.cache.valido:
             print("[CACHE] Cache no válido para búsqueda")
             return None
         
-        criterio_lower = criterio.lower()
-        resultados = []
         carpetas = self.cache.directorios.get('directorios', [])
-        
         if not carpetas:
             print("[CACHE] No hay carpetas en cache")
             return []
         
-        # Búsqueda con límite
         MAX_RESULTADOS = 2000
+        
+        # V.5.0: Usar índice Trie si está disponible
+        if self.index_ready:
+            if use_prefix:
+                # Búsqueda ultra-rápida por prefijo
+                return self.indexer.search(criterio, MAX_RESULTADOS)
+            else:
+                # Búsqueda contains (más lenta pero más flexible)
+                return self.indexer.search_contains(criterio, MAX_RESULTADOS)
+        
+        # FALLBACK: Búsqueda lineal (si índice no disponible)
+        if self.building_index:
+            print("[CACHE] Usando búsqueda lineal (índice construyéndose en background...)")
+        else:
+            print("[CACHE] Usando búsqueda lineal (índice no disponible)")
+            # Intentar revivir el índice si no se está construyendo y debería
+            if self.auto_build_index:
+                print("[CACHE] Intentando iniciar construcción de índice...")
+                self._build_index()
+                
+        return self._linear_search(criterio, MAX_RESULTADOS)
+    
+    def _linear_search(self, criterio, max_resultados=2000):
+        """Búsqueda lineal - FALLBACK si índice no disponible"""
+        criterio_lower = criterio.lower()
+        resultados = []
+        carpetas = self.cache.directorios.get('directorios', [])
+        
         start_time = time.time()
         
         for carpeta in carpetas:
-            if len(resultados) >= MAX_RESULTADOS:
+            if len(resultados) >= max_resultados:
                 break
                 
             if criterio_lower in carpeta['nombre'].lower():
@@ -269,7 +359,7 @@ class CacheManager:
                 ))
         
         search_time = time.time() - start_time
-        print(f"[CACHE] Búsqueda completada: {len(resultados)} resultados en {search_time:.3f}s")
+        print(f"[CACHE] Búsqueda lineal: {len(resultados)} resultados en {search_time:.3f}s")
         
         return resultados
     
@@ -305,7 +395,9 @@ class CacheManager:
             'ruta_base': self.cache.ruta_base,
             'archivo_existe': os.path.exists(self.cache_file),
             'expirado': self.cache.is_expired(),
-            'archivo_cache': self.cache_file
+            'archivo_cache': self.cache_file,
+            'index_ready': self.index_ready,
+            'building_index': self.building_index
         }
     
     def necesita_construccion(self):

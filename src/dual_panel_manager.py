@@ -1,4 +1,5 @@
-# src/dual_panel_manager.py - Gestión de Paneles Duales V.4.5
+# src/dual_panel_manager.py - Gestión de Paneles Duales V.4.5 - OPTIMIZADO
+import tkinter as tk
 
 class DualPanelManager:
     """Gestiona el sistema de paneles duales sin solapamiento"""
@@ -10,6 +11,7 @@ class DualPanelManager:
             'explorador': None
         }
         self.occupied_columns = set()  # Columnas actualmente ocupadas
+        self.original_width = 0
     
     def configure_grid(self, app_frame):
         """Configura grid con 3 columnas para paneles duales"""
@@ -30,7 +32,7 @@ class DualPanelManager:
             return 1
       
     def assign_panel_position(self, panel_type):
-        """Asigna posición a un panel"""
+        """Asigna posición a un panel y EXPANDE la ventana MANTENIÉNDOLA CENTRADA"""
         if panel_type not in self.panel_positions:
             print(f"[ERROR] Panel tipo desconocido: {panel_type}")
             return 1
@@ -38,6 +40,10 @@ class DualPanelManager:
         # Si ya tiene posición, devolverla
         if self.panel_positions[panel_type] is not None:
             return self.panel_positions[panel_type]
+        
+        # Guardar ancho original si es el primer panel
+        if len(self.occupied_columns) == 0:
+            self.original_width = self.app.master.winfo_width()
         
         # Obtener siguiente columna disponible
         column = self.get_next_available_column()
@@ -48,18 +54,61 @@ class DualPanelManager:
         if hasattr(self.app, 'window_manager'):
             self.app.window_manager.add_panel()
         
+        # EXPANDIR VENTANA Y RE-CENTRAR
+        try:
+            # Verificar si está maximizada (Windows)
+            is_maximized = False
+            try:
+                if self.app.master.state() == 'zoomed':
+                    is_maximized = True
+            except:
+                pass
+                
+            if is_maximized:
+                print("[LAYOUT] Ventana maximizada, no se puede redimensionar")
+            else:
+                current_width = self.app.master.winfo_width()
+                current_height = self.app.master.winfo_height()
+                
+                # Fix para startup: si width es muy pequeño (no renderizado), usar default
+                if current_width < 100:
+                    current_width = 600
+                    current_height = 500
+                
+                screen_width = self.app.master.winfo_screenwidth()
+                screen_height = self.app.master.winfo_screenheight()
+                
+                # Ancho estimado del panel (aprox 300px)
+                panel_width = 300
+                new_width = current_width + panel_width
+                
+                # Calcular nueva posición X para mantener el centro
+                # Centro actual de la pantalla
+                center_x = screen_width // 2
+                center_y = screen_height // 2
+                
+                # Nueva esquina superior izquierda
+                new_x = center_x - (new_width // 2)
+                new_y = center_y - (current_height // 2)
+                
+                # Asegurar que no quede fuera de pantalla (izquierda/arriba)
+                new_x = max(0, new_x)
+                new_y = max(0, new_y)
+                
+                # No exceder ancho de pantalla
+                if new_width < screen_width - 50:
+                    self.app.master.geometry(f"{new_width}x{current_height}+{new_x}+{new_y}")
+                    print(f"[LAYOUT] Ventana expandida a {new_width}px y re-centrada en {new_x},{new_y}")
+            
+        except Exception as e:
+            print(f"[LAYOUT] Error redimensionando ventana: {e}")
+        
         # Mostrar grip de redimensionamiento cuando hay paneles
         if hasattr(self.app, 'main_grip') and len(self.occupied_columns) > 0:
             try:
                 self.app.main_grip.pack(side='right', fill='y', before=self.app.main_container)
-                print(f"[DEBUG] Grip mostrado. Visible: {self.app.main_grip.winfo_viewable()}")
-                print(f"[DEBUG] Grip width: {self.app.main_grip.winfo_width()}")
-                print(f"[DEBUG] Grip height: {self.app.main_grip.winfo_height()}")
             except Exception as e:
-                print(f"[DEBUG] No se pudo mostrar grip: {e}")
-        else:
-            print(f"[DEBUG] main_grip existe: {hasattr(self.app, 'main_grip')}")
-            print(f"[DEBUG] occupied_columns: {len(self.occupied_columns)}")
+                pass
         
         print(f"[DEBUG] Panel {panel_type} asignado a columna {column}")
         
@@ -93,7 +142,7 @@ class DualPanelManager:
                     if hasattr(self.app, 'main_container_wrapper'):
                         self.app.main_container_wrapper.pack_propagate(True)
                 except Exception as e:
-                    print(f"[DEBUG] No se pudo ocultar grip: {e}")
+                    pass
             
             print(f"[DEBUG] Panel {panel_type} liberado de columna {old_position}")
             
@@ -116,73 +165,3 @@ class DualPanelManager:
             if pos == column:
                 return panel_type
         return None
-    
-    def assign_panel_position(self, panel_type):
-        """Asigna posición a un panel"""
-        if panel_type not in self.panel_positions:
-            print(f"[ERROR] Panel tipo desconocido: {panel_type}")
-            return 1
-        
-        # Si ya tiene posición, devolverla
-        if self.panel_positions[panel_type] is not None:
-            return self.panel_positions[panel_type]
-        
-        # Obtener siguiente columna disponible
-        column = self.get_next_available_column()
-        self.panel_positions[panel_type] = column
-        self.occupied_columns.add(column)
-        
-        # Notificar al window_manager
-        if hasattr(self.app, 'window_manager'):
-            self.app.window_manager.add_panel()
-        
-        print(f"[DEBUG] Panel {panel_type} asignado a columna {column}")
-        
-        # NUEVO: Permitir redimensionamiento libre
-        self._configure_flexible_resize()
-        
-        # Actualizar contador de paneles
-        active_panels = sum(1 for pos in self.panel_positions.values() if pos is not None)
-        if hasattr(self.app, 'window_manager'):
-            self.app.window_manager.update_panel_count(active_panels)
-        
-        return column
-
-    def release_panel_position(self, panel_type):
-        """Libera la posición de un panel y notifica al window_manager"""
-        if panel_type not in self.panel_positions:
-            return
-        
-        old_position = self.panel_positions[panel_type]
-        
-        if old_position is not None:
-            self.panel_positions[panel_type] = None
-            self.occupied_columns.discard(old_position)
-            
-            # Notificar al window_manager
-            if hasattr(self.app, 'window_manager'):
-                self.app.window_manager.remove_panel()
-            
-            print(f"[DEBUG] Panel {panel_type} liberado de columna {old_position}")
-            
-            # NUEVO: Reconfigurar redimensionamiento
-            self._configure_flexible_resize()
-            
-            # Actualizar contador de paneles
-            active_panels = sum(1 for pos in self.panel_positions.values() if pos is not None)
-            if hasattr(self.app, 'window_manager'):
-                self.app.window_manager.update_panel_count(active_panels)
-
-    def _configure_flexible_resize(self):
-        """Configura redimensionamiento flexible para permitir reducir la app"""
-        try:
-            # Permitir que la ventana se redimensione libremente
-            self.app.master.minsize(600, 400)  # Ancho mínimo razonable
-            
-            # Forzar que el main_container sea flexible
-            if hasattr(self.app, 'main_container'):
-                self.app.main_container.grid_propagate(False)
-            
-            print("[DEBUG] Redimensionamiento flexible configurado")
-        except Exception as e:
-            print(f"[DEBUG] Error configurando resize flexible: {e}")

@@ -290,7 +290,7 @@ class UIComponents:
         
         label_estado = tk.Label(
             status_frame,
-            text="F2: Enfocar búsqueda • F3: Copiar • F4: Abrir • F5: Modo • Tab: Navegar",
+            text="Listo.",
             font=Fonts.NORMAL,
             anchor=tk.W,
             bg=Colors.STATUS_BAR_BG,

@@ -71,15 +71,18 @@ class UICallbacks:
             self._ajuste_en_progreso = False
 
     def limpiar_resultados(self):
-        """Limpia resultados del TreeView"""
+        """Limpia resultados del TreeView - OPTIMIZADO"""
         try:
-            for item in self.app.tree.get_children():
-                self.app.tree.delete(item)
+            # Borrado masivo es mucho más rápido que uno por uno
+            if hasattr(self.app, 'tree') and self.app.tree:
+                children = self.app.tree.get_children()
+                if children:
+                    self.app.tree.delete(*children)
         except Exception as e:
             print(f"Error limpiando resultados: {e}")
 
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Muestra resultados en TreeView"""
+        """Muestra resultados en TreeView con Lazy Loading OPTIMIZADO"""
         self.limpiar_resultados()
         
         if not resultados:
@@ -89,9 +92,42 @@ class UICallbacks:
             self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
             return
         
+        # Agregar al historial si NO es búsqueda silenciosa
+        if not getattr(self.app.search_coordinator, 'busqueda_silenciosa', False):
+            num_resultados = len(resultados) if resultados else 0
+            if hasattr(self.app, '_finalizar_busqueda_con_historial'):
+                self.app._finalizar_busqueda_con_historial(metodo, num_resultados)
+            elif hasattr(self.app.search_coordinator, 'finalizar_busqueda_con_historial'):
+                self.app.search_coordinator.finalizar_busqueda_con_historial(metodo, num_resultados)
+        
         try:
+            # Usar tree explorer si está disponible y activo
+            if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer and \
+               hasattr(self.app, 'mostrar_explorador') and self.app.mostrar_explorador.get():
+                
+                formatted_results = []
+                for resultado in resultados:
+                    if isinstance(resultado, tuple) and len(resultado) >= 3:
+                        nombre, ruta_rel, ruta_abs = resultado[:3]
+                        formatted_results.append({
+                            'name': nombre,
+                            'path': ruta_abs,
+                            'files': 0,
+                            'size': '0 B'
+                        })
+                    elif isinstance(resultado, dict):
+                        formatted_results.append(resultado)
+                
+                self.app.tree_explorer.populate_search_results(formatted_results)
+                self.actualizar_estado(f"✅ {len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
+                return
+
+            # Fallback: TreeView normal con LAZY LOADING
+            letra_metodo, tags_color = self._metodo_a_config(metodo)
+            items_to_insert = []
+            
             for i, resultado in enumerate(resultados):
-                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                base_tags = ['evenrow' if i % 2 == 0 else 'oddrow']
                 
                 if isinstance(resultado, tuple) and len(resultado) >= 3:
                     nombre, ruta_rel, ruta_abs = resultado[:3]
@@ -101,30 +137,86 @@ class UICallbacks:
                 else:
                     continue
                 
-                letra_metodo = metodo[0].upper() if metodo else 'C'
-                self.app.tree.insert("", "end",
-                                   text=f"📁 {nombre}",
-                                   values=(letra_metodo, ruta_rel),
-                                   tags=(tag,))
+                items_to_insert.append({
+                    'text': f"📁 {nombre}",
+                    'values': (letra_metodo, ruta_rel),
+                    'tags': tuple(base_tags + [tags_color])
+                })
             
-            self.actualizar_estado(f"{len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
-            self._ajustar_columnas_inmediato()
+            # OPTIMIZACIÓN: Insertar primer lote INMEDIATAMENTE para feedback instantáneo
+            BATCH_SIZE = 100
+            first_batch_end = min(BATCH_SIZE, len(items_to_insert))
             
-            # Actualizar scrollbars
-            if callable(self.app.configurar_scrollbars):
+            for i in range(first_batch_end):
+                item = items_to_insert[i]
+                self.app.tree.insert("", "end", 
+                                   text=item['text'],
+                                   values=item['values'],
+                                   tags=item['tags'])
+            
+            # Si hay más, programar el resto
+            if len(items_to_insert) > BATCH_SIZE:
+                self.actualizar_estado(f"Renderizando {len(items_to_insert)} resultados...")
+                # Usar after(1) para que sea casi inmediato pero permita refrescar UI
+                self.app.master.after(1, lambda: self._insertar_lote(items_to_insert, BATCH_SIZE, metodo, tiempo_total))
+            else:
+                # Si son pocos, finalizar ya
+                self.actualizar_estado(f"✅ {len(items_to_insert)} resultados en {tiempo_total:.3f}s ({metodo})")
                 self.app.configurar_scrollbars()
+                self._ajustar_columnas_inmediato()
+                
+                # Restaurar botones
+                self.app.btn_buscar.configure(state='normal', text='Buscar')
+                self.app.btn_cancelar.configure(state='disabled')
             
         except Exception as e:
             self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
+            print(f"Error detallado: {e}")
 
-    def actualizar_estado(self, mensaje):
-        """Actualiza la barra de estado"""
+    def _insertar_lote(self, items, start_index, metodo, tiempo_total):
+        """Inserta un lote de items en el TreeView"""
         try:
-            if hasattr(self.app, 'label_estado') and self.app.label_estado:
-                self.app.label_estado.config(text=mensaje)
-                self.app.master.update_idletasks()
+            BATCH_SIZE = 100
+            end_index = min(start_index + BATCH_SIZE, len(items))
+            
+            for i in range(start_index, end_index):
+                item = items[i]
+                self.app.tree.insert("", "end", 
+                                   text=item['text'],
+                                   values=item['values'],
+                                   tags=item['tags'])
+            
+            if end_index < len(items):
+                # Programar siguiente lote (1ms delay para máxima velocidad)
+                progress = int((end_index / len(items)) * 100)
+                if start_index % 500 == 0: # Actualizar texto menos frecuentemente
+                    self.actualizar_estado(f"Renderizando... {progress}%")
+                
+                self.app.master.after(1, lambda: self._insertar_lote(items, end_index, metodo, tiempo_total))
+            else:
+                # Finalizado
+                self.actualizar_estado(f"✅ {len(items)} resultados en {tiempo_total:.3f}s ({metodo})")
+                self.app.configurar_scrollbars()
+                # self._ajustar_columnas_inmediato() # OPTIMIZACIÓN: No ajustar en cada lote
+                
+                # Restaurar botones
+                self.app.btn_buscar.configure(state='normal', text='Buscar')
+                self.app.btn_cancelar.configure(state='disabled')
+                
         except Exception as e:
-            print(f"Error actualizando estado: {e}")
+            print(f"Error en carga por lotes: {e}")
+            
+    def _metodo_a_config(self, metodo):
+        """Helper para obtener configuración según método"""
+        metodo_lower = metodo.lower() if metodo else ""
+        if 'cache' in metodo_lower:
+            return "C", 'cache'
+        elif 'tradicional' in metodo_lower:
+            return "T", 'tradicional'
+        elif 'tree' in metodo_lower:
+            return "E", 'tree'
+        else:
+            return "?", 'unknown'
 
     def deshabilitar_busqueda(self):
         """Deshabilita botones de búsqueda"""
@@ -146,26 +238,23 @@ class UICallbacks:
         except Exception as e:
             print(f"Error habilitando búsqueda: {e}")
 
-    def mostrar_advertencia(self, mensaje):
-        """Muestra diálogo de advertencia"""
+    def actualizar_estado(self, mensaje, color="black"):
+        """Actualiza la barra de estado"""
         try:
-            messagebox.showwarning("Advertencia", mensaje)
+            if hasattr(self.app, 'label_estado') and self.app.label_estado:
+                self.app.label_estado.config(text=mensaje, fg=color)
+                self.app.label_estado.update_idletasks()
         except Exception as e:
-            print(f"Error mostrando advertencia: {e}")
+            print(f"Error actualizando estado: {e}")
+
+    def mostrar_advertencia(self, mensaje):
+        messagebox.showwarning("Advertencia", mensaje)
 
     def mostrar_error(self, mensaje):
-        """Muestra diálogo de error"""
-        try:
-            messagebox.showerror("Error", mensaje)
-        except Exception as e:
-            print(f"Error mostrando error: {e}")
+        messagebox.showerror("Error", mensaje)
 
-    def mostrar_info(self, titulo, mensaje):
-        """Muestra diálogo informativo"""
-        try:
-            messagebox.showinfo(titulo, mensaje)
-        except Exception as e:
-            print(f"Error mostrando info: {e}")
+    def mostrar_info(self, mensaje):
+        messagebox.showinfo("Información", mensaje)
 
     def obtener_seleccion_tabla(self):
         """Obtiene información del elemento seleccionado"""

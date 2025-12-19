@@ -134,7 +134,8 @@ class SearchCoordinator:
             path_hash = hashlib.md5(location['path'].encode()).hexdigest()[:8]
             cache_filename = f"cache_{path_hash}.pkl"
             
-            temp_cache = CacheManager(location['path'])
+            # OPTIMIZACIÓN: auto_build_index=False para evitar indexación costosa en búsquedas rápidas
+            temp_cache = CacheManager(location['path'], auto_build_index=False)
             temp_cache.cache_file = cache_filename
             
             # Cargar cache existente con el nombre correcto
@@ -142,10 +143,11 @@ class SearchCoordinator:
             
             if cache_loaded and temp_cache.cache.valido and len(temp_cache.cache.directorios.get('directorios', [])) > 0:
                 print(f"[DEBUG] Cache válido encontrado para {location['name']}: {temp_cache.cache.directorios['total']} directorios")
-                results = temp_cache.buscar_en_cache(criterio)
+                # Usar búsqueda lineal rápida en lugar de Trie para evitar overhead de construcción
+                results = temp_cache._linear_search(criterio, max_resultados=20)
                 if results:
                     print(f"[DEBUG] Cache devolvió {len(results)} resultados para {location['name']}")
-                    return results[:20]  # Limitar a 20
+                    return results
                 else:
                     print(f"[DEBUG] Cache no encontró resultados para '{criterio}' en {location['name']}")
                     return []

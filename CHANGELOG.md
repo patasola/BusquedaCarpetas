@@ -1,11 +1,3 @@
-# Registro de Cambios - Búsqueda Rápida de Carpetas
-
-## V. 5.0 - Luce Intellettual - VERSIÓN ACTUAL
-========================================
-
-### 🎨 CAMBIOS EN ESTA VERSIÓN
-- ✅ **Actualización de Nombre**: La versión 5.0 ahora se llama "Luce Intellettual" (Luz Intelectual en italiano).
-- ✅ **Mantenimiento**: Correcciones menores y estabilización del código.
 
 ---
 
@@ -120,33 +112,6 @@
 
 ---
 
-## V. 4.1 - Optimizaciones Core
-========================================
-
-### ⚡ BÚSQUEDAS MÁS RÁPIDAS
-- ✅ Algoritmos de búsqueda optimizados
-- ✅ Mejor manejo de memoria durante búsquedas
-- ✅ Caché más eficiente y menos fragmentado
-
-### 🔧 MEJORAS DE ESTABILIDAD
-- ✅ Manejo robusto de errores de sistema
-- ✅ Mejor gestión de hilos y procesos
-- ✅ Menos uso de recursos del sistema
-
-### 🛠️ CORRECCIONES DE BUGS
-- ✅ Fixes en navegación por teclado
-- ✅ Corrección de memory leaks menores
-- ✅ Mejoras en compatibilidad con Windows 11
-
----
-
-## V. 4.0 - Reescritura Completa
-========================================
-
-### 🏗️ ARQUITECTURA COMPLETAMENTE NUEVA
-- ✅ Código modular y mantenible con separación clara
-- ✅ Patrón MVC (Modelo-Vista-Controlador) implementado
-- ✅ Estructura de archivos organizada por funcionalidad
 - ✅ Sistema de plugins preparado para futuras expansiones
 
 ### 🚀 NUEVAS CARACTERÍSTICAS PRINCIPALES
