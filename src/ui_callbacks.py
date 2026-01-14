@@ -1,4 +1,4 @@
-# src/ui_callbacks.py - Callbacks de UI V.4.2 (Refactorizado)
+﻿# src/ui_callbacks.py - Callbacks de UI V.4.2 (Refactorizado)
 import tkinter as tk
 from tkinter import messagebox
 import os
@@ -79,44 +79,49 @@ class UICallbacks:
             print(f"Error limpiando resultados: {e}")
 
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Muestra resultados en TreeView"""
+        """Muestra resultados en TreeView - OPTIMIZADO CON BATCH INSERT"""
         self.limpiar_resultados()
         
         if not resultados:
-            # Restaurar botón de búsqueda cuando no hay resultados
             self.app.btn_buscar.configure(state='normal', text='Buscar')
             self.app.btn_cancelar.configure(state='disabled')
             self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
             return
         
         try:
-            for i, resultado in enumerate(resultados):
-                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                
-                if isinstance(resultado, tuple) and len(resultado) >= 3:
-                    nombre, ruta_rel, ruta_abs = resultado[:3]
-                elif isinstance(resultado, dict):
-                    nombre = resultado.get('name', 'Sin nombre')
-                    ruta_rel = resultado.get('path', '')
-                else:
-                    continue
-                
-                letra_metodo = metodo[0].upper() if metodo else 'C'
-                self.app.tree.insert("", "end",
-                                   text=f"📁 {nombre}",
-                                   values=(letra_metodo, ruta_rel),
-                                   tags=(tag,))
+            # CRÍTICO: Preparar para inserción masiva
+            batch_size = 500
+            total = len(resultados)
             
-            self.actualizar_estado(f"{len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
+            for batch_start in range(0, total, batch_size):
+                batch_end = min(batch_start + batch_size, total)
+                batch = resultados[batch_start:batch_end]
+                
+                for i, resultado in enumerate(batch, start=batch_start):
+                    tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                    
+                    if isinstance(resultado, tuple) and len(resultado) >= 3:
+                        nombre, ruta_rel, ruta_abs = resultado[:3]
+                    elif isinstance(resultado, dict):
+                        nombre = resultado.get('name', 'Sin nombre')
+                        ruta_rel = resultado.get('path', '')
+                    else:
+                        continue
+                    
+                    letra_metodo = metodo[0].upper() if metodo else 'C'
+                    self.app.tree.insert("", "end", text=f"📁 {nombre}",
+                                       values=(letra_metodo, ruta_rel), tags=(tag,))
+                
+                if batch_end < total:
+                    self.actualizar_estado(f"Cargando {batch_end}/{total}...")
+                    self.app.tree.update_idletasks()
+            
+            self.actualizar_estado(f"{len(resultados):,} resultados en {tiempo_total:.3f}s ({metodo})")
             self._ajustar_columnas_inmediato()
-            
-            # Actualizar scrollbars
             if callable(self.app.configurar_scrollbars):
                 self.app.configurar_scrollbars()
-            
         except Exception as e:
-            self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
-
+            self.actualizar_estado(f"Error: {str(e)}")
     def actualizar_estado(self, mensaje):
         """Actualiza la barra de estado"""
         try:

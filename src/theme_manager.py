@@ -1,4 +1,4 @@
-# src/theme_manager.py - V3 con callbacks y actualización dinámica
+﻿# src/theme_manager.py - V3 con callbacks y actualización dinámica
 import tkinter as tk
 from tkinter import ttk
 
@@ -8,30 +8,48 @@ class ThemeManager:
     # Definición de paletas de colores
     TEMAS = {
         "claro": {
-            "bg": "#F5F5F5",
-            "fg": "#1e1e1e",
-            "bg_alt": "#FFFFFF",
-            "fg_alt": "#333333",
-            "button_bg": "#E0E0E0",
-            "button_fg": "#1e1e1e",
-            "button_active_bg": "#D0D0D0",
-            "entry_bg": "#FFFFFF",
-            "entry_fg": "#1e1e1e",
-            "entry_border": "#CCCCCC",
-            "tree_bg": "#FFFFFF",
-            "tree_fg": "#1e1e1e",
-            "tree_selected_bg": "#0078D7",
-            "tree_selected_fg": "#FFFFFF",
-            "tree_field_bg": "#FAFAFA",
-            "tree_heading_bg": "#F0F0F0",
-            "frame_bg": "#F5F5F5",
-            "border": "#CCCCCC",
-            "status_bg": "#007acc",
-            "status_fg": "#FFFFFF",
-            "menu_bg": "#F0F0F0",
-            "menu_fg": "#1e1e1e",
-            "menu_active_bg": "#0078D7",
-            "menu_active_fg": "#FFFFFF",
+            # Base Colors
+            "bg": "#f5f5f5",              # bg_primary - Fondo principal
+            "bg_alt": "#ffffff",          # bg_secondary - Fondo secundario
+            "bg_surface": "#e8e8e8",      # Superficies elevadas
+            
+            # Text Colors
+            "fg": "#2c3e50",              # text_primary - Texto principal
+            "fg_alt": "#7f8c8d",          # text_secondary - Texto secundario
+            "fg_disabled": "#bdc3c7",     # text_disabled
+            
+            # Accent Colors
+            "accent_primary": "#3498db",  # Azul principal
+            "accent_hover": "#5dade2",    # Hover
+            "success": "#27ae60",         # Verde - solo para éxito
+            "warning": "#e67e22",         # Naranja - advertencias
+            "error": "#e74c3c",           # Rojo - errores
+            
+            # Button Colors
+            "button_bg": "#e0e0e0",       # Fondo de botones neutro
+            "button_fg": "#2c3e50",       # Texto de botones
+            "button_hover": "#d0d0d0",    # Hover
+            "button_active_bg": "#3498db", # Activo
+            "button_active_fg": "#ffffff", # Texto activo
+            
+            # Legacy mappings for compatibility
+            "entry_bg": "#ffffff",
+            "entry_fg": "#2c3e50",
+            "entry_border": "#bdc3c7",
+            "tree_bg": "#ffffff",
+            "tree_fg": "#2c3e50",
+            "tree_selected_bg": "#3498db",
+            "tree_selected_fg": "#ffffff",
+            "tree_field_bg": "#ffffff",
+            "tree_heading_bg": "#e8e8e8",
+            "frame_bg": "#f5f5f5",
+            "border": "#bdc3c7",
+            "status_bg": "#e8e8e8",
+            "status_fg": "#2c3e50",
+            "menu_bg": "#f5f5f5",
+            "menu_fg": "#2c3e50",
+            "menu_active_bg": "#3498db",
+            "menu_active_fg": "#ffffff",
         },
         "oscuro": {
             "bg": "#1e1e1e",

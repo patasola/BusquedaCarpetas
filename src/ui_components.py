@@ -1,20 +1,20 @@
-# src/ui_components.py - Componentes de Interfaz V.4.2 (Tooltip Simple)
+﻿# src/ui_components.py - Componentes de Interfaz V.4.2 (Tooltip Simple)
 import tkinter as tk
 from tkinter import ttk
 from .components.tree_tooltip import TreeViewTooltip
 
 
 class Colors:
-    BACKGROUND = "#f6f5f5"
-    TITLE_FG = "#424242"
+    BACKGROUND = "#f5f5f5"
+    TITLE_FG = "#2c3e50"
     TREE_BG = "#ffffff"
-    TREE_SELECT_BG = "#e3f2fd"
-    TREE_SELECT_FG = "#0d47a1"
+    TREE_SELECT_BG = "#3498db"
+    TREE_SELECT_FG = "#ffffff"
     BUTTON_BG = "#e0e0e0"
-    BUTTON_FG = "#424242"
+    BUTTON_FG = "#2c3e50"
     BUTTON_ACTIVE_BG = "#d0d0d0"
-    CACHE_BAR_BG = "#F0F8FF"
-    STATUS_BAR_BG = "SystemButtonFace"
+    CACHE_BAR_BG = "#e8e8e8"
+    STATUS_BAR_BG = "#e8e8e8"
 
 class Fonts:
     BUTTONS = ("Segoe UI", 9)

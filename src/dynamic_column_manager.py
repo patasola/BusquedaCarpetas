@@ -1,4 +1,4 @@
-# src/dynamic_column_manager.py - Callbacks de UI V.4.2 (Refactorizado)
+﻿# src/dynamic_column_manager.py - Callbacks de UI V.4.2 (Refactorizado)
 import tkinter as tk
 from tkinter import messagebox
 
@@ -28,10 +28,9 @@ class UICallbacks:
             print(f"ERROR limpiando resultados: {e}")
     
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Muestra resultados en TreeView"""
+        """Muestra resultados en TreeView - OPTIMIZADO CON BATCH"""
         self.limpiar_resultados()
         
-        # Agregar al historial si NO es búsqueda silenciosa
         if not getattr(self.app.search_coordinator, 'busqueda_silenciosa', False):
             num_resultados = len(resultados) if resultados else 0
             self.app._finalizar_busqueda_con_historial(metodo, num_resultados)
@@ -44,46 +43,42 @@ class UICallbacks:
         try:
             letra_metodo, tags_color = self._metodo_a_config(metodo)
             
-            # Usar tree explorer si está disponible
             if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
                 formatted_results = []
                 for resultado in resultados:
                     if isinstance(resultado, tuple) and len(resultado) >= 3:
                         nombre, ruta_rel, ruta_abs = resultado[:3]
-                        formatted_results.append({
-                            'name': nombre,
-                            'path': ruta_abs,
-                            'files': 0,
-                            'size': '0 B'
-                        })
+                        formatted_results.append({'name': nombre, 'path': ruta_abs, 'files': 0, 'size': '0 B'})
                     elif isinstance(resultado, dict):
                         formatted_results.append(resultado)
-                
                 self.app.tree_explorer.populate_search_results(formatted_results)
             else:
-                # Fallback: TreeView normal
-                for i, resultado in enumerate(resultados):
-                    base_tags = ['evenrow' if i % 2 == 0 else 'oddrow']
-                    
-                    if isinstance(resultado, tuple) and len(resultado) >= 3:
-                        nombre, ruta_rel, ruta_abs = resultado[:3]
-                    elif isinstance(resultado, dict):
-                        nombre = resultado.get('name', 'Sin nombre')
-                        ruta_rel = resultado.get('path', '')
-                    else:
-                        continue
-                    
-                    self.app.tree.insert("", "end", 
-                                       text=f"📁 {nombre}",
-                                       values=(letra_metodo, ruta_rel),
-                                       tags=tuple(base_tags + [tags_color]))
+                # OPTIMIZADO: Batch processing
+                batch_size = 500
+                total = len(resultados)
+                for batch_start in range(0, total, batch_size):
+                    batch_end = min(batch_start + batch_size, total)
+                    batch = resultados[batch_start:batch_end]
+                    for i, resultado in enumerate(batch, start=batch_start):
+                        base_tags = ['evenrow' if i % 2 == 0 else 'oddrow']
+                        if isinstance(resultado, tuple) and len(resultado) >= 3:
+                            nombre, ruta_rel, ruta_abs = resultado[:3]
+                        elif isinstance(resultado, dict):
+                            nombre = resultado.get('name', 'Sin nombre')
+                    ruta_rel = resultado.get('path', '')
+                        else:
+                            continue
+                        self.app.tree.insert("", "end", text=f"📁 {nombre}",
+                                           values=(letra_metodo, ruta_rel),
+                                           tags=tuple(base_tags + [tags_color]))
+                    if batch_end < total:
+                        self.actualizar_estado(f"Cargando {batch_end}/{total}...")
+                        self.app.tree.update_idletasks()
             
-            self.actualizar_estado(f"✅ {len(resultados)} resultados en {tiempo_total:.3f}s ({metodo})")
+            self.actualizar_estado(f"✅ {len(resultados):,} resultados en {tiempo_total:.3f}s ({metodo})")
             self.app.configurar_scrollbars()
-            
         except Exception as e:
-            self.actualizar_estado(f"Error mostrando resultados: {str(e)}")
-    
+            self.actualizar_estado(f"Error: {str(e)}")
     def mostrar_resultados_async(self, resultados, metodo, tiempo_total):
         """Versión asíncrona de mostrar_resultados"""
         self.app.master.after(0, lambda: self.mostrar_resultados(resultados, metodo, tiempo_total))
