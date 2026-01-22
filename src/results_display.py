@@ -1,7 +1,6 @@
-# src/results_display.py - Visualización de resultados OPTIMIZADO
+# src/results_display.py - Visualización OPTIMIZADA con dummies sin verificación
 import tkinter as tk
 import os
-import time
 
 class ResultsDisplay:
     """Maneja la visualización de resultados en el TreeView"""
@@ -36,8 +35,8 @@ class ResultsDisplay:
             return
         
         try:
-            print(f"[PROFILE] Inicio renderizado multi: {time.time()}")
-            batch_size = 50
+            # Mostrar inmediatamente TODOS los resultados sin verificación I/O
+            batch_size = 50  # Lotes más grandes para renderizado rápido
             for i in range(0, len(resultados), batch_size):
                 batch = resultados[i:i+batch_size]
                 delay = (i // batch_size) * 5
@@ -59,7 +58,6 @@ class ResultsDisplay:
             return
         
         try:
-            print(f"[PROFILE] Inicio renderizado tradicional: {time.time()}")
             self._agregar_por_lotes(resultados, "Tradicional")
             self.app.ui_callbacks.actualizar_estado(f"✅ {len(resultados)} resultados (Búsqueda tradicional)")
             self.app.btn_buscar.configure(state='normal', text='Buscar')
@@ -77,29 +75,16 @@ class ResultsDisplay:
             self.app.ui_callbacks.habilitar_busqueda()
     
     def _agregar_por_lotes(self, resultados, metodo):
-        """Agrega resultados por lotes"""
-        batch_size = 50
+        """Agrega resultados por lotes SIN verificación I/O"""
+        batch_size = 50  # Lotes grandes para velocidad
         for i in range(0, len(resultados), batch_size):
             batch = resultados[i:i+batch_size]
             delay = (i // batch_size) * 5
             self.app.master.after(delay, lambda b=batch, idx=i, m=metodo: 
                 self._agregar_batch(b, idx, m))
-        print(f"[PROFILE] Fin programación lotes: {time.time()}")
-    
-    def _tiene_subcarpetas_rapido(self, ruta):
-        """Verificación ultra-rápida de subcarpetas usando os.scandir
-        Solo busca el PRIMER subdirectorio, no escanea toda la carpeta"""
-        try:
-            with os.scandir(ruta) as it:
-                for entry in it:
-                    if entry.is_dir(follow_symlinks=False):
-                        return True  # Encontramos al menos una subcarpeta
-            return False
-        except (PermissionError, OSError, FileNotFoundError):
-            return False
     
     def _agregar_batch(self, batch, start_index, metodo):
-        """Agrega un batch al TreeView con verificación optimizada"""
+        """Agrega un batch al TreeView SIN verificación I/O - MÁXIMA VELOCIDAD"""
         try:
             letra_metodo = metodo[0].upper() if metodo else 'C'
             
@@ -120,10 +105,9 @@ class ResultsDisplay:
                             values=(letra_metodo, ruta_completa),
                             tags=(tag,))
                         
-                        # ⚡ OPTIMIZACIÓN: Verificación rápida solo del primer item
-                        # Mucho más eficiente que os.path.isdir() completo
-                        if self._tiene_subcarpetas_rapido(ruta_completa):
-                            self.app.tree.insert(item_id, "end", text="", values=("", ""))
+                        # ⚡ OPTIMIZACIÓN: Agregar dummy SIEMPRE (sin I/O check)
+                        # El tree_expansion_handler verificará al expandir
+                        self.app.tree.insert(item_id, "end", text="Cargando...", values=("", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item: {e}")
@@ -132,7 +116,7 @@ class ResultsDisplay:
             print(f"[ERROR] Error en _agregar_batch: {e}")
     
     def _agregar_batch_multi(self, batch, start_index):
-        """Agrega batch multi-ubicaciones con verificación optimizada"""
+        """Agrega batch multi-ubicaciones SIN verificación I/O"""
         try:
             for i, resultado in enumerate(batch):
                 try:
@@ -148,14 +132,14 @@ class ResultsDisplay:
                         demandante = resultado[4] if len(resultado) > 4 else ""
                         demandado = resultado[5] if len(resultado) > 5 else ""
                         
+                        # Insertar item principal
                         item_id = self.app.tree.insert("", "end",
                             text=f"📂 {nombre}",
                             values=(ubicacion, ruta_abs, demandante, demandado),
                             tags=(tag,))
                         
-                        # ⚡ OPTIMIZACIÓN: Verificación rápida solo del primer item
-                        if self._tiene_subcarpetas_rapido(ruta_abs):
-                            self.app.tree.insert(item_id, "end", text="", values=("", "", "", ""))
+                        # ⚡ OPTIMIZACIÓN: Agregar dummy SIEMPRE (sin I/O check)
+                        self.app.tree.insert(item_id, "end", text="Cargando...", values=("", "", "", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item multi: {e}")
@@ -176,8 +160,6 @@ class ResultsDisplay:
             # Actualizar scrollbars
             if hasattr(self.app, 'configurar_scrollbars'):
                 self.app.configurar_scrollbars()
-            
-            print(f"[PROFILE] Fin renderizado multi: {time.time()}")
 
         except:
             self.app.ui_callbacks.habilitar_busqueda()

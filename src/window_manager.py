@@ -16,7 +16,7 @@ class WindowManager:
         
         # Control de redimensionamiento
         self.current_panel_count = 0
-        self.base_app_width = 900  # Ancho inicial de la app
+        self.base_app_width = 990  # AUMENTADO 10%: 900px → 990px
         self.user_resized_manually = False
         self.manual_app_width = None
     
@@ -32,7 +32,7 @@ class WindowManager:
         self.pixels_per_cm = self.screen_width / 33.3
         
         # Ancho de cada panel (8cm)
-        panel_width_cm = 6.5  # Cambiado de 8 a 6.5cm (~500px en lugar de 615px)
+        panel_width_cm = 7.15  # AUMENTADO 10%: 6.5cm → 7.15cm (~550px en lugar de ~500px)
         self.panel_width = int(panel_width_cm * self.pixels_per_cm)
         
         # Tamaño inicial
