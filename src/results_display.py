@@ -1,4 +1,4 @@
-# src/results_display.py - Visualización OPTIMIZADA con dummies sin verificación
+# src/results_display.py - Visualización OPTIMIZADA para 1-20 resultados típicos
 import tkinter as tk
 import os
 
@@ -11,7 +11,7 @@ class ResultsDisplay:
     def mostrar_instantaneos(self, resultados, criterio, metodo):
         """Muestra resultados instantáneos"""
         try:
-            self._agregar_por_lotes(resultados, metodo)
+            self._agregar_resultados(resultados, metodo)
             self.app.ui_callbacks.actualizar_estado(f"✅ {len(resultados)} resultados ({metodo})")
             self.app.btn_buscar.configure(state='normal', text='Buscar')
             self.app.btn_cancelar.configure(state='disabled')
@@ -35,17 +35,9 @@ class ResultsDisplay:
             return
         
         try:
-            # Mostrar inmediatamente TODOS los resultados sin verificación I/O
-            batch_size = 50  # Lotes más grandes para renderizado rápido
-            for i in range(0, len(resultados), batch_size):
-                batch = resultados[i:i+batch_size]
-                delay = (i // batch_size) * 5
-                self.app.master.after(delay, lambda b=batch, idx=i: 
-                    self._agregar_batch_multi(b, idx))
-            
-            total_delay = ((len(resultados) // batch_size) + 1) * 5
-            self.app.master.after(total_delay + 10, lambda: 
-                self._finalizar_multi(resultados, criterio))
+            # Optimizado para 1-20 resultados típicos
+            self._agregar_resultados_multi(resultados)
+            self._finalizar_multi(resultados, criterio)
         except Exception as e:
             self.app.ui_callbacks.habilitar_busqueda()
     
@@ -58,7 +50,7 @@ class ResultsDisplay:
             return
         
         try:
-            self._agregar_por_lotes(resultados, "Tradicional")
+            self._agregar_resultados(resultados, "Tradicional")
             self.app.ui_callbacks.actualizar_estado(f"✅ {len(resultados)} resultados (Búsqueda tradicional)")
             self.app.btn_buscar.configure(state='normal', text='Buscar')
             self.app.btn_cancelar.configure(state='disabled')
@@ -74,17 +66,36 @@ class ResultsDisplay:
         except Exception as e:
             self.app.ui_callbacks.habilitar_busqueda()
     
-    def _agregar_por_lotes(self, resultados, metodo):
-        """Agrega resultados por lotes SIN verificación I/O"""
-        batch_size = 50  # Lotes grandes para velocidad
-        for i in range(0, len(resultados), batch_size):
-            batch = resultados[i:i+batch_size]
-            delay = (i // batch_size) * 5
-            self.app.master.after(delay, lambda b=batch, idx=i, m=metodo: 
-                self._agregar_batch(b, idx, m))
+    def _agregar_resultados(self, resultados, metodo):
+        """Agrega resultados SIN batching - optimizado para 1-20 items"""
+        if len(resultados) <= 100:
+            # Caso típico (1-20 items): mostrar TODOS inmediatamente
+            self._agregar_batch(resultados, 0, metodo)
+        else:
+            # Caso excepcional (>100): usar batching
+            batch_size = 50
+            for i in range(0, len(resultados), batch_size):
+                batch = resultados[i:i+batch_size]
+                delay = (i // batch_size) * 3
+                self.app.master.after(delay, lambda b=batch, idx=i, m=metodo: 
+                    self._agregar_batch(b, idx, m))
+    
+    def _agregar_resultados_multi(self, resultados):
+        """Agrega resultados multi SIN batching - optimizado para 1-20 items"""
+        if len(resultados) <= 100:
+            # Caso típico: mostrar TODOS inmediatamente
+            self._agregar_batch_multi(resultados, 0)
+        else:
+            # Caso excepcional: usar batching
+            batch_size = 50
+            for i in range(0, len(resultados), batch_size):
+                batch = resultados[i:i+batch_size]
+                delay = (i // batch_size) * 3
+                self.app.master.after(delay, lambda b=batch, idx=i: 
+                    self._agregar_batch_multi(b, idx))
     
     def _agregar_batch(self, batch, start_index, metodo):
-        """Agrega un batch al TreeView SIN verificación I/O - MÁXIMA VELOCIDAD"""
+        """Agrega un batch al TreeView - SIN verificación I/O"""
         try:
             letra_metodo = metodo[0].upper() if metodo else 'C'
             
@@ -105,8 +116,7 @@ class ResultsDisplay:
                             values=(letra_metodo, ruta_completa),
                             tags=(tag,))
                         
-                        # ⚡ OPTIMIZACIÓN: Agregar dummy SIEMPRE (sin I/O check)
-                        # El tree_expansion_handler verificará al expandir
+                        # Agregar dummy para triángulo de expansión
                         self.app.tree.insert(item_id, "end", text="Cargando...", values=("", ""))
                             
                 except Exception as e:
@@ -116,7 +126,7 @@ class ResultsDisplay:
             print(f"[ERROR] Error en _agregar_batch: {e}")
     
     def _agregar_batch_multi(self, batch, start_index):
-        """Agrega batch multi-ubicaciones SIN verificación I/O"""
+        """Agrega batch multi-ubicaciones - SIN verificación I/O"""
         try:
             for i, resultado in enumerate(batch):
                 try:
@@ -138,7 +148,7 @@ class ResultsDisplay:
                             values=(ubicacion, ruta_abs, demandante, demandado),
                             tags=(tag,))
                         
-                        # ⚡ OPTIMIZACIÓN: Agregar dummy SIEMPRE (sin I/O check)
+                        # Agregar dummy para triángulo de expansión
                         self.app.tree.insert(item_id, "end", text="Cargando...", values=("", "", "", ""))
                             
                 except Exception as e:
