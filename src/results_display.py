@@ -1,6 +1,7 @@
-# src/results_display.py - Visualización de resultados con soporte de subcarpetas
+# src/results_display.py - Visualización de resultados OPTIMIZADO
 import tkinter as tk
 import os
+import time
 
 class ResultsDisplay:
     """Maneja la visualización de resultados en el TreeView"""
@@ -35,14 +36,15 @@ class ResultsDisplay:
             return
         
         try:
-            batch_size = 3
+            print(f"[PROFILE] Inicio renderizado multi: {time.time()}")
+            batch_size = 50
             for i in range(0, len(resultados), batch_size):
                 batch = resultados[i:i+batch_size]
-                delay = (i // batch_size) * 3
+                delay = (i // batch_size) * 5
                 self.app.master.after(delay, lambda b=batch, idx=i: 
                     self._agregar_batch_multi(b, idx))
             
-            total_delay = ((len(resultados) // batch_size) + 1) * 3
+            total_delay = ((len(resultados) // batch_size) + 1) * 5
             self.app.master.after(total_delay + 10, lambda: 
                 self._finalizar_multi(resultados, criterio))
         except Exception as e:
@@ -57,6 +59,7 @@ class ResultsDisplay:
             return
         
         try:
+            print(f"[PROFILE] Inicio renderizado tradicional: {time.time()}")
             self._agregar_por_lotes(resultados, "Tradicional")
             self.app.ui_callbacks.actualizar_estado(f"✅ {len(resultados)} resultados (Búsqueda tradicional)")
             self.app.btn_buscar.configure(state='normal', text='Buscar')
@@ -75,15 +78,28 @@ class ResultsDisplay:
     
     def _agregar_por_lotes(self, resultados, metodo):
         """Agrega resultados por lotes"""
-        batch_size = 5
+        batch_size = 50
         for i in range(0, len(resultados), batch_size):
             batch = resultados[i:i+batch_size]
-            delay = (i // batch_size) * 2
+            delay = (i // batch_size) * 5
             self.app.master.after(delay, lambda b=batch, idx=i, m=metodo: 
                 self._agregar_batch(b, idx, m))
+        print(f"[PROFILE] Fin programación lotes: {time.time()}")
+    
+    def _tiene_subcarpetas_rapido(self, ruta):
+        """Verificación ultra-rápida de subcarpetas usando os.scandir
+        Solo busca el PRIMER subdirectorio, no escanea toda la carpeta"""
+        try:
+            with os.scandir(ruta) as it:
+                for entry in it:
+                    if entry.is_dir(follow_symlinks=False):
+                        return True  # Encontramos al menos una subcarpeta
+            return False
+        except (PermissionError, OSError, FileNotFoundError):
+            return False
     
     def _agregar_batch(self, batch, start_index, metodo):
-        """Agrega un batch al TreeView CON soporte de subcarpetas"""
+        """Agrega un batch al TreeView con verificación optimizada"""
         try:
             letra_metodo = metodo[0].upper() if metodo else 'C'
             
@@ -104,10 +120,10 @@ class ResultsDisplay:
                             values=(letra_metodo, ruta_completa),
                             tags=(tag,))
                         
-                        # NUEVO: Agregar dummy si tiene subcarpetas
-                        if os.path.isdir(ruta_completa) and self._tiene_subcarpetas(ruta_completa):
-                            # Agregar nodo dummy para mostrar flecha de expansión
-                            self.app.tree.insert(item_id, "end", text="Cargando...", values=("", ""))
+                        # ⚡ OPTIMIZACIÓN: Verificación rápida solo del primer item
+                        # Mucho más eficiente que os.path.isdir() completo
+                        if self._tiene_subcarpetas_rapido(ruta_completa):
+                            self.app.tree.insert(item_id, "end", text="", values=("", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item: {e}")
@@ -116,7 +132,7 @@ class ResultsDisplay:
             print(f"[ERROR] Error en _agregar_batch: {e}")
     
     def _agregar_batch_multi(self, batch, start_index):
-        """Agrega batch multi-ubicaciones CON soporte BD"""
+        """Agrega batch multi-ubicaciones con verificación optimizada"""
         try:
             for i, resultado in enumerate(batch):
                 try:
@@ -137,28 +153,15 @@ class ResultsDisplay:
                             values=(ubicacion, ruta_abs, demandante, demandado),
                             tags=(tag,))
                         
-                        # Agregar dummy si tiene subcarpetas
-                        if os.path.isdir(ruta_abs) and self._tiene_subcarpetas(ruta_abs):
-                            self.app.tree.insert(item_id, "end", text="Cargando...", values=("", "", "", ""))
+                        # ⚡ OPTIMIZACIÓN: Verificación rápida solo del primer item
+                        if self._tiene_subcarpetas_rapido(ruta_abs):
+                            self.app.tree.insert(item_id, "end", text="", values=("", "", "", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item multi: {e}")
                     continue
         except Exception as e:
             print(f"[ERROR] Error en _agregar_batch_multi: {e}")
-    
-    def _tiene_subcarpetas(self, ruta):
-        """Verifica si una carpeta tiene subcarpetas"""
-        try:
-            if not os.path.exists(ruta) or not os.path.isdir(ruta):
-                return False
-            
-            for entry in os.scandir(ruta):
-                if entry.is_dir():
-                    return True
-            return False
-        except:
-            return False
     
     def _finalizar_multi(self, resultados, criterio):
         """Finaliza búsqueda multi"""
@@ -173,6 +176,8 @@ class ResultsDisplay:
             # Actualizar scrollbars
             if hasattr(self.app, 'configurar_scrollbars'):
                 self.app.configurar_scrollbars()
+            
+            print(f"[PROFILE] Fin renderizado multi: {time.time()}")
 
         except:
             self.app.ui_callbacks.habilitar_busqueda()

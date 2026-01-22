@@ -14,6 +14,7 @@ class SearchMethods:
         """Punto de entrada principal para búsquedas"""
         self.app.ui_callbacks.limpiar_resultados()
         self.app.ui_callbacks.actualizar_estado("Buscando...")
+        print(f"[PROFILE] Inicio búsqueda: {time.time()}")
         
         # 1. Multi-ubicaciones
         if hasattr(self.app, 'multi_location_search'):
@@ -52,10 +53,13 @@ class SearchMethods:
                     if len(all_results) >= 100:
                         break
                 except Exception as e:
+                    print(f"[ERROR] Error buscando en {location.get('name')}: {e}")
                     continue
             
+            # Enriquecer resultados con BD (esto puede ser lento si hay muchos)
             all_results = self._enriquecer_con_bd(all_results, criterio)
             
+            print(f"[PROFILE] Fin búsqueda (encontrados {len(all_results)}): {time.time()}")
             from .results_display import ResultsDisplay
             self.app.master.after(0, lambda: 
                 ResultsDisplay(self.app).mostrar_multi(all_results, criterio))
@@ -69,8 +73,8 @@ class SearchMethods:
         cache_filename = f"cache_{path_hash}.pkl"
         
         from .cache_manager import CacheManager
-        temp_cache = CacheManager(location['path'])
-        temp_cache.cache_file = cache_filename
+        # Usar el constructor que acepta cache_file
+        temp_cache = CacheManager(location['path'], cache_file=cache_filename)
         
         # Intentar cache
         cache_loaded = temp_cache.cargar_cache()
@@ -79,33 +83,33 @@ class SearchMethods:
                 stats = temp_cache.cache.directorios
                 if stats.get('total', 0) > 0:
                     results = temp_cache.buscar_en_cache(criterio)
-                    if results:
-                        return results[:20]
+                    # SIEMPRE retornar resultados del cache si existe y es válido
+                    return results if results else []
             except:
                 pass
         
-        # Búsqueda directa
+        # Búsqueda directa (Solo si no hay cache o falló)
         return self._buscar_directo(location['path'], criterio)
     
     def _buscar_directo(self, path, criterio):
-        """Búsqueda directa con os.walk"""
+        """Búsqueda directa con os.walk (limitada a primer nivel para velocidad)"""
         if not os.path.exists(path):
             return []
         
         results = []
         criterio_lower = criterio.lower()
         
-        for root, dirs, files in os.walk(path):
-            for dirname in dirs[:15]:
-                if criterio_lower in dirname.lower():
-                    ruta_completa = os.path.join(root, dirname)
-                    ruta_relativa = os.path.relpath(ruta_completa, path)
-                    results.append((dirname, ruta_relativa, ruta_completa))
-                    
-                    if len(results) >= 20:
-                        break
-            break  # Solo primer nivel
-        
+        try:
+            # Usar os.scandir para mayor velocidad en el primer nivel
+            with os.scandir(path) as it:
+                for entry in it:
+                    if entry.is_dir() and criterio_lower in entry.name.lower():
+                        results.append((entry.name, entry.name, entry.path))
+                        if len(results) >= 20:
+                            break
+        except Exception as e:
+            print(f"[ERROR] Error en búsqueda directa: {e}")
+            
         return results
     
     def buscar_tradicional_fallback(self, criterio):
@@ -131,6 +135,7 @@ class SearchMethods:
             resultados = []
             criterio_lower = criterio.lower()
             
+            # Búsqueda profunda (os.walk) - Solo como último recurso
             for root, dirs, files in os.walk(self.app.ruta_carpeta):
                 for dirname in dirs:
                     if criterio_lower in dirname.lower():
@@ -146,6 +151,7 @@ class SearchMethods:
             
             resultados = self._enriquecer_con_bd(resultados, criterio)
             
+            print(f"[PROFILE] Fin búsqueda (encontrados {len(resultados)}): {time.time()}")
             from .results_display import ResultsDisplay
             self.app.master.after(0, lambda: 
                 ResultsDisplay(self.app).mostrar_tradicionales(resultados, criterio))
@@ -170,38 +176,26 @@ class SearchMethods:
             return []
 
     def _convertir_a_radicado(self, criterio):
-        """Convierte formato AAAA-EXP a radicado de 23 dígitos
-        
-        Formato: 110013105017 + AAAA (año) + NNNNN (expediente 5 dígitos) + 00
-        Ejemplo: 2025-10212 → 11001310501720251021200
-        """
+        """Convierte formato AAAA-EXP a radicado de 23 dígitos"""
         import re
-        # Detectar formato AAAA-EXP (año-expediente)
         match = re.match(r'(\d{4})-(\d+)$', criterio)
         if not match:
             return None
         
-        año = match.group(1)  # 4 dígitos del año
-        exp = match.group(2).zfill(5)  # Expediente con padding a 5 dígitos
-        
-        # Formato completo: prefijo (12) + año (4) + exp (5) + sufijo (2) = 23 dígitos
+        año = match.group(1)
+        exp = match.group(2).zfill(5)
         radicado = f"110013105017{año}{exp}00"
-        
-        # Verificar que sea exactamente 23 dígitos
         return radicado if len(radicado) == 23 else None
     
     def _enriquecer_con_bd(self, resultados, criterio):
         """Enriquece resultados con datos de la base de datos"""
         if not hasattr(self.app, 'database_manager') or not self.app.database_manager:
-            # Sin database manager, retornar con valores vacíos
             return [(r[0], r[1], r[2], "", "") if len(r) == 3 else 
                     (r[0], r[1], r[2], r[3], "", "") if len(r) == 4 else r 
                     for r in resultados]
         
-        # Intentar convertir criterio a radicado
         radicado = self._convertir_a_radicado(criterio)
         if not radicado:
-            # Si no es formato AAAA-EXP, retornar con valores vacíos
             return [(r[0], r[1], r[2], "", "") if len(r) == 3 else 
                     (r[0], r[1], r[2], r[3], "", "") if len(r) == 4 else r 
                     for r in resultados]
@@ -209,18 +203,13 @@ class SearchMethods:
         # Consultar base de datos
         demandante, demandado = self.app.database_manager.obtener_info_proceso(radicado)
         
-        # Enriquecer resultados
-        # Tuplas pueden ser de 3 elementos (nombre, ruta_rel, ruta_abs) 
-        # o 4 elementos (nombre, ruta_rel, ruta_abs, ubicacion) para multi-ubicación
         resultados_enriquecidos = []
         for resultado in resultados:
             if len(resultado) == 3:
-                # Búsqueda cache/tradicional: (nombre, ruta_rel, ruta_abs)
                 resultados_enriquecidos.append((
                     resultado[0], resultado[1], resultado[2], demandante, demandado
                 ))
             elif len(resultado) == 4:
-                # Búsqueda multi-ubicación: (nombre, ruta_rel, ruta_abs, ubicacion)
                 resultados_enriquecidos.append((
                     resultado[0], resultado[1], resultado[2], resultado[3], demandante, demandado
                 ))

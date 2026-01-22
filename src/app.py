@@ -3,6 +3,7 @@ import os
 import tkinter as tk
 import time
 
+
 from .config import ConfigManager
 from .cache_manager import CacheManager
 from .search_engine import SearchEngine
@@ -26,6 +27,8 @@ from .search_methods import SearchMethods
 from .results_display import ResultsDisplay
 from .theme_manager import ThemeManager
 from .tree_column_config import TreeColumnConfig
+
+
 
 class LocationTooltip:
     """Tooltip para la barra de ubicaciones"""
@@ -83,17 +86,15 @@ class LocationTooltip:
 
 class BusquedaCarpetaApp:
     def __init__(self, master):
-        start_time = time.time()
-        
         self.master = master
-        self.version = "V. 5.0 - Luce Intellettual"
-        self.modo_numerico = True
-        
-        # Variables para menú Ver
+        start_time = time.time()
+        self.version = "4.5"
+        self.mostrar_explorador = tk.BooleanVar(value=False)
+        self.mostrar_historial = tk.BooleanVar(value=False)
+        self._selection_timer = None
         self.mostrar_barra_cache = tk.BooleanVar(value=True)
         self.mostrar_barra_estado = tk.BooleanVar(value=True)
-        self.mostrar_historial = tk.BooleanVar(value=False)
-        self.mostrar_explorador = tk.BooleanVar(value=False)
+        self.modo_numerico = True
         
         # Configuración
         self.config = ConfigManager()
@@ -272,6 +273,7 @@ class BusquedaCarpetaApp:
             self.ui_callbacks.mostrar_advertencia("Ingrese un criterio de búsqueda")
             return
         
+        
         self.ui_callbacks.deshabilitar_busqueda()
         self.btn_buscar.configure(text='Buscando...')
         self.ui_callbacks.actualizar_estado("Iniciando...")
@@ -283,25 +285,37 @@ class BusquedaCarpetaApp:
         self.search_coordinator.cancelar_busqueda()
 
     def on_tree_select(self, event):
-        """Maneja selección en TreeView"""
+        """Maneja selección en TreeView con DEBOUNCE"""
         hay_seleccion = len(self.tree.selection()) > 0
         estado = tk.NORMAL if hay_seleccion else tk.DISABLED
         
         self.btn_abrir.config(state=estado)
         self.btn_copiar.config(state=estado)
         
-        # Sincronizar con explorador
+        # Cancelar timer anterior si existe
+        if self._selection_timer:
+            self.master.after_cancel(self._selection_timer)
+            self._selection_timer = None
+            
+        # Sincronizar con explorador (con retraso de 300ms)
         if hay_seleccion and hasattr(self, 'file_explorer_manager') and self.file_explorer_manager:
             if self.file_explorer_manager.is_visible():
-                try:
-                    ruta = self._obtener_ruta_absoluta_seleccionada()
-                    if ruta and os.path.exists(ruta) and os.path.isdir(ruta):
-                        self.file_explorer_manager.load_directory(ruta)
-                except:
-                    pass
+                self._selection_timer = self.master.after(300, self._sync_explorer_delayed)
         
         if callable(self.configurar_scrollbars):
             self.configurar_scrollbars()
+
+    def _sync_explorer_delayed(self):
+        """Ejecuta la sincronización después del debounce"""
+        try:
+            ruta = self._obtener_ruta_absoluta_seleccionada()
+            if ruta and os.path.exists(ruta) and os.path.isdir(ruta):
+                if self.file_explorer_manager.is_visible():
+                    self.file_explorer_manager.load_directory(ruta)
+        except Exception as e:
+            print(f"Error en sync delayed: {e}")
+        finally:
+            self._selection_timer = None
 
     def _obtener_ruta_absoluta_seleccionada(self):
         """Obtiene ruta absoluta del item seleccionado"""
