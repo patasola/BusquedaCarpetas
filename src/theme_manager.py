@@ -1,6 +1,9 @@
 ﻿# src/theme_manager.py - V3 con callbacks y actualización dinámica
 import tkinter as tk
 from tkinter import ttk
+import ctypes
+import os
+import sys
 
 class ThemeManager:
     """Gestiona los temas (modo oscuro/claro) de la aplicación"""
@@ -50,6 +53,13 @@ class ThemeManager:
             "menu_fg": "#2c3e50",
             "menu_active_bg": "#3498db",
             "menu_active_fg": "#ffffff",
+            "menu_active_fg": "#ffffff",
+            
+            # Method Colors (Tags)
+            "tag_cache_bg": "#e8f5e8", "tag_cache_fg": "#1b5e20",
+            "tag_traditional_bg": "#e3f2fd", "tag_traditional_fg": "#0d47a1",
+            "tag_tree_bg": "#fff3e0", "tag_tree_fg": "#e65100",
+            "tag_unknown_bg": "#f5f5f5", "tag_unknown_fg": "#424242",
         },
         "oscuro": {
             "bg": "#1e1e1e",
@@ -79,6 +89,13 @@ class ThemeManager:
             "menu_fg": "#e0e0e0",
             "menu_active_bg": "#0974bc",
             "menu_active_fg": "#ffffff",
+            "menu_active_fg": "#ffffff",
+            
+            # Method Colors (Tags) - DARK MODE
+            "tag_cache_bg": "#0d2b10", "tag_cache_fg": "#81c784",  # Verde oscuro/claro
+            "tag_traditional_bg": "#0d1b2a", "tag_traditional_fg": "#64b5f6",  # Azul oscuro/claro
+            "tag_tree_bg": "#331e0d", "tag_tree_fg": "#ffb74d",  # Naranja oscuro/claro
+            "tag_unknown_bg": "#2d2d30", "tag_unknown_fg": "#9e9e9e",  # Gris oscuro/claro
         }
     }
     
@@ -139,7 +156,48 @@ class ThemeManager:
         self.app.master.configure(bg=self.colores["bg"])
         self._aplicar_tema_recursivo(self.app.master)
         self._configurar_estilos_ttk()
+        self._configurar_estilos_ttk()
         self._actualizar_treeviews()
+        self._aplicar_modo_oscuro_windows()
+    
+    def _aplicar_modo_oscuro_windows(self):
+        """Intenta aplicar modo oscuro a la barra de título de Windows"""
+        try:
+            if sys.platform != "win32":
+                return
+                
+            # Obtener HWND
+            hwnd = ctypes.windll.user32.GetParent(self.app.master.winfo_id())
+            
+            # Constantes DWM
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+            
+            # Determinar valor (1 = True/Oscuro, 0 = False/Claro)
+            value = 1 if self.tema_actual == "oscuro" else 0
+            value = ctypes.c_int(value)
+            
+            # Intentar aplicar (Windows 11 / 10 20H1+)
+            try:
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, 
+                    DWMWA_USE_IMMERSIVE_DARK_MODE,
+                    ctypes.byref(value), 
+                    ctypes.sizeof(value)
+                )
+            except:
+                # Fallback para versiones anteriores de Windows 10
+                try:
+                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                        hwnd, 
+                        DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+                        ctypes.byref(value), 
+                        ctypes.sizeof(value)
+                    )
+                except:
+                    pass
+        except Exception as e:
+            print(f"[ThemeManager] Error aplicando modo oscuro Windows: {e}")
     
     def _aplicar_tema_recursivo(self, widget):
         try:
@@ -254,6 +312,9 @@ class ThemeManager:
             
             print(f"[ThemeManager] TreeView {nombre} actualizado exitosamente")
             
+            # 5. Configurar tags de métodos (NUEVO)
+            self._configurar_tags_metodos(tree)
+            
         except Exception as e:
             print(f"[ThemeManager] Error en TreeView {nombre}: {e}")
     
@@ -298,3 +359,45 @@ class ThemeManager:
     
     def get_tema_actual(self):
         return self.tema_actual
+    def get_tema_actual(self):
+        return self.tema_actual
+
+    def _configurar_tags_metodos(self, tree):
+        """Configura los tags de métodos con los colores del tema actual"""
+        try:
+            # Tags base de métodos
+            method_tags = {
+                'cache_method': {'foreground': self.colores["tag_cache_fg"], 'background': self.colores["tag_cache_bg"]},
+                'tradicional_method': {'foreground': self.colores["tag_traditional_fg"], 'background': self.colores["tag_traditional_bg"]},
+                'tree_method': {'foreground': self.colores["tag_tree_fg"], 'background': self.colores["tag_tree_bg"]},
+                'unknown_method': {'foreground': self.colores["tag_unknown_fg"], 'background': self.colores["tag_unknown_bg"]}
+            }
+            
+            for tag, config in method_tags.items():
+                tree.tag_configure(tag, **config)
+            
+            # Tags combinados (evenrow/oddrow + método)
+            # En modo oscuro, podemos querer que evenrow/oddrow sean sutilmente diferentes o iguales
+            # Para simplificar y garantizar legibilidad, usaremos los mismos colores base del método
+            # pero quizás con una ligera variación si fuera necesario. Por ahora, directos.
+            
+            combined_tags = [
+                ('evenrow_cache', self.colores["tag_cache_bg"], self.colores["tag_cache_fg"]),
+                ('evenrow_tradicional', self.colores["tag_traditional_bg"], self.colores["tag_traditional_fg"]),
+                ('evenrow_tree', self.colores["tag_tree_bg"], self.colores["tag_tree_fg"]),
+                ('evenrow_unknown', self.colores["tag_unknown_bg"], self.colores["tag_unknown_fg"]),
+                ('oddrow_cache', self.colores["tag_cache_bg"], self.colores["tag_cache_fg"]),
+                ('oddrow_tradicional', self.colores["tag_traditional_bg"], self.colores["tag_traditional_fg"]),
+                ('oddrow_tree', self.colores["tag_tree_bg"], self.colores["tag_tree_fg"]),
+                ('oddrow_unknown', self.colores["tag_unknown_bg"], self.colores["tag_unknown_fg"])
+            ]
+            
+            for tag, bg, fg in combined_tags:
+                tree.tag_configure(tag, background=bg, foreground=fg)
+                
+            # Configurar evenrow/oddrow genéricos
+            tree.tag_configure('evenrow', background=self.colores["tree_bg"], foreground=self.colores["tree_fg"])
+            tree.tag_configure('oddrow', background=self.colores["tree_bg"], foreground=self.colores["tree_fg"])
+            
+        except Exception as e:
+            print(f"[ThemeManager] Error configurando tags de métodos: {e}")

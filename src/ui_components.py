@@ -214,30 +214,8 @@ class UIComponents:
         tree.tag_configure('evenrow', background='#ffffff')
         
         # Tags para métodos con colores
-        method_tags = {
-            'cache_method': {'foreground': '#1b5e20', 'background': '#e8f5e8', 'font': ('Segoe UI', 10, 'bold')},
-            'tradicional_method': {'foreground': '#0d47a1', 'background': '#e3f2fd', 'font': ('Segoe UI', 10, 'bold')},
-            'tree_method': {'foreground': '#e65100', 'background': '#fff3e0', 'font': ('Segoe UI', 10, 'bold')},
-            'unknown_method': {'foreground': '#424242', 'background': '#f5f5f5', 'font': ('Segoe UI', 10, 'bold')}
-        }
-        
-        for tag, config in method_tags.items():
-            tree.tag_configure(tag, **config)
-        
-        # Tags combinados para filas alternadas con colores
-        combined_tags = [
-            ('evenrow_cache', '#f1f8e9', '#1b5e20'),
-            ('evenrow_tradicional', '#e8f4fd', '#0d47a1'),
-            ('evenrow_tree', '#fff8f0', '#e65100'),
-            ('evenrow_unknown', '#fafafa', '#424242'),
-            ('oddrow_cache', '#e8f5e8', '#1b5e20'),
-            ('oddrow_tradicional', '#e3f2fd', '#0d47a1'),
-            ('oddrow_tree', '#fff3e0', '#e65100'),
-            ('oddrow_unknown', '#f5f5f5', '#424242')
-        ]
-        
-        for tag, bg, fg in combined_tags:
-            tree.tag_configure(tag, background=bg, foreground=fg, font=('Segoe UI', 10, 'bold'))
+        # Tags para métodos y filas alternadas ahora son manejados por ThemeManager
+        # para soportar cambio dinámico de tema (claro/oscuro)
         
         # Botones de acción
         action_frame = tk.Frame(main_frame, bg=Colors.BACKGROUND)
