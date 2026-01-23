@@ -100,6 +100,11 @@ class FileExplorerManager:
                 self.frame.after(100, self.ui.update_scrollbars)
                 self.frame.after(300, self.ui.update_scrollbars)
             
+            # FORZAR APLICACIÓN DE TEMA
+            # Asegura que los widgets recién creados o mostrados adopten el tema actual
+            if hasattr(self.app, 'theme_manager'):
+                self.app.theme_manager.aplicar_tema()
+            
             print(f"[DEBUG] Explorador mostrado en columna {self.assigned_column}")
     
     def hide(self):
@@ -383,7 +388,9 @@ class FileExplorerManager:
         self.current_path = os.path.normpath(path)
         self.path_label.configure(text=f"Ra├¡z: {self.current_path}")
         
-        print(f"[DEBUG] Cargando directorio: {self.current_path}")
+        from datetime import datetime as _datetime
+        current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        print(f"[{current_time}] [DEBUG] Cargando directorio: {self.current_path}")
         
         # Limpiar ├írbol y mapeos
         for item in self.tree.get_children():
