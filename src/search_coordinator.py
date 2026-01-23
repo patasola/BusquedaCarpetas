@@ -101,7 +101,7 @@ class SearchCoordinator:
                         enhanced_result = (nombre, ruta_rel, ruta_abs, location['name'])
                         all_results.append(enhanced_result)
                 
-                if len(all_results) >= 200:
+                if len(all_results) >= 1000:
                     break
         except Exception as e:
             print(f"[DEBUG] Error en búsqueda multi-ubicaciones: {e}")
@@ -121,7 +121,7 @@ class SearchCoordinator:
             
             if temp_cache.cache.valido and len(temp_cache.cache.directorios.get('directorios', [])) > 0:
                 results = temp_cache.buscar_en_cache(criterio)
-                return results[:20] if results else []
+                return results[:1000] if results else []
             
             return self._search_direct_limited(location['path'], criterio)
         except Exception as e:
@@ -139,7 +139,7 @@ class SearchCoordinator:
                         break
                     if entry.is_dir() and criterio_lower in entry.name.lower():
                         results.append((entry.name, entry.name, entry.path))
-                        if len(results) >= 25:
+                        if len(results) >= 100:
                             break
         except:
             pass
@@ -157,7 +157,7 @@ class SearchCoordinator:
         """Búsqueda desde cache"""
         try:
             resultados = self.app.cache_manager.buscar_en_cache(criterio)
-            return resultados[:100] if resultados else []
+            return resultados[:1000] if resultados else []
         except:
             return []
     
@@ -180,7 +180,7 @@ class SearchCoordinator:
                         ruta_completa = os.path.join(root, dirname)
                         ruta_relativa = os.path.relpath(ruta_completa, self.app.ruta_carpeta)
                         resultados.append((dirname, ruta_relativa, ruta_completa))
-                        if len(resultados) >= 150:
+                        if len(resultados) >= 500:
                             return resultados
                 
                 depth = root.replace(self.app.ruta_carpeta, '').count(os.sep)

@@ -50,7 +50,7 @@ class SearchMethods:
                             nombre, ruta_rel, ruta_abs = result[:3]
                             all_results.append((nombre, ruta_rel, ruta_abs, location['name']))
                     
-                    if len(all_results) >= 100:
+                    if len(all_results) >= 1000:
                         break
                 except Exception as e:
                     print(f"[ERROR] Error buscando en {location.get('name')}: {e}")
@@ -105,7 +105,7 @@ class SearchMethods:
                 for entry in it:
                     if entry.is_dir() and criterio_lower in entry.name.lower():
                         results.append((entry.name, entry.name, entry.path))
-                        if len(results) >= 20:
+                        if len(results) >= 100:
                             break
         except Exception as e:
             print(f"[ERROR] Error en búsqueda directa: {e}")
