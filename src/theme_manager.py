@@ -413,8 +413,8 @@ class ThemeManager:
                 background=self.colores["tree_bg"],
                 foreground=self.colores["tree_fg"],
                 fieldbackground=self.colores["tree_field_bg"],
-                borderwidth=0 if style_name == "Treeview" else 1,
-                relief="flat" if style_name == "Treeview" else "solid"
+                borderwidth=0,  # SIN BORDE
+                relief="flat"   # SIN RELIEVE
             )
             
             style.map(style_name,
