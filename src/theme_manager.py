@@ -78,8 +78,8 @@ class ThemeManager:
             "tree_selected_bg": "#0974bc",
             "tree_selected_fg": "#ffffff",
             "tree_field_bg": "#333333",  # Mismo que tree_bg
-            "tree_heading_bg": "#202020",  # Gris muy oscuro (casi negro) para fondo headers
-            "tree_heading_fg": "#e0e0e0",  # Gris claro para texto headers
+            "tree_heading_bg": "#3e3e42",  # Gris más claro para encabezados (distinto al fondo)
+            "tree_heading_fg": "#ffffff",  # Blanco brillante para texto headers
             "frame_bg": "#1e1e1e",
             "border": "#3e3e42",
             "status_bg": "#007acc",
