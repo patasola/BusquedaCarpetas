@@ -291,10 +291,11 @@ class ThemeManager:
                 if hasattr(self.app.historial_manager, 'tree') and self.app.historial_manager.tree:
                     self._apply_theme_to_tree(self.app.historial_manager.tree, "Historial", tag_colors)
             
-            # TreeView explorador
-            if hasattr(self.app, 'file_explorer') and self.app.file_explorer:
-                if hasattr(self.app.file_explorer, 'tree') and self.app.file_explorer.tree:
-                    self._apply_theme_to_tree(self.app.file_explorer.tree, "Explorador", tag_colors)
+            # TreeView explorador (FileExplorerManager)
+            if hasattr(self.app, 'file_explorer_manager') and self.app.file_explorer_manager:
+                if hasattr(self.app.file_explorer_manager, 'ui') and self.app.file_explorer_manager.ui:
+                    if hasattr(self.app.file_explorer_manager.ui, 'tree') and self.app.file_explorer_manager.ui.tree:
+                        self._apply_theme_to_tree(self.app.file_explorer_manager.ui.tree, "Explorador", tag_colors)
                             
         except Exception as e:
             print(f"[ThemeManager] Error actualizando TreeViews: {e}")
