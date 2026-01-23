@@ -413,9 +413,16 @@ class ThemeManager:
                 background=self.colores["tree_bg"],
                 foreground=self.colores["tree_fg"],
                 fieldbackground=self.colores["tree_field_bg"],
-                borderwidth=0,  # SIN BORDE
-                relief="flat"   # SIN RELIEVE
+                borderwidth=0,
+                relief="flat"
             )
+            
+            # Redefinir layout para eliminar bordes internos del tema
+            # Esto elimina el elemento 'Treeview.border' o similar que pueda existir
+            try:
+                style.layout(style_name, [('Treeview.treearea', {'sticky': 'nswe'})])
+            except Exception as e:
+                print(f"[ThemeManager] Error configurando layout de {style_name}: {e}")
             
             style.map(style_name,
                 background=[("selected", self.colores["tree_selected_bg"])],
