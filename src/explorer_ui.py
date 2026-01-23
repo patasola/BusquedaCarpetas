@@ -18,7 +18,8 @@ class ExplorerUI:
         """Crea la interfaz del explorador con ancho específico"""
         try:
             # Frame principal con grip - USAR ANCHO CALCULADO
-            self.frame = tk.Frame(self.parent_frame, width=panel_width, relief=tk.RIDGE, borderwidth=1)
+            # SIN BORDE para evitar marco blanco
+            self.frame = tk.Frame(self.parent_frame, width=panel_width, relief=tk.FLAT, borderwidth=0)
             self.frame.pack_propagate(False)
             
             # Grip de redimensionamiento
@@ -173,7 +174,8 @@ class ExplorerUI:
     def _create_treeview(self):
         """Crea el TreeView con columnas OPTIMIZADAS"""
         tree_frame = tk.Frame(self.content_frame)
-        tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
+        # SIN PADDING para evitar espacios blancos
+        tree_frame.pack(fill='both', expand=True, padx=0, pady=0)
         
         # Configurar Grid Layout
         tree_frame.grid_rowconfigure(0, weight=1)

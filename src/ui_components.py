@@ -139,11 +139,11 @@ class UIComponents:
         btn_cancelar.pack(side=tk.LEFT)
         
         # Tabla de resultados
-        table_container = tk.Frame(main_frame, bg="#e9ecef", relief=tk.SOLID, borderwidth=1)
+        table_container = tk.Frame(main_frame, bg=Colors.BACKGROUND, relief=tk.FLAT, borderwidth=0)
         table_container.pack(fill=tk.BOTH, expand=True, pady=(10, 15))
         
         tree_frame = tk.Frame(table_container, bg=Colors.TREE_BG)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
         
         # Scrollbars
         y_scroll = ttk.Scrollbar(tree_frame, orient="vertical")

@@ -97,7 +97,7 @@ class HistorialManager(BaseTreeManager):
             else:
                 parent_frame = self.app.master
             
-            self.frame = tk.Frame(parent_frame, width=panel_width, relief=tk.RIDGE, borderwidth=1)
+            self.frame = tk.Frame(parent_frame, width=panel_width, relief=tk.FLAT, borderwidth=0)
             self.frame.pack_propagate(False)
             
             # Grip de redimensionamiento en el borde izquierdo
