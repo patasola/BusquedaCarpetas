@@ -15,15 +15,15 @@
       "Fecha"
     ],
     "column_widths": {
-      "Criterio": 100,
+      "Criterio": 90,
       "Metodo": 30,
       "Resultados": 50,
-      "Tiempo": 55,
+      "Tiempo": 50,
       "Fecha": 55,
       "Demandante": 150,
       "Demandado": 150,
       "Ruta": 200,
-      "#0": 200
+      "#0": 64
     }
   }
 }

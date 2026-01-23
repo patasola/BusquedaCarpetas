@@ -1,5 +1,6 @@
 ﻿# src/ui_callbacks.py - Callbacks de UI V.4.2 (Refactorizado)
 import tkinter as tk
+from .results_renderer import ResultsRenderer
 from tkinter import messagebox
 import os
 import time
@@ -71,63 +72,41 @@ class UICallbacks:
             self._ajuste_en_progreso = False
 
     def limpiar_resultados(self):
-        """Limpia resultados del TreeView"""
+        """Limpia resultados del TreeView - OPTIMIZADO"""
+        import time as _time
+        from datetime import datetime as _datetime
+        _t0 = _time.perf_counter()
         try:
-            for item in self.app.tree.get_children():
-                self.app.tree.delete(item)
+            # CRÍTICO: Borrado masivo en una sola operación (mucho más rápido)
+            children = self.app.tree.get_children()
+            if children:
+                self.app.tree.delete(*children)  # Desempaquetar todos los items
+            _t1 = _time.perf_counter()
+            current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            print(f"[{current_time}] [LIMPIAR] Completado en {(_t1-_t0)*1000:.2f} ms")
         except Exception as e:
-            print(f"Error limpiando resultados: {e}")
+            _t1 = _time.perf_counter()
+            current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            print(f"[{current_time}] [LIMPIAR] Error en {(_t1-_t0)*1000:.2f} ms: {e}")
 
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Muestra resultados en TreeView - OPTIMIZADO CON BATCH INSERT"""
+        """Muestra resultados - DELEGADO A ResultsRenderer"""
         self.limpiar_resultados()
-        
-        if not resultados:
-            self.app.btn_buscar.configure(state='normal', text='Buscar')
-            self.app.btn_cancelar.configure(state='disabled')
-            self.actualizar_estado(f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)")
-            return
-        
-        try:
-            # CRÍTICO: Preparar para inserción masiva
-            batch_size = 500
-            total = len(resultados)
-            
-            for batch_start in range(0, total, batch_size):
-                batch_end = min(batch_start + batch_size, total)
-                batch = resultados[batch_start:batch_end]
-                
-                for i, resultado in enumerate(batch, start=batch_start):
-                    tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                    
-                    if isinstance(resultado, tuple) and len(resultado) >= 3:
-                        nombre, ruta_rel, ruta_abs = resultado[:3]
-                    elif isinstance(resultado, dict):
-                        nombre = resultado.get('name', 'Sin nombre')
-                        ruta_rel = resultado.get('path', '')
-                    else:
-                        continue
-                    
-                    letra_metodo = metodo[0].upper() if metodo else 'C'
-                    self.app.tree.insert("", "end", text=f"📁 {nombre}",
-                                       values=(letra_metodo, ruta_rel), tags=(tag,))
-                
-                if batch_end < total:
-                    self.actualizar_estado(f"Cargando {batch_end}/{total}...")
-                    self.app.tree.update_idletasks()
-            
-            self.actualizar_estado(f"{len(resultados):,} resultados en {tiempo_total:.3f}s ({metodo})")
-            self._ajustar_columnas_inmediato()
-            if callable(self.app.configurar_scrollbars):
-                self.app.configurar_scrollbars()
-        except Exception as e:
-            self.actualizar_estado(f"Error: {str(e)}")
+        return ResultsRenderer.render_results(
+            self.app, resultados, metodo, tiempo_total,
+            actualizar_estado_callback=self.actualizar_estado
+        )
     def actualizar_estado(self, mensaje):
         """Actualiza la barra de estado"""
         try:
             if hasattr(self.app, 'label_estado') and self.app.label_estado:
                 self.app.label_estado.config(text=mensaje)
                 self.app.master.update_idletasks()
+                
+                # Debug timestamp
+                from datetime import datetime as _datetime
+                current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{current_time}] [DEBUG] Estado actualizado: {mensaje}")
         except Exception as e:
             print(f"Error actualizando estado: {e}")
 

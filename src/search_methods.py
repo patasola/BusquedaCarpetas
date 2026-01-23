@@ -30,6 +30,11 @@ class SearchMethods:
                 from .results_display import ResultsDisplay
                 resultados = self._enriquecer_con_bd(resultados, criterio)
                 ResultsDisplay(self.app).mostrar_instantaneos(resultados, criterio, "Cache")
+                
+                # Registrar en historial
+                if hasattr(self.app, 'historial_manager'):
+                    # Tiempo aproximado ya que es instantáneo
+                    self.app.historial_manager.agregar_busqueda(criterio, "Cache", len(resultados), 0.01)
                 return
         
         # 3. Búsqueda tradicional
@@ -39,6 +44,7 @@ class SearchMethods:
     def buscar_multi_ubicaciones(self, criterio):
         """Búsqueda asíncrona en múltiples ubicaciones"""
         def worker():
+            start_time = time.time()
             all_results = []
             enabled_locations = self.app.multi_location_search.get_enabled_locations()
             
@@ -63,6 +69,12 @@ class SearchMethods:
             from .results_display import ResultsDisplay
             self.app.master.after(0, lambda: 
                 ResultsDisplay(self.app).mostrar_multi(all_results, criterio))
+            
+            # Registrar en historial
+            if hasattr(self.app, 'historial_manager'):
+                tiempo_total = time.time() - start_time
+                self.app.master.after(0, lambda: 
+                    self.app.historial_manager.agregar_busqueda(criterio, "Multi", len(all_results), tiempo_total))
         
         threading.Thread(target=worker, daemon=True).start()
     
@@ -121,10 +133,15 @@ class SearchMethods:
                 from .results_display import ResultsDisplay
                 resultados = self._enriquecer_con_bd(resultados, criterio)
                 ResultsDisplay(self.app).mostrar_instantaneos(resultados, criterio, "Cache")
+                
+                # Registrar en historial
+                if hasattr(self.app, 'historial_manager'):
+                    self.app.historial_manager.agregar_busqueda(criterio, "Cache", len(resultados), 0.01)
                 return
         
         # 2. Búsqueda directa
         def worker():
+            start_time = time.time()
             if not hasattr(self.app, 'ruta_carpeta') or not self.app.ruta_carpeta:
                 self.app.master.after(0, lambda: [
                     self.app.ui_callbacks.actualizar_estado("No se encontraron resultados"),
@@ -155,6 +172,12 @@ class SearchMethods:
             from .results_display import ResultsDisplay
             self.app.master.after(0, lambda: 
                 ResultsDisplay(self.app).mostrar_tradicionales(resultados, criterio))
+            
+            # Registrar en historial
+            if hasattr(self.app, 'historial_manager'):
+                tiempo_total = time.time() - start_time
+                self.app.master.after(0, lambda: 
+                    self.app.historial_manager.agregar_busqueda(criterio, "Tradicional", len(resultados), tiempo_total))
         
         threading.Thread(target=worker, daemon=True).start()
     

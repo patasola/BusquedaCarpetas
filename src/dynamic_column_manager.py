@@ -1,5 +1,6 @@
 ﻿# src/dynamic_column_manager.py - Callbacks de UI V.4.2 (Refactorizado)
 import tkinter as tk
+from .results_renderer import ResultsRenderer
 from tkinter import messagebox
 
 class UICallbacks:
@@ -20,65 +21,26 @@ class UICallbacks:
             return "?", 'unknown'
     
     def limpiar_resultados(self):
-        """Limpia resultados del TreeView"""
+        """Limpia resultados - OPTIMIZADO"""
         try:
-            for item in self.app.tree.get_children():
-                self.app.tree.delete(item)
+            children = self.app.tree.get_children()
+            if children:
+                self.app.tree.delete(*children)
         except Exception as e:
-            print(f"ERROR limpiando resultados: {e}")
+            print(f"Error limpiando: {e}")
     
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Muestra resultados en TreeView - OPTIMIZADO CON BATCH"""
+        """Muestra resultados - DELEGADO A ResultsRenderer"""
         self.limpiar_resultados()
         
         if not getattr(self.app.search_coordinator, 'busqueda_silenciosa', False):
             num_resultados = len(resultados) if resultados else 0
             self.app._finalizar_busqueda_con_historial(metodo, num_resultados)
         
-        if not resultados:
-            mensaje = f"No se encontraron resultados ({metodo}, {tiempo_total:.3f}s)"
-            self.actualizar_estado(mensaje)
-            return
-        
-        try:
-            letra_metodo, tags_color = self._metodo_a_config(metodo)
-            
-            if hasattr(self.app, 'tree_explorer') and self.app.tree_explorer:
-                formatted_results = []
-                for resultado in resultados:
-                    if isinstance(resultado, tuple) and len(resultado) >= 3:
-                        nombre, ruta_rel, ruta_abs = resultado[:3]
-                        formatted_results.append({'name': nombre, 'path': ruta_abs, 'files': 0, 'size': '0 B'})
-                    elif isinstance(resultado, dict):
-                        formatted_results.append(resultado)
-                self.app.tree_explorer.populate_search_results(formatted_results)
-            else:
-                # OPTIMIZADO: Batch processing
-                batch_size = 500
-                total = len(resultados)
-                for batch_start in range(0, total, batch_size):
-                    batch_end = min(batch_start + batch_size, total)
-                    batch = resultados[batch_start:batch_end]
-                    for i, resultado in enumerate(batch, start=batch_start):
-                        base_tags = ['evenrow' if i % 2 == 0 else 'oddrow']
-                        if isinstance(resultado, tuple) and len(resultado) >= 3:
-                            nombre, ruta_rel, ruta_abs = resultado[:3]
-                        elif isinstance(resultado, dict):
-                            nombre = resultado.get('name', 'Sin nombre')
-                    ruta_rel = resultado.get('path', '')
-                        else:
-                            continue
-                        self.app.tree.insert("", "end", text=f"📁 {nombre}",
-                                           values=(letra_metodo, ruta_rel),
-                                           tags=tuple(base_tags + [tags_color]))
-                    if batch_end < total:
-                        self.actualizar_estado(f"Cargando {batch_end}/{total}...")
-                        self.app.tree.update_idletasks()
-            
-            self.actualizar_estado(f"✅ {len(resultados):,} resultados en {tiempo_total:.3f}s ({metodo})")
-            self.app.configurar_scrollbars()
-        except Exception as e:
-            self.actualizar_estado(f"Error: {str(e)}")
+        return ResultsRenderer.render_results(
+            self.app, resultados, metodo, tiempo_total,
+            actualizar_estado_callback=self.actualizar_estado
+        )
     def mostrar_resultados_async(self, resultados, metodo, tiempo_total):
         """Versión asíncrona de mostrar_resultados"""
         self.app.master.after(0, lambda: self.mostrar_resultados(resultados, metodo, tiempo_total))

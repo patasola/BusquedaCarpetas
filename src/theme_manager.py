@@ -53,18 +53,17 @@ class ThemeManager:
             "menu_fg": "#2c3e50",
             "menu_active_bg": "#3498db",
             "menu_active_fg": "#ffffff",
-            "menu_active_fg": "#ffffff",
             
             # Method Colors (Tags)
             "tag_cache_bg": "#e8f5e8", "tag_cache_fg": "#1b5e20",
             "tag_traditional_bg": "#e3f2fd", "tag_traditional_fg": "#0d47a1",
-            "tag_tree_bg": "#fff3e0", "tag_tree_fg": "#e65100",
             "tag_tree_bg": "#fff3e0", "tag_tree_fg": "#e65100",
             "tag_unknown_bg": "#f5f5f5", "tag_unknown_fg": "#424242",
             
             # Grip (Separador)
             "grip_bg": "#f5f5f5",         # Invisible (igual al fondo)
             "grip_hover": "#d0d0d0",      # Visible al hover
+        },
         "oscuro": {
             "bg": "#1e1e1e",
             "fg": "#d4d4d4",
@@ -89,17 +88,14 @@ class ThemeManager:
             "status_bg": "#007acc",
             "status_fg": "#ffffff",
             # Menú
-            # Menú
             "menu_bg": "#2d2d30",
             "menu_fg": "#ffffff", # Texto blanco para contraste
             "menu_active_bg": "#0974bc",
-            "menu_active_fg": "#ffffff",
             "menu_active_fg": "#ffffff",
             
             # Method Colors (Tags) - DARK MODE
             "tag_cache_bg": "#0d2b10", "tag_cache_fg": "#81c784",  # Verde oscuro/claro
             "tag_traditional_bg": "#0d1b2a", "tag_traditional_fg": "#64b5f6",  # Azul oscuro/claro
-            "tag_tree_bg": "#331e0d", "tag_tree_fg": "#ffb74d",  # Naranja oscuro/claro
             "tag_tree_bg": "#331e0d", "tag_tree_fg": "#ffb74d",  # Naranja oscuro/claro
             "tag_unknown_bg": "#2d2d30", "tag_unknown_fg": "#9e9e9e",  # Gris oscuro/claro
             
@@ -165,7 +161,6 @@ class ThemeManager:
         """Aplica el tema actual a todos los widgets"""
         self.app.master.configure(bg=self.colores["bg"])
         self._aplicar_tema_recursivo(self.app.master)
-        self._configurar_estilos_ttk()
         self._configurar_estilos_ttk()
         self._actualizar_treeviews()
         self._aplicar_modo_oscuro_windows()
@@ -274,8 +269,6 @@ class ThemeManager:
                             pass
                 except Exception as e:
                     print(f"[ThemeManager] Error aplicando tema al menú: {e}")
-                except Exception as e:
-                    print(f"[ThemeManager] Error aplicando tema al menú: {e}")
             
             # Intento de aplicar tema a botones específicos del historial
             if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
@@ -302,28 +295,22 @@ class ThemeManager:
                         hm.title_label.configure(bg=self.colores["bg"], fg=self.colores["fg"])
                     except: pass
                 
-                # Botón Limpiar (Rojo/Error)
+                # Botón Limpiar y Exportar - Usar colores estándar del tema
                 if hasattr(hm, 'btn_limpiar') and hm.btn_limpiar:
                     try:
-                        # En modo oscuro, usar fondo oscuro y texto rojo claro, o botón estándar
-                        # Para consistencia, usaremos colores de error si existen, o botón estándar
-                        error_bg = self.colores.get("error", "#c62828") if self.tema_actual == "claro" else "#5c0000"
-                        error_fg = "#ffffff" if self.tema_actual == "claro" else "#ffcccc"
-                        
                         hm.btn_limpiar.configure(
-                            bg=self.colores["button_bg"], # Fondo estándar
-                            fg=self.colores["error"] if "error" in self.colores else "#c62828", # Texto rojo
+                            bg=self.colores["button_bg"],
+                            fg=self.colores["button_fg"],
                             activebackground=self.colores["button_active_bg"],
                             activeforeground=self.colores["button_active_fg"]
                         )
                     except: pass
                 
-                # Botón Exportar (Verde/Success)
                 if hasattr(hm, 'btn_exportar') and hm.btn_exportar:
                     try:
                         hm.btn_exportar.configure(
                             bg=self.colores["button_bg"],
-                            fg=self.colores["success"] if "success" in self.colores else "#2e7d32",
+                            fg=self.colores["button_fg"],
                             activebackground=self.colores["button_active_bg"],
                             activeforeground=self.colores["button_active_fg"]
                         )
@@ -455,9 +442,7 @@ class ThemeManager:
     
     def get_tema_actual(self):
         return self.tema_actual
-    def get_tema_actual(self):
-        return self.tema_actual
-
+    
     def _configurar_tags_metodos(self, tree):
         """Configura los tags de métodos con los colores del tema actual"""
         try:

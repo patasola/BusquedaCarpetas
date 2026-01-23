@@ -4,6 +4,7 @@ from tkinter import ttk
 from datetime import datetime
 import json
 import os
+import traceback
 from .column_manager import ColumnManager
 from .managers.base_tree_manager import BaseTreeManager
 
@@ -26,7 +27,9 @@ class HistorialManager(BaseTreeManager):
         
         # Atributos específicos del historial
         self.historial_data = []
-        self.historial_file = "historial_busquedas.json"
+        # Usar ruta absoluta para asegurar que se encuentre el archivo
+        self.historial_file = os.path.abspath("historial_busquedas.json")
+        print(f"[DEBUG] Archivo de historial: {self.historial_file}")
         
         # Variables para redimensionamiento
         self.resize_start_x = 0
@@ -60,6 +63,9 @@ class HistorialManager(BaseTreeManager):
                 self.app.mostrar_historial.set(True)
             
             print(f"[DEBUG] Historial mostrado en columna {self.assigned_column}")
+            
+            # Asegurar que la vista esté actualizada
+            self.actualizar_vista()
             
             # Aplicar tema actual al mostrar
             if hasattr(self.app, 'theme_manager'):
@@ -158,31 +164,49 @@ class HistorialManager(BaseTreeManager):
             control_frame = tk.Frame(self.content_frame)
             control_frame.pack(fill='x', padx=5, pady=5)
             
+            # Configuración de estilo de botones (Neutros y limpios)
+            btn_config = {
+                'font': ('Segoe UI', 10), # Fuente ligeramente más pequeña
+                'bd': 1,
+                'cursor': 'hand2',
+                'relief': 'raised',
+                'bg': '#f5f5f5',
+                'fg': '#333333',
+                'anchor': tk.CENTER, # Centrado explícito
+                'justify': tk.CENTER, # Justificación explícita
+                'padx': 0,
+                'pady': 0
+            }
+            
+            # Botón Limpiar - En Frame fijo para ser cuadrado
+            frame_limpiar = tk.Frame(control_frame, width=35, height=35)
+            frame_limpiar.pack_propagate(False) # Forzar tamaño
+            frame_limpiar.pack(side='left', padx=(0, 5))
+            
             self.btn_limpiar = tk.Button(
-                control_frame,
-                text="Limpiar",
+                frame_limpiar,
+                text="🗑", # Variante de texto seleccionada por el usuario
                 command=self.limpiar_historial,
-                font=('Segoe UI', 9),
-                bg='#ffebee',
-                fg='#c62828',
-                relief='flat',
-                padx=10,
-                pady=4
+                **btn_config
             )
-            self.btn_limpiar.pack(side='left', padx=(0, 5))
+            self.btn_limpiar.pack(fill='both', expand=True)
+            
+            # Botón Exportar - En Frame fijo para ser cuadrado
+            frame_exportar = tk.Frame(control_frame, width=35, height=35)
+            frame_exportar.pack_propagate(False) # Forzar tamaño
+            frame_exportar.pack(side='left')
             
             self.btn_exportar = tk.Button(
-                control_frame,
-                text="Exportar",
+                frame_exportar,
+                text="💾", 
                 command=self.exportar_historial,
-                font=('Segoe UI', 9),
-                bg='#e8f5e8',
-                fg='#2e7d32',
-                relief='flat',
-                padx=10,
-                pady=4
+                **btn_config
             )
-            self.btn_exportar.pack(side='left')
+            self.btn_exportar.pack(fill='both', expand=True)
+            
+            # Tooltips para botones
+            self._create_tooltip(self.btn_limpiar, "Borrar todo el historial")
+            self._create_tooltip(self.btn_exportar, "Exportar a CSV")
             
             # TreeView con scrollbar
             tree_frame = tk.Frame(self.content_frame)
@@ -196,30 +220,25 @@ class HistorialManager(BaseTreeManager):
             self.tree = ttk.Treeview(
                 tree_frame,
                 columns=("Criterio", "Metodo", "Resultados", "Tiempo", "Fecha"),
-                show="tree headings",
-                style="Custom.Treeview"  # MISMO ESTILO
+                show="headings", # Solo headings, sin columna #0
+                style="Treeview" # Estilo base
             )
             
-            # ELIMINADO: Configuración hardcoded de estilos y tags
-            # Dejamos que ThemeManager maneje los estilos globales
-            
-            # Configurar encabezados (busca esta sección)
-            self.tree.heading("#0", text="#", anchor=tk.CENTER)
+            # Configurar encabezados MANUALMENTE
             self.tree.heading("Criterio", text="Criterio", anchor=tk.W)
             self.tree.heading("Metodo", text="M", anchor=tk.CENTER)
-            self.tree.heading("Resultados", text="Res.", anchor=tk.CENTER)  # Texto más corto
+            self.tree.heading("Resultados", text="Res.", anchor=tk.CENTER)
             self.tree.heading("Tiempo", text="Tiempo", anchor=tk.CENTER)
-            self.tree.heading("Fecha", text="Hora", anchor=tk.CENTER)  # Texto más corto
+            self.tree.heading("Fecha", text="Hora", anchor=tk.CENTER)
             
-            # Configurar columnas con anchos similares al TreeView principal
-            self.tree.column("#0", width=35, anchor=tk.CENTER, minwidth=30, stretch=False)
-            self.tree.column("Criterio", width=100, anchor=tk.W, minwidth=80, stretch=False)
-            self.tree.column("Metodo", width=30, anchor=tk.CENTER, minwidth=25, stretch=False)
-            self.tree.column("Resultados", width=50, anchor=tk.CENTER, minwidth=45, stretch=False)
-            self.tree.column("Tiempo", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)
-            self.tree.column("Fecha", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)
+            # Configurar columnas MANUALMENTE
+            self.tree.column("Criterio", width=120, anchor=tk.W, minwidth=80)
+            self.tree.column("Metodo", width=40, anchor=tk.CENTER, minwidth=25)
+            self.tree.column("Resultados", width=60, anchor=tk.CENTER, minwidth=45)
+            self.tree.column("Tiempo", width=60, anchor=tk.CENTER, minwidth=50)
+            self.tree.column("Fecha", width=60, anchor=tk.CENTER, minwidth=50)
             
-            # Definicion de columnas para ColumnManager
+            # Definicion de columnas para ColumnManager (Lo mantenemos pero no lo aplicamos aun)
             column_definitions = {
                 "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "minwidth": 80, "stretch": False, "default_visible": True},
                 "Metodo": {"title": "M", "width": 30, "anchor": "center", "minwidth": 25, "stretch": False, "default_visible": True},
@@ -232,25 +251,47 @@ class HistorialManager(BaseTreeManager):
             }
             
             # Inicializar ColumnManager
-            self.column_manager = ColumnManager(self.tree, "historial_tree", column_definitions)
+            # self.column_manager = ColumnManager(self.tree, "historial_tree", column_definitions)
+            
             # Configurar scrollbars
             self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
             vsb.configure(command=self.tree.yview)
             hsb.configure(command=self.tree.xview)
             
-            # Configurar tags iniciales (ThemeManager los actualizará)
-            self.tree.tag_configure('evenrow', background='#ffffff')
-            self.tree.tag_configure('oddrow', background='#f8f9fa')
+            vsb.pack(side='right', fill='y')
+            hsb.pack(side='bottom', fill='x')
+            self.tree.pack(side='left', fill='both', expand=True)
             
-            # Aplicar tema actual si es posible
-            if hasattr(self.app, 'theme_manager'):
-                self.app.theme_manager._actualizar_treeviews()
+            # Configurar tags SIMPLES
+            self.tree.tag_configure('evenrow', background='#ffffff', foreground='#000000')
+            self.tree.tag_configure('oddrow', background='#f8f9fa', foreground='#000000')
             
             self.actualizar_vista()
             
         except Exception as e:
             print(f"Error creando historial: {e}")
             self.frame = None
+    
+    def _create_tooltip(self, widget, text):
+        """Crea un tooltip simple para un widget"""
+        def show_tooltip(event):
+            tooltip = tk.Toplevel()
+            tooltip.wm_overrideredirect(True)
+            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            
+            label = tk.Label(tooltip, text=text, background="#ffffe0", 
+                           relief='solid', borderwidth=1, font=('Segoe UI', 8))
+            label.pack()
+            
+            widget.tooltip_window = tooltip
+        
+        def hide_tooltip(event):
+            if hasattr(widget, 'tooltip_window'):
+                widget.tooltip_window.destroy()
+                del widget.tooltip_window
+        
+        widget.bind('<Enter>', show_tooltip)
+        widget.bind('<Leave>', hide_tooltip)
     
     def start_resize(self, event):
         """Inicia el redimensionamiento"""
@@ -274,6 +315,7 @@ class HistorialManager(BaseTreeManager):
     
     def agregar_busqueda(self, criterio, metodo, num_resultados, tiempo_total):
         """Agrega una búsqueda al historial - SIEMPRE registra, sin importar si está visible"""
+        print(f"[DEBUG] Intentando agregar búsqueda: {criterio}, {metodo}, {num_resultados}")
         try:
             # Crear entrada del historial
             entrada = {
@@ -295,18 +337,20 @@ class HistorialManager(BaseTreeManager):
             # Guardar en archivo
             self.guardar_historial()
             
-            # Actualizar vista solo si está visible
-            if self.visible and self.tree:
+            # Actualizar vista SIEMPRE si el tree existe
+            if self.tree:
                 self.actualizar_vista()
                 
-            print(f"[DEBUG] Búsqueda registrada en historial: {criterio} ({metodo}) - {num_resultados} resultados")
+            print(f"[DEBUG] Búsqueda registrada EXITOSAMENTE: {criterio}")
             
         except Exception as e:
-            print(f"Error agregando búsqueda al historial: {e}")
+            traceback.print_exc()
+            print(f"[ERROR] Error agregando búsqueda al historial: {e}")
     
     def actualizar_vista(self):
         """Actualiza la vista del TreeView con los datos del historial"""
         if not self.tree:
+            print("[DEBUG] actualizar_vista: self.tree es None")
             return
         
         try:
@@ -316,22 +360,8 @@ class HistorialManager(BaseTreeManager):
             
             # Agregar entradas del historial
             for i, entrada in enumerate(self.historial_data):
-                # Determinar tags según el método y fila alternada
+                # Determinar tags según fila alternada
                 row_tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-                
-                # Tag del método
-                metodo = entrada['metodo'].upper()
-                if metodo == 'C':
-                    method_tag = 'cache_method'
-                elif metodo == 'T':
-                    method_tag = 'tradicional_method'
-                elif metodo == 'A' or metodo == 'E':
-                    method_tag = 'tree_method'
-                else:
-                    method_tag = row_tag
-                
-                # Combinar tags
-                tags = (row_tag, method_tag)
                 
                 # Insertar en TreeView
                 self.tree.insert('', 'end', 
@@ -343,14 +373,17 @@ class HistorialManager(BaseTreeManager):
                                    entrada['tiempo'],
                                    entrada['fecha']
                                ),
-                               tags=tags)
+                               tags=(row_tag,))
             
             # Actualizar scrollbars
             if hasattr(self, 'update_scrollbars'):
                 self.tree.after_idle(self.update_scrollbars)
+            
+            print("[DEBUG] Vista historial actualizada correctamente")
                 
         except Exception as e:
-            print(f"Error actualizando vista historial: {e}")
+            traceback.print_exc()
+            print(f"[ERROR] Error actualizando vista historial: {e}")
     
     def cargar_historial(self):
         """Carga el historial desde archivo"""
