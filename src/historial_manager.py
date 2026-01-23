@@ -32,6 +32,13 @@ class HistorialManager(BaseTreeManager):
         self.resize_start_x = 0
         self.resize_start_width = 0
         
+        # Referencias a widgets para theming
+        self.btn_limpiar = None
+        self.btn_exportar = None
+        self.close_btn = None
+        self.title_label = None
+        self.title_frame = None
+        
         # Cargar historial existente
         self.cargar_historial()
   
@@ -53,6 +60,10 @@ class HistorialManager(BaseTreeManager):
                 self.app.mostrar_historial.set(True)
             
             print(f"[DEBUG] Historial mostrado en columna {self.assigned_column}")
+            
+            # Aplicar tema actual al mostrar
+            if hasattr(self.app, 'theme_manager'):
+                self.app.theme_manager.aplicar_tema()
     
     def hide(self):
         """Oculta el panel de historial y libera su posición"""
@@ -105,22 +116,22 @@ class HistorialManager(BaseTreeManager):
             self.content_frame.pack(side='right', fill='both', expand=True)
             
             # Título
-            title_frame = tk.Frame(self.content_frame, bg='#2c3e50')
-            title_frame.pack(fill='x')
+            self.title_frame = tk.Frame(self.content_frame, bg='#2c3e50')
+            self.title_frame.pack(fill='x')
             
-            title_label = tk.Label(
-                title_frame,
+            self.title_label = tk.Label(
+                self.title_frame,
                 text="Historial de Busquedas",
                 bg='#2c3e50',
                 fg='white',
                 font=('Segoe UI', 10, 'bold'),
                 pady=8
             )
-            title_label.pack(side='left', expand=True)
+            self.title_label.pack(side='left', expand=True)
             
             # Botón cerrar
-            close_btn = tk.Button(
-                title_frame,
+            self.close_btn = tk.Button(
+                self.title_frame,
                 text="X",
                 command=self.hide,
                 bg='#2c3e50',
@@ -130,13 +141,13 @@ class HistorialManager(BaseTreeManager):
                 padx=8,
                 pady=4
             )
-            close_btn.pack(side='right')
+            self.close_btn.pack(side='right')
             
             # Botones de control
             control_frame = tk.Frame(self.content_frame)
             control_frame.pack(fill='x', padx=5, pady=5)
             
-            btn_limpiar = tk.Button(
+            self.btn_limpiar = tk.Button(
                 control_frame,
                 text="Limpiar",
                 command=self.limpiar_historial,
@@ -147,9 +158,9 @@ class HistorialManager(BaseTreeManager):
                 padx=10,
                 pady=4
             )
-            btn_limpiar.pack(side='left', padx=(0, 5))
+            self.btn_limpiar.pack(side='left', padx=(0, 5))
             
-            btn_exportar = tk.Button(
+            self.btn_exportar = tk.Button(
                 control_frame,
                 text="Exportar",
                 command=self.exportar_historial,
@@ -160,7 +171,7 @@ class HistorialManager(BaseTreeManager):
                 padx=10,
                 pady=4
             )
-            btn_exportar.pack(side='left')
+            self.btn_exportar.pack(side='left')
             
             # TreeView con scrollbar
             tree_frame = tk.Frame(self.content_frame)
@@ -178,27 +189,8 @@ class HistorialManager(BaseTreeManager):
                 style="Custom.Treeview"  # MISMO ESTILO
             )
             
-            # Aplicar exactamente el mismo estilo que el TreeView principal
-            style = ttk.Style()
-            
-            # Asegurar que el estilo existe (puede que ya esté configurado)
-            style.configure('Custom.Treeview',
-                          rowheight=28,
-                          background="#ffffff",
-                          fieldbackground="#ffffff", 
-                          foreground="#2c3e50",
-                          selectbackground="#e3f2fd",
-                          selectforeground="#0d47a1",
-                          borderwidth=1,
-                          relief="solid",
-                          font=('Segoe UI', 10))  # MISMA FUENTE
-            
-            style.configure('Custom.Treeview.Heading', 
-                          font=('Segoe UI', 10, 'bold'),
-                          background="#f8f9fa",
-                          foreground="#2c3e50",
-                          relief="flat",
-                          borderwidth=1)
+            # ELIMINADO: Configuración hardcoded de estilos y tags
+            # Dejamos que ThemeManager maneje los estilos globales
             
             # Configurar encabezados (busca esta sección)
             self.tree.heading("#0", text="#", anchor=tk.CENTER)
@@ -207,15 +199,14 @@ class HistorialManager(BaseTreeManager):
             self.tree.heading("Resultados", text="Res.", anchor=tk.CENTER)  # Texto más corto
             self.tree.heading("Tiempo", text="Tiempo", anchor=tk.CENTER)
             self.tree.heading("Fecha", text="Hora", anchor=tk.CENTER)  # Texto más corto
-
             
             # Configurar columnas con anchos similares al TreeView principal
-            self.tree.column("#0", width=35, anchor=tk.CENTER, minwidth=30, stretch=False)  # Reducido de 40
-            self.tree.column("Criterio", width=100, anchor=tk.W, minwidth=80, stretch=False)  # Reducido de 120 a 100
-            self.tree.column("Metodo", width=30, anchor=tk.CENTER, minwidth=25, stretch=False)  # Reducido de 35
-            self.tree.column("Resultados", width=50, anchor=tk.CENTER, minwidth=45, stretch=False)  # Reducido de 70
-            self.tree.column("Tiempo", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 60
-            self.tree.column("Fecha", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)  # Reducido de 80
+            self.tree.column("#0", width=35, anchor=tk.CENTER, minwidth=30, stretch=False)
+            self.tree.column("Criterio", width=100, anchor=tk.W, minwidth=80, stretch=False)
+            self.tree.column("Metodo", width=30, anchor=tk.CENTER, minwidth=25, stretch=False)
+            self.tree.column("Resultados", width=50, anchor=tk.CENTER, minwidth=45, stretch=False)
+            self.tree.column("Tiempo", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)
+            self.tree.column("Fecha", width=55, anchor=tk.CENTER, minwidth=50, stretch=False)
             
             # Definicion de columnas para ColumnManager
             column_definitions = {
@@ -236,19 +227,14 @@ class HistorialManager(BaseTreeManager):
             vsb.configure(command=self.tree.yview)
             hsb.configure(command=self.tree.xview)
             
-            # Configurar tags para filas alternadas (MISMO QUE TreeView principal)
+            # Configurar tags iniciales (ThemeManager los actualizará)
             self.tree.tag_configure('evenrow', background='#ffffff')
             self.tree.tag_configure('oddrow', background='#f8f9fa')
             
-            # Tags para métodos (MISMOS COLORES que TreeView principal)
-            self.tree.tag_configure('cache_method', 
-                                  foreground='#1b5e20', 
-                                  background='#e8f5e8',
-                                  font=('Segoe UI', 10, 'bold'))
-            self.tree.tag_configure('tradicional_method', 
-                                  foreground='#0d47a1', 
-                                  background='#e3f2fd',
-                                  font=('Segoe UI', 10, 'bold'))
+            # Aplicar tema actual si es posible
+            if hasattr(self.app, 'theme_manager'):
+                self.app.theme_manager._actualizar_treeviews()
+            
             self.actualizar_vista()
             
         except Exception as e:
@@ -525,6 +511,7 @@ class HistorialManager(BaseTreeManager):
             metodos = {}
             for entrada in self.historial_data:
                 metodo = entrada.get('metodo', 'Desconocido')
+            
                 metodos[metodo] = metodos.get(metodo, 0) + 1
             
             return {

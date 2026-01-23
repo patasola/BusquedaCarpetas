@@ -265,6 +265,60 @@ class ThemeManager:
                             pass
                 except Exception as e:
                     print(f"[ThemeManager] Error aplicando tema al menú: {e}")
+                except Exception as e:
+                    print(f"[ThemeManager] Error aplicando tema al menú: {e}")
+            
+            # Intento de aplicar tema a botones específicos del historial
+            if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
+                hm = self.app.historial_manager
+                
+                # Botón Cerrar
+                if hasattr(hm, 'close_btn') and hm.close_btn:
+                    try:
+                        hm.close_btn.configure(
+                            bg=self.colores["bg"], # Usar bg principal para integrarse
+                            fg=self.colores["fg"],
+                            activebackground=self.colores["button_active_bg"],
+                            activeforeground=self.colores["button_active_fg"]
+                        )
+                    except: pass
+                
+                # Título
+                if hasattr(hm, 'title_frame') and hm.title_frame:
+                    try:
+                        hm.title_frame.configure(bg=self.colores["bg"])
+                    except: pass
+                if hasattr(hm, 'title_label') and hm.title_label:
+                    try:
+                        hm.title_label.configure(bg=self.colores["bg"], fg=self.colores["fg"])
+                    except: pass
+                
+                # Botón Limpiar (Rojo/Error)
+                if hasattr(hm, 'btn_limpiar') and hm.btn_limpiar:
+                    try:
+                        # En modo oscuro, usar fondo oscuro y texto rojo claro, o botón estándar
+                        # Para consistencia, usaremos colores de error si existen, o botón estándar
+                        error_bg = self.colores.get("error", "#c62828") if self.tema_actual == "claro" else "#5c0000"
+                        error_fg = "#ffffff" if self.tema_actual == "claro" else "#ffcccc"
+                        
+                        hm.btn_limpiar.configure(
+                            bg=self.colores["button_bg"], # Fondo estándar
+                            fg=self.colores["error"] if "error" in self.colores else "#c62828", # Texto rojo
+                            activebackground=self.colores["button_active_bg"],
+                            activeforeground=self.colores["button_active_fg"]
+                        )
+                    except: pass
+                
+                # Botón Exportar (Verde/Success)
+                if hasattr(hm, 'btn_exportar') and hm.btn_exportar:
+                    try:
+                        hm.btn_exportar.configure(
+                            bg=self.colores["button_bg"],
+                            fg=self.colores["success"] if "success" in self.colores else "#2e7d32",
+                            activebackground=self.colores["button_active_bg"],
+                            activeforeground=self.colores["button_active_fg"]
+                        )
+                    except: pass
             
             for child in widget.winfo_children():
                 self._aplicar_tema_recursivo(child)
