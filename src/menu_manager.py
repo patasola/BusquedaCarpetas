@@ -6,15 +6,16 @@ class MenuManager:
     
     def __init__(self, app):
         self.app = app
+        self.menubar = None
     
     def create_menu_bar(self):
         """Crea la barra de menú completa - OPTIMIZADA"""
-        menubar = Menu(self.app.master)
-        self.app.master.config(menu=menubar)
+        self.menubar = Menu(self.app.master)
+        self.app.master.config(menu=self.menubar)
         
-        self._create_archivo_menu(menubar)
-        self._create_ver_menu(menubar)
-        self._create_ayuda_menu(menubar)
+        self._create_archivo_menu(self.menubar)
+        self._create_ver_menu(self.menubar)
+        self._create_ayuda_menu(self.menubar)
     
     def _create_archivo_menu(self, menubar):
         """Crea menú Archivo - Con nomenclatura clara"""

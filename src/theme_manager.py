@@ -78,15 +78,16 @@ class ThemeManager:
             "tree_selected_bg": "#0974bc",
             "tree_selected_fg": "#ffffff",
             "tree_field_bg": "#333333",  # Mismo que tree_bg
-            "tree_heading_bg": "#2d2f32",  # Headers columnas
-            "tree_heading_fg": "#cccccc",  # Texto headers
+            "tree_heading_bg": "#202020",  # Gris muy oscuro (casi negro) para fondo headers
+            "tree_heading_fg": "#e0e0e0",  # Gris claro para texto headers
             "frame_bg": "#1e1e1e",
             "border": "#3e3e42",
             "status_bg": "#007acc",
             "status_fg": "#ffffff",
             # Menú
+            # Menú
             "menu_bg": "#2d2d30",
-            "menu_fg": "#e0e0e0",
+            "menu_fg": "#ffffff", # Texto blanco para contraste
             "menu_active_bg": "#0974bc",
             "menu_active_fg": "#ffffff",
             "menu_active_fg": "#ffffff",
@@ -240,6 +241,30 @@ class ThemeManager:
                     activebackground=self.colores["menu_active_bg"],
                     activeforeground=self.colores["menu_active_fg"]
                 )
+            
+            # Intento de aplicar tema a la barra de menú principal si existe
+            if hasattr(self.app, 'menu_manager') and hasattr(self.app.menu_manager, 'menubar'):
+                try:
+                    menubar = self.app.menu_manager.menubar
+                    menubar.configure(
+                        bg=self.colores["menu_bg"],
+                        fg=self.colores["menu_fg"],
+                        activebackground=self.colores["menu_active_bg"],
+                        activeforeground=self.colores["menu_active_fg"]
+                    )
+                    # Aplicar a los menús hijos (cascadas)
+                    for child in menubar.winfo_children():
+                        try:
+                            child.configure(
+                                bg=self.colores["menu_bg"],
+                                fg=self.colores["menu_fg"],
+                                activebackground=self.colores["menu_active_bg"],
+                                activeforeground=self.colores["menu_active_fg"]
+                            )
+                        except:
+                            pass
+                except Exception as e:
+                    print(f"[ThemeManager] Error aplicando tema al menú: {e}")
             
             for child in widget.winfo_children():
                 self._aplicar_tema_recursivo(child)

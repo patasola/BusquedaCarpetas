@@ -188,25 +188,8 @@ class ExplorerUI:
                          style="Custom.Treeview", selectmode="extended",
                          yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         
-        # Asegurar que use exactamente el mismo estilo
-        style = ttk.Style()
-        style.configure('Custom.Treeview',
-                       rowheight=28,
-                       background="#ffffff",
-                       fieldbackground="#ffffff",
-                       foreground="#2c3e50",
-                       selectbackground="#e3f2fd",
-                       selectforeground="#0d47a1",
-                       borderwidth=1,
-                       relief="solid",
-                       font=('Segoe UI', 10))
-        
-        style.configure('Custom.Treeview.Heading',
-                       font=('Segoe UI', 10, 'bold'),
-                       background="#f8f9fa",
-                       foreground="#2c3e50",
-                       relief="flat",
-                       borderwidth=1)
+        # El estilo 'Custom.Treeview' ya es configurado globalmente por ThemeManager
+        # No lo redefinimos aquí para permitir que el cambio de tema funcione correctamente
         
         # Tags IDÉNTICOS al TreeView principal
         self.tree.tag_configure('evenrow', background='#ffffff')
