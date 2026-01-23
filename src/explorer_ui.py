@@ -47,11 +47,22 @@ class ExplorerUI:
         self.grip_frame.pack(side='left', fill='y')
         self.grip_frame.pack_propagate(False)
         
-        # Eventos del grip
+        # Eventos del grip con colores dinámicos
         self.grip_frame.bind('<Button-1>', self.explorer_manager.start_resize)
         self.grip_frame.bind('<B1-Motion>', self.explorer_manager.do_resize)
-        self.grip_frame.bind('<Enter>', lambda e: self.grip_frame.config(bg='#b0b0b0'))
-        self.grip_frame.bind('<Leave>', lambda e: self.grip_frame.config(bg='#d0d0d0'))
+        
+        def on_grip_enter(e):
+            if hasattr(self.explorer_manager.app, 'theme_manager'):
+                bg = self.explorer_manager.app.theme_manager.get_color("grip_hover")
+                self.grip_frame.config(bg=bg)
+        
+        def on_grip_leave(e):
+            if hasattr(self.explorer_manager.app, 'theme_manager'):
+                bg = self.explorer_manager.app.theme_manager.get_color("grip_bg")
+                self.grip_frame.config(bg=bg)
+                
+        self.grip_frame.bind('<Enter>', on_grip_enter)
+        self.grip_frame.bind('<Leave>', on_grip_leave)
     
     def _create_title(self):
         """Crea la barra de título"""

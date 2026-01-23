@@ -105,11 +105,22 @@ class HistorialManager(BaseTreeManager):
             self.grip_frame.pack(side='left', fill='y')
             self.grip_frame.pack_propagate(False)
             
-            # Eventos para el grip
+            # Eventos para el grip con colores dinámicos
             self.grip_frame.bind('<Button-1>', self.start_resize)
             self.grip_frame.bind('<B1-Motion>', self.do_resize)
-            self.grip_frame.bind('<Enter>', lambda e: self.grip_frame.config(bg='#b0b0b0'))
-            self.grip_frame.bind('<Leave>', lambda e: self.grip_frame.config(bg='#d0d0d0'))
+            
+            def on_grip_enter(e):
+                if hasattr(self.app, 'theme_manager'):
+                    bg = self.app.theme_manager.get_color("grip_hover")
+                    self.grip_frame.config(bg=bg)
+            
+            def on_grip_leave(e):
+                if hasattr(self.app, 'theme_manager'):
+                    bg = self.app.theme_manager.get_color("grip_bg")
+                    self.grip_frame.config(bg=bg)
+            
+            self.grip_frame.bind('<Enter>', on_grip_enter)
+            self.grip_frame.bind('<Leave>', on_grip_leave)
             
             # Frame de contenido
             self.content_frame = tk.Frame(self.frame)

@@ -59,8 +59,12 @@ class ThemeManager:
             "tag_cache_bg": "#e8f5e8", "tag_cache_fg": "#1b5e20",
             "tag_traditional_bg": "#e3f2fd", "tag_traditional_fg": "#0d47a1",
             "tag_tree_bg": "#fff3e0", "tag_tree_fg": "#e65100",
+            "tag_tree_bg": "#fff3e0", "tag_tree_fg": "#e65100",
             "tag_unknown_bg": "#f5f5f5", "tag_unknown_fg": "#424242",
-        },
+            
+            # Grip (Separador)
+            "grip_bg": "#f5f5f5",         # Invisible (igual al fondo)
+            "grip_hover": "#d0d0d0",      # Visible al hover
         "oscuro": {
             "bg": "#1e1e1e",
             "fg": "#d4d4d4",
@@ -96,7 +100,12 @@ class ThemeManager:
             "tag_cache_bg": "#0d2b10", "tag_cache_fg": "#81c784",  # Verde oscuro/claro
             "tag_traditional_bg": "#0d1b2a", "tag_traditional_fg": "#64b5f6",  # Azul oscuro/claro
             "tag_tree_bg": "#331e0d", "tag_tree_fg": "#ffb74d",  # Naranja oscuro/claro
+            "tag_tree_bg": "#331e0d", "tag_tree_fg": "#ffb74d",  # Naranja oscuro/claro
             "tag_unknown_bg": "#2d2d30", "tag_unknown_fg": "#9e9e9e",  # Gris oscuro/claro
+            
+            # Grip (Separador)
+            "grip_bg": "#1e1e1e",         # Invisible (igual al fondo)
+            "grip_hover": "#3e3e42",      # Visible al hover
         }
     }
     
