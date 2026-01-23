@@ -7,11 +7,13 @@ class MenuManager:
     def __init__(self, app):
         self.app = app
         self.menubar = None
+        self.menu_visible = False  # Estado inicial: oculto
     
     def create_menu_bar(self):
         """Crea la barra de menú completa - OPTIMIZADA"""
         self.menubar = Menu(self.app.master)
-        self.app.master.config(menu=self.menubar)
+        # NO configurar menu al inicio para que arranque oculto
+        # self.app.master.config(menu=self.menubar)
         
         self._create_archivo_menu(self.menubar)
         self._create_ver_menu(self.menubar)
@@ -339,3 +341,24 @@ class MenuManager:
         self.app.mostrar_explorador.set(False)
         self.app.mostrar_barra_cache.set(True)
         self.app.mostrar_barra_estado.set(True)
+
+    def toggle_menu_visibility(self, event=None):
+        """Alterna la visibilidad de la barra de menú"""
+        if self.menu_visible:
+            self.hide_menu()
+        else:
+            self.show_menu()
+        return "break"
+
+    def show_menu(self, event=None):
+        """Muestra la barra de menú"""
+        if not self.menubar:
+            return
+        self.app.master.config(menu=self.menubar)
+        self.menu_visible = True
+
+    def hide_menu(self, event=None):
+        """Oculta la barra de menú"""
+        # Para ocultar, pasamos un menú vacío o None (en Tkinter config(menu='') funciona)
+        self.app.master.config(menu='')
+        self.menu_visible = False

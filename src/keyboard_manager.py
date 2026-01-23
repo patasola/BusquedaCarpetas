@@ -45,6 +45,10 @@ class KeyboardManager:
 
         # F12: Toggle tema
         self.app.master.bind('<F12>', lambda e: self._toggle_tema())
+        
+        # Alt: Toggle menú (Auto-hide)
+        self.app.master.bind('<Alt_L>', lambda e: self._toggle_menu())
+        self.app.master.bind('<Alt_R>', lambda e: self._toggle_menu())
 
         print("[DEBUG] Atajos de paneles configurados:")
         print("  - Ctrl+Shift+H: Historial")
@@ -216,7 +220,9 @@ class KeyboardManager:
                             widget.selection_set(children[0])
                             widget.focus(children[0])
                             
-                print(f"[DEBUG] Foco establecido en: {widget.winfo_class()}")
+                from datetime import datetime as _datetime
+                current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{current_time}] [DEBUG] Foco establecido en: {widget.winfo_class()}")
         except Exception as e:
             print(f"[DEBUG] Error enfocando widget: {e}")
         
@@ -304,4 +310,12 @@ class KeyboardManager:
         """Toggle entre modo claro y oscuro"""
         if hasattr(self.app, 'theme_manager'):
             self.app.theme_manager.toggle_tema()
+            return "break"
+            self.app.theme_manager.toggle_tema()
+            return "break"
+
+    def _toggle_menu(self):
+        """Toggle visibilidad del menú"""
+        if hasattr(self.app, 'menu_manager'):
+            self.app.menu_manager.toggle_menu_visibility()
             return "break"
