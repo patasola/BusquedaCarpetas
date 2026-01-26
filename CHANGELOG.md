@@ -1,5 +1,12 @@
 # Changelog - BusquedaCarpetas V4.5
 
+## [4.5.2] - 2026-01-23
+
+### 🔧 Correcciones y Estética
+- **FIXED:** `AttributeError: 'CacheManager' object has no attribute 'get_cache_stats'` en el gestor de caché.
+- **UI:** Optimizado icono de papelera (🗑) para centrado perfecto.
+- **CLEANUP:** Eliminados archivos temporales y scripts de prueba del directorio raíz.
+
 ## [4.5.1] - 2026-01-22
 
 ### 🚀 Optimizaciones de Performance Críticas
