@@ -164,5 +164,15 @@ class CacheManager:
         
         return resultados
 
+    def get_cache_stats(self):
+        """Retorna estadísticas del cache"""
+        return {
+            'carpetas': self.cache.directorios.get('total', 0), # Para locations_config_modal.py
+            'total': self.cache.directorios.get('total', 0),    # Alias común
+            'timestamp': self.cache.timestamp,
+            'valido': self.cache.valido,
+            'ruta_base': self.cache.ruta_base
+        }
+
     def necesita_construccion(self):
         return not self.cache.valido or len(self.cache.directorios.get('directorios', [])) == 0
