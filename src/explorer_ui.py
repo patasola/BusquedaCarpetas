@@ -14,12 +14,13 @@ class ExplorerUI:
         self.tree = None
         self.path_label = None
     
-    def create(self, panel_width=300):
+    def create(self, panel_width=300, col_widths=None):
         """Crea la interfaz del explorador con ancho específico"""
         try:
             # Frame principal con grip - USAR ANCHO CALCULADO
             # SIN BORDE para evitar marco blanco
             self.frame = tk.Frame(self.parent_frame, width=panel_width, relief=tk.FLAT, borderwidth=0)
+            self.frame.grid_propagate(False) # Grid en lugar de pack
             self.frame.pack_propagate(False)
             
             # Grip de redimensionamiento
@@ -33,7 +34,7 @@ class ExplorerUI:
             self._create_title()
             self._create_navigation_bar()
             self._create_path_display()
-            self._create_treeview()
+            self._create_treeview(col_widths=col_widths)
             self._create_shortcuts_bar()
             
             return True
@@ -182,7 +183,7 @@ class ExplorerUI:
                                   bg='#f5f5f5', relief='sunken', bd=1, padx=5, pady=2)
         self.path_label.pack(fill='x')
     
-    def _create_treeview(self):
+    def _create_treeview(self, col_widths=None):
         """Crea el TreeView con columnas OPTIMIZADAS"""
         tree_frame = tk.Frame(self.content_frame)
         # SIN PADDING para evitar espacios blancos
@@ -201,16 +202,16 @@ class ExplorerUI:
                          style="Custom.Treeview", selectmode="extended",
                          yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         
-        # El estilo 'Custom.Treeview' ya es configurado globalmente por ThemeManager
-        # No lo redefinimos aquí para permitir que el cambio de tema funcione correctamente
-        
         # Tags IDÉNTICOS al TreeView principal
         self.tree.tag_configure('evenrow', background='#ffffff')
         self.tree.tag_configure('oddrow', background='#f8f9fa')
         
-        # Configurar columnas
-        self.tree.column("#0", width=250, minwidth=150, stretch=False)
-        self.tree.column("Fecha", width=120, minwidth=100, stretch=False)
+        # Configurar columnas con anchos guardados
+        w0 = col_widths.get("#0", 250) if col_widths else 250
+        wf = col_widths.get("Fecha", 120) if col_widths else 120
+        
+        self.tree.column("#0", width=w0, minwidth=150, stretch=False)
+        self.tree.column("Fecha", width=wf, minwidth=100, stretch=False)
         
         self.tree.heading("#0", text="Nombre", anchor=tk.W)
         self.tree.heading("Fecha", text="Fecha Modificación", anchor=tk.W)

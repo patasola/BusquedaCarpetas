@@ -9,10 +9,31 @@ class ConfigManager:
         self.config_file = "config.json"
         self.default_config = {
             "ruta_carpeta": os.path.expanduser("~"),
-            "version": "4.2"
+            "version": "4.5",
+            # UI Settings
+            "theme": "claro",
+            "window_geometry": "990x700+100+100",
+            "show_history": False,
+            "show_explorer": False,
+            "manual_app_width": None,
+            "explorer_width": 350,
+            "history_width": 300,
+            # Column Widths
+            "main_column_widths": {"#0": 200, "Método": 35, "Ruta": 300},
+            "explorer_column_widths": {"#0": 250, "Fecha": 120},
+            "history_column_widths": {"Criterio": 120, "Metodo": 40, "Resultados": 60, "Tiempo": 60, "Fecha": 60}
         }
         self.config = self._load_config()
     
+    def get(self, key, default=None):
+        """Obtiene un valor de configuración"""
+        return self.config.get(key, default if default is not None else self.default_config.get(key))
+
+    def set(self, key, value):
+        """Establece un valor de configuración"""
+        self.config[key] = value
+        self._save_config()
+
     def _load_config(self):
         """Carga configuración con fallback a defaults"""
         try:

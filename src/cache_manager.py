@@ -117,6 +117,7 @@ class CacheManager:
                                     ruta_relativa = os.path.relpath(entry.path, self.ruta_base)
                                     carpetas.append({
                                         'nombre': entry.name,
+                                        'nombre_lower': entry.name.lower(), # Pre-calculado
                                         'ruta_relativa': ruta_relativa,
                                         'ruta_absoluta': entry.path
                                     })
@@ -156,13 +157,14 @@ class CacheManager:
         carpetas = self.cache.directorios.get('directorios', [])
         
         for carpeta in carpetas:
-            if criterio_lower in carpeta['nombre'].lower():
+            # Usar nombre pre-calculado para velocidad instantánea
+            if criterio_lower in carpeta.get('nombre_lower', carpeta['nombre'].lower()):
                 resultados.append((
                     carpeta['nombre'],
                     carpeta['ruta_relativa'], 
                     carpeta['ruta_absoluta']
                 ))
-                if len(resultados) >= 1000: # Límite aumentado
+                if len(resultados) >= 1000:
                     break
         
         return resultados

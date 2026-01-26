@@ -35,17 +35,23 @@ class TreeColumnConfig:
         }
     }
     
-    def __init__(self, tree, config_id):
+    def __init__(self, tree, config_id, app=None):
         """
         Args:
             tree: TreeView instance existente (puede ser None si aún no existe)
             config_id: ID único para persistencia ('results' o 'historial')
+            app: Instancia de la app principal para acceder a la configuración global
         """
         self.tree = tree
+        self.app = app
         # Track de anchos originales para toggle
         self._original_widths = {}
         self.config_id = config_id
-        self.config_file = "tree_column_config.json"
+        # Mapear IDs de TreeColumnConfig a claves de ConfigManager
+        self.config_keys = {
+            "results": "main_column_widths",
+            "historial": "history_column_widths"
+        }
         
         # Obtener definiciones de columnas para este TreeView
         self.column_defs = self.COLUMN_DEFINITIONS.get(config_id, {})
@@ -68,6 +74,17 @@ class TreeColumnConfig:
             self._initialize_columns()
             self.load_config()
             self.bind_context_menu()
+            
+    def _get_saved_widths(self):
+        """Obtiene anchos guardados desde la configuración global"""
+        if self.app and hasattr(self.app, 'config'):
+            key = self.config_keys.get(self.config_id)
+            if key:
+                config = self.app.config.get(key, {})
+                # Puede ser un dict con 'widths': {...} o un dict directo de anchos
+                if isinstance(config, dict):
+                    return config.get('widths', config)
+        return {}
     
     def _initialize_columns(self):
         """Inicializa todas las columnas definidas en el TreeView"""
@@ -90,6 +107,9 @@ class TreeColumnConfig:
         # Configurar TODAS las columnas en el tree (para que existan)
         self.tree.configure(columns=tuple(all_columns_ordered))
         
+        # Obtener anchos guardados para no sobreescribirlos con defaults
+        saved_widths = self._get_saved_widths()
+        
         # Configurar headings y propiedades de TODAS las columnas
         for col_id in all_columns_ordered:
             col_def = self.column_defs.get(col_id, {
@@ -99,13 +119,16 @@ class TreeColumnConfig:
                 "default_visible": True
             })
             
-            self.tree.heading(col_id, text=col_def.get("title", col_id), anchor=col_def.get("anchor", "w"))
+            # PRIORIDAD: 1. Guardado, 2. ColDef, 3. Hardcoded default
+            w = saved_widths.get(col_id, col_def.get("width", 100))
+            
+            self.tree.heading(col_id, text=col_def.get("title", col_id), anchor=col_def.get("anchor", "center" if col_id == "Método" else "w"))
             self.tree.column(
                 col_id,
-                width=col_def.get("width", 100),
+                width=w,
                 anchor=col_def.get("anchor", "w"),
                 minwidth=col_def.get("minwidth", 50),
-                stretch=col_def.get("stretch", False)
+                stretch=True if col_id == "Ruta" else False
             )
         
         # Guardar todas las columnas disponibles
@@ -140,10 +163,10 @@ class TreeColumnConfig:
         try:
             region = self.tree.identify_region(event.x, event.y)
             if region == "heading":
-                column = self.tree.identify_column(event.x)
+                source_col_id = self.tree.identify_column(event.x)
                 self._drag_data["dragging"] = True
-                self._drag_data["column"] = column
-                self._drag_data["start_x"] = event.x
+                self._drag_data["source_col"] = source_col_id
+                self._drag_data["target_idx"] = None
                 self.tree.config(cursor="hand2")
                 
                 # Crear línea guía visual
@@ -154,42 +177,86 @@ class TreeColumnConfig:
     def _create_drop_indicator(self):
         """Crea línea vertical guía para drag & drop"""
         try:
+            # Determinar color según tema
+            line_color = "#3498db"  # Azul base
+            if self.app and hasattr(self.app, 'theme_manager'):
+                if self.app.theme_manager.tema_actual == "oscuro":
+                    line_color = "#00d2ff"  # Cian vibrante para oscuro
+                else:
+                    line_color = "#2980b9"  # Azul fuerte para claro
+
             # Frame delgado para línea vertical
+            # USAR EL TREE DIRECTAMENTE como parent para que place sea relativo a él
             self._drop_line = tk.Frame(
-                self.tree.master,
-                bg="#007ACC",  # Azul
+                self.tree,
+                bg=line_color,
                 width=3,
                 height=self.tree.winfo_height()
             )
             # Inicialmente oculto
             self._drop_line.place_forget()
-        except:
+        except Exception as e:
+            print(f"[TreeColumnConfig] Error creando indicador: {e}")
             self._drop_line = None
     
     def _on_drag_motion(self, event):
-        """Maneja movimiento durante drag"""
-        if self._drag_data["dragging"]:
-            # Visual feedback: cambiar cursor
-            self.tree.config(cursor="exchange")
+        """Maneja el dibujo de la guía visual basado en límites calculados por anclaje visual"""
+        if not self._drag_data["dragging"]: return
+        self.tree.config(cursor="exchange")
+        
+        try:
+            # 1. Obtener orden visual actualizado
+            is_tree = ("tree" in self.tree.cget("show"))
+            display_cols = list(self.tree["displaycolumns"])
+            if display_cols == ["#all"]:
+                display_cols = list(self.tree["columns"])
+            all_visible = (["#0"] + display_cols) if is_tree else display_cols
             
-            # Actualizar posición de línea guía
-            try:
-                region = self.tree.identify_region(event.x, event.y)
-                if region == "heading":
-                    target_col = self.tree.identify_column(event.x)
-                    if target_col:
-                        # Obtener bbox de la columna target
-                        bbox = self.tree.bbox(self.tree.get_children()[0] if self.tree.get_children() else "", target_col)
-                        if bbox and self._drop_line:
-                            # Posicionar línea al inicio de la columna target
-                            x_pos = bbox[0]
-                            self._drop_line.place(
-                                x=x_pos,
-                                y=0,
-                                height=self.tree.winfo_height()
-                            )
-            except:
-                pass
+            # 2. ANCLAJE VISUAL: Encontrar la primera columna visible para anclar coordenadas
+            # Insertar item temporal para medición (invisible para el usuario)
+            dummy = self.tree.insert("", "end")
+            first_vis_idx = -1
+            first_vis_x = 0
+            
+            for i, col in enumerate(all_visible):
+                bbox = self.tree.bbox(dummy, col)
+                if bbox:
+                    first_vis_idx = i
+                    first_vis_x = bbox[0]
+                    break
+            
+            # Limpiar dummy
+            self.tree.delete(dummy)
+            
+            if first_vis_idx == -1: return # Nada visible
+            
+            # 3. Calcular TODOS los bordes (boundaries) relativos al anclaje
+            boundaries = []
+            curr_x = first_vis_x
+            
+            # Ir hacia atrás desde el anclaje para encontrar el inicio absoluto (pueda ser negativo)
+            for i in range(first_vis_idx - 1, -1, -1):
+                curr_x -= self.tree.column(all_visible[i], "width")
+            
+            boundaries.append(curr_x) # Lado izquierdo de la Col 0
+            for col in all_visible:
+                curr_x += self.tree.column(col, "width")
+                boundaries.append(curr_x) # Lado derecho de cada columna
+                
+            # 4. Encontrar el hueco (gap) más cercano al ratón
+            # En un Tree, el primer gap (índice 0, antes de #0) está prohibido
+            valid_boundaries = boundaries[1:] if is_tree else boundaries
+            closest_x = min(valid_boundaries, key=lambda b: abs(b - event.x))
+            
+            # Guardamos el índice real del borde en la lista 'boundaries'
+            self._drag_data["target_idx"] = boundaries.index(closest_x)
+            
+            # 5. Dibujar guía
+            if self._drop_line:
+                self._drop_line.place(x=closest_x, y=0, height=self.tree.winfo_height())
+                    
+        except Exception as e:
+            print(f"[TreeColumnConfig] Error crítico en motion: {e}")
     
     def _on_drag_release(self, event):
         """Maneja soltar columna para reordenar"""
@@ -197,53 +264,60 @@ class TreeColumnConfig:
             if not self._drag_data["dragging"]:
                 return
             
-            region = self.tree.identify_region(event.x, event.y)
+            source_col = self._drag_data.get("source_col")
+            target_idx = self._drag_data.get("target_idx")
             
-            if region == "heading":
-                source_col = self._drag_data["column"]
-                target_col = self.tree.identify_column(event.x)
-                
-                if source_col and target_col and source_col != target_col:
-                    self._reorder_columns(source_col, target_col)
+            if source_col and target_idx is not None:
+                # La columna #0 (Carpeta) no se puede mover por limitaciones de Tkinter
+                if source_col == "#0":
+                    print("[TreeColumnConfig] La columna principal '#0' no puede ser movida.")
+                else:
+                    self._reorder_columns_by_index(source_col, target_idx)
             
         finally:
             # Reset drag state
             self._drag_data["dragging"] = False
-            self._drag_data["column"] = None
             self.tree.config(cursor="")
             
-            # Destruir línea guía
             if hasattr(self, '_drop_line') and self._drop_line:
                 try:
                     self._drop_line.destroy()
                     self._drop_line = None
-                except:
-                    pass
-    
-    def _reorder_columns(self, source_col, target_col):
-        """Reordena columnas moviendo source_col a posición de target_col"""
+                except: pass
+
+    def _reorder_columns_by_index(self, source_col_id, target_pos_idx):
+        """Reordena usando el ID lógico de la fuente y el índice del 'hueco' de destino final"""
         try:
-            # Convertir #N a índice
-            source_idx = int(source_col.replace("#", "")) - 1
-            target_idx = int(target_col.replace("#", "")) - 1
+            display_cols = list(self.tree["displaycolumns"])
+            if display_cols == ["#all"]:
+                display_cols = list(self.tree["columns"])
             
-            # Obtener displaycolumns actual
-            current_display = list(self.tree["displaycolumns"])
-            if current_display == ['#all']:
-                current_display = list(self.tree["columns"])
+            # Identificar nombre real de la columna arrastrada
+            col_name = str(self.tree.column(source_col_id, "id"))
             
-            # Reordenar
-            if 0 <= source_idx < len(current_display) and 0 <= target_idx < len(current_display):
-                col_to_move = current_display[source_idx]
-                current_display.pop(source_idx)
-                current_display.insert(target_idx, col_to_move)
+            if col_name in display_cols:
+                # Quitar de su sitio
+                display_cols.remove(col_name)
                 
-                # Aplicar nuevo orden
-                self.tree.configure(displaycolumns=tuple(current_display))
+                # Calcular nueva posición:
+                # target_pos_idx es el índice del borde en [ #0, C1, C2... ]
+                # Gap 1 (después de #0) -> Índice 0 en display_cols
+                # Gap 2 (después de C1) -> Índice 1 en display_cols
+                is_tree = ("tree" in self.tree.cget("show"))
+                adj_idx = target_pos_idx - (1 if is_tree else 0)
+                
+                # Ajuste de seguridad: no permitir insertar antes de #0 si es un tree
+                adj_idx = max(0, min(adj_idx, len(display_cols)))
+                
+                # Insertar
+                display_cols.insert(adj_idx, col_name)
+                
+                # Aplicar
+                self.tree.configure(displaycolumns=tuple(display_cols))
                 self.save_config()
-                print(f"[TreeColumnConfig] Columna '{col_to_move}' reordenada: posición {source_idx} → {target_idx}")
+                print(f"[TreeColumnConfig] Reordenado: '{col_name}' al hueco visual {target_pos_idx}")
         except Exception as e:
-            print(f"[TreeColumnConfig] Error reordenando columnas: {e}")
+            print(f"[TreeColumnConfig] Error final en reordenamiento: {e}")
     
     def _on_right_click(self, event):
         """Maneja clic derecho - muestra menú si es en cabecera"""
@@ -340,27 +414,35 @@ class TreeColumnConfig:
             print(f"[TreeColumnConfig] Error en toggle: {e}")
     
     def load_config(self):
-        """Carga configuración guardada"""
+        """Carga configuración guardada desde el config central"""
         try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    all_configs = json.load(f)
+            if self.app and hasattr(self.app, 'config'):
+                key = self.config_keys.get(self.config_id)
+                if not key: return
                 
-                config = all_configs.get(self.config_id, {})
-                visible_columns = config.get('visible_columns', None)
+                config = self.app.config.get(key, {})
+                visible_columns = config.get('visible_columns')
                 
                 if visible_columns:
                     # Filtrar solo columnas que existen
                     valid_columns = [c for c in visible_columns if c in self.all_columns]
                     if valid_columns:
                         self.tree.configure(displaycolumns=tuple(valid_columns))
-                        return
+                        
+                # Aplicar anchos si están en el config (aunque ya se hace en _initialize_columns)
+                # Esto es útil si load_config se llama después
+                widths = config.get('widths', {})
+                for col_id, w in widths.items():
+                    try:
+                        self.tree.column(col_id, width=w)
+                    except: pass
+                return
             
-            # Si no hay config guardada, usar defaults
+            # Fallback a defaults si no hay app/config
             self._apply_defaults()
             
         except Exception as e:
-            print(f"[TreeColumnConfig] Error cargando config: {e}")
+            print(f"[TreeColumnConfig] Error cargando config central: {e}")
             self._apply_defaults()
     
     def _apply_defaults(self):
@@ -384,32 +466,37 @@ class TreeColumnConfig:
             print(f"[TreeColumnConfig] Error aplicando defaults: {e}")
     
     def save_config(self):
-        """Guarda configuración actual"""
+        """Guarda configuración actual en el config central"""
         try:
-            # Leer configuraciones existentes
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    all_configs = json.load(f)
-            else:
-                all_configs = {}
-            
+            if not self.app or not hasattr(self.app, 'config'):
+                return
+                
             # Obtener displaycolumns actual
             current_display = list(self.tree["displaycolumns"])
             if current_display == ['#all']:
                 current_display = list(self.tree["columns"])
             
-            # Actualizar configuración de este TreeView
-            all_configs[self.config_id] = {
+            # Obtener anchos actuales
+            cols = ["#0"] + list(self.tree["columns"])
+            widths = {str(col): self.tree.column(col, 'width') for col in cols}
+            
+            # Preparar datos de configuración
+            config_data = {
                 'visible_columns': current_display,
-                'all_columns': self.all_columns
+                'all_columns': self.all_columns,
+                'widths': widths
             }
             
-            # Guardar
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(all_configs, f, indent=2, ensure_ascii=False)
+            # Guardar en el config manager
+            key = self.config_keys.get(self.config_id)
+            if key:
+                self.app.config.set(key, config_data)
+                # Ojo: ConfigManager.set ya llama a _save_config()
+                
+            print(f"[TreeColumnConfig] Configuración guardada para {self.config_id}")
                 
         except Exception as e:
-            print(f"[TreeColumnConfig] Error guardando config: {e}")
+            print(f"[TreeColumnConfig] Error guardando config central: {e}")
     
     def _reconfigure_all_headings(self):
         """Re-configura todos los headings (útil después de tree.configure)"""

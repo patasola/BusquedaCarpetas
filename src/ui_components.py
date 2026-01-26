@@ -60,7 +60,7 @@ class UIComponents:
                  background=[('selected', Colors.TREE_SELECT_BG)],
                  foreground=[('selected', Colors.TREE_SELECT_FG)])
 
-    def crear_interfaz_completa(self):
+    def crear_interfaz_completa(self, col_widths=None):
         # Frame principal
         main_frame = tk.Frame(self.master, bg=Colors.BACKGROUND)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
@@ -166,9 +166,21 @@ class UIComponents:
         tree.heading("Método", text="M", anchor=tk.CENTER)
         tree.heading("Ruta", text="Ruta Relativa", anchor=tk.W)
         
-        tree.column("#0", width=200, anchor=tk.W, minwidth=120, stretch=False)
-        tree.column("Método", width=35, anchor=tk.CENTER, minwidth=30, stretch=False)
-        tree.column("Ruta", width=300, anchor=tk.W, minwidth=150, stretch=True)
+        # Aplicar anchos (guardados o defaults) de forma robusta
+        cw = col_widths if col_widths else {}
+        
+        # Diccionario de defaults para asegurar que siempre haya valores válidos
+        defaults = {"#0": 200, "Método": 35, "Ruta": 300}
+        
+        # Aplicar a cada columna
+        for col in ["#0", "Método", "Ruta"]:
+            # Intentar obtener de guardados, si no de defaults
+            w = cw.get(col, defaults.get(col, 200))
+            anchor = tk.W if col != "Método" else tk.CENTER
+            stretch = True if col == "Ruta" else False
+            minw = 120 if col == "#0" else (30 if col == "Método" else 150)
+            
+            tree.column(col, width=w, anchor=anchor, minwidth=minw, stretch=stretch)
         
         # AGREGAR TOOLTIP AL TREEVIEW
         self.tooltip = TreeViewTooltip(tree)

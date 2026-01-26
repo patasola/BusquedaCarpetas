@@ -48,14 +48,25 @@ class HistorialManager(BaseTreeManager):
     def show(self):
         """Muestra el panel de historial con posicionamiento dual"""
         if not self.frame:
-            self.create_historial()
+            saved_width = self.app.config.get("history_width")
+            col_widths = self.app.config.get("history_column_widths")
+            self.create_historial(saved_width=saved_width, col_widths=col_widths)
         
         if self.frame:
             # Obtener columna asignada del sistema de paneles duales
             self.assigned_column = self.app.assign_panel_position('historial')
             
+            # Cargar ancho guardado
+            saved_width = self.app.config.get("history_width", 350)
+            if saved_width <= 50: saved_width = 350 # Sanitizar
+            
+            # CONFIGURACIÓN CRÍTICA: Forzar ancho en el grid
+            if hasattr(self.app, 'app_frame'):
+                self.app.app_frame.grid_columnconfigure(self.assigned_column, minsize=saved_width, weight=0)
+            
             # Mostrar en la columna asignada
-            self.frame.grid(row=0, column=self.assigned_column, sticky='ns', padx=(0, 0))
+            self.frame.grid(row=0, column=self.assigned_column, sticky='nsew', padx=(0, 0))
+            self.frame.config(width=saved_width)
             self.visible = True
             
             # Actualizar la variable del menú
@@ -86,13 +97,22 @@ class HistorialManager(BaseTreeManager):
             # Actualizar la variable del menú
             if hasattr(self.app, 'mostrar_historial'):
                 self.app.mostrar_historial.set(False)
+
+    def get_current_width(self):
+        """Obtiene el ancho actual del frame del historial"""
+        try:
+            if self.frame:
+                return self.frame.winfo_width()
+        except:
+            pass
+        return None
     
-    def create_historial(self):
+    def create_historial(self, saved_width=None, col_widths=None):
         """Crea el widget del historial con estilo consistente - ANCHO 8CM"""
         try:
             # Calcular ancho del panel (8cm)
-            panel_width = 300  # Fallback
-            if hasattr(self.app, 'window_manager') and hasattr(self.app.window_manager, 'get_panel_width'):
+            panel_width = saved_width if saved_width and saved_width > 50 else 350
+            if (not saved_width or saved_width <= 50) and hasattr(self.app, 'window_manager') and hasattr(self.app.window_manager, 'get_panel_width'):
                 panel_width = self.app.window_manager.get_panel_width()
             
             print(f"[DEBUG] Historial usando ancho: {panel_width}px (8cm)")
@@ -231,12 +251,13 @@ class HistorialManager(BaseTreeManager):
             self.tree.heading("Tiempo", text="Tiempo", anchor=tk.CENTER)
             self.tree.heading("Fecha", text="Hora", anchor=tk.CENTER)
             
-            # Configurar columnas MANUALMENTE
-            self.tree.column("Criterio", width=120, anchor=tk.W, minwidth=80)
-            self.tree.column("Metodo", width=40, anchor=tk.CENTER, minwidth=25)
-            self.tree.column("Resultados", width=60, anchor=tk.CENTER, minwidth=45)
-            self.tree.column("Tiempo", width=60, anchor=tk.CENTER, minwidth=50)
-            self.tree.column("Fecha", width=60, anchor=tk.CENTER, minwidth=50)
+            # Configurar columnas con anchos guardados o defaults
+            cw = col_widths if col_widths else {}
+            self.tree.column("Criterio", width=cw.get("Criterio", 120), anchor=tk.W, minwidth=80)
+            self.tree.column("Metodo", width=cw.get("Metodo", 40), anchor=tk.CENTER, minwidth=25)
+            self.tree.column("Resultados", width=cw.get("Resultados", 60), anchor=tk.CENTER, minwidth=45)
+            self.tree.column("Tiempo", width=cw.get("Tiempo", 60), anchor=tk.CENTER, minwidth=50)
+            self.tree.column("Fecha", width=cw.get("Fecha", 60), anchor=tk.CENTER, minwidth=50)
             
             # Definicion de columnas para ColumnManager (Lo mantenemos pero no lo aplicamos aun)
             column_definitions = {

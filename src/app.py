@@ -95,15 +95,18 @@ class BusquedaCarpetaApp:
         self.mostrar_barra_cache = tk.BooleanVar(value=True)
         self.mostrar_barra_estado = tk.BooleanVar(value=True)
         self.modo_numerico = True
+        self._is_initializing = True  # Bloquear redimensionamientos automáticos en el arranque
         
-        # Configuración
+        # 1. Configuración (Necesaria para todo lo demás)
         self.config = ConfigManager()
         self.ruta_carpeta = self.config.cargar_ruta()
         
-        # Managers principales
+        # 2. Window Manager (Necesita self.config y self)
+        self.window_manager = WindowManager(master, self.version, self)
+        
+        # 3. Otros Managers
         self.cache_manager = CacheManager(self.ruta_carpeta)
         self.search_engine = SearchEngine(self.ruta_carpeta)
-        self.window_manager = WindowManager(master, self.version)
         self.multi_location_search = MultiLocationSearch(self)
         self.dual_panel_manager = DualPanelManager(self)
         
@@ -111,6 +114,10 @@ class BusquedaCarpetaApp:
         self.search_methods = SearchMethods(self)
         self.results_display = ResultsDisplay(self)
                 
+        # Cargar tema guardado
+        tema_guardado = self.config.get("theme", "claro")
+        self.theme_manager = ThemeManager(self, tema_inicial=tema_guardado)
+        
         # ODBC Database Manager
         try:
             from .database_manager import DatabaseManager
@@ -118,8 +125,15 @@ class BusquedaCarpetaApp:
         except ImportError:
             self.database_manager = None
         
-        # Configurar ventana
-        self.window_manager.configurar_ventana()
+        # Configurar ventana usando preferencias guardadas
+        self.window_manager.configurar_ventana(
+            saved_geometry=self.config.get("window_geometry"),
+            manual_app_width=self.config.get("manual_app_width")
+        )
+        
+        # Protocolo de cierre para guardar preferencias
+        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
+        
         self.tree_explorer = None
         
         # Inicializar
@@ -129,10 +143,117 @@ class BusquedaCarpetaApp:
         self._start_location_rotation()
         self._cargar_cache_inteligente()
         
+        self.master.after(500, self._restore_panel_visibility_safe)
+        
         print(f"[PROFILE] App iniciada en: {time.time() - start_time:.3f}s")
         
         # Crear barra de atajos global
         self.create_global_shortcuts_bar()
+
+    def _restore_panel_visibility_safe(self):
+        """Restaura la visibilidad de los paneles de forma segura sin disparar resizes"""
+        try:
+            # Leer valores de la configuración
+            restaurar_historial = self.config.get("show_history", False)
+            restaurar_explorador = self.config.get("show_explorer", False)
+            
+            print(f"[DEBUG] Restaurando paneles - Historial: {restaurar_historial}, Explorador: {restaurar_explorador}")
+            
+            # Aplicar visibilidad
+            if restaurar_historial:
+                self.toggle_historial()
+            if restaurar_explorador:
+                self.toggle_explorador()
+            
+            # Finalizar inicialización después de un breve delay para permitir el renderizado
+            self.master.after(500, self._finish_initialization)
+        except Exception as e:
+            print(f"[ERROR] Error restaurando paneles: {e}")
+            self._is_initializing = False
+
+    def _finish_initialization(self):
+        self._is_initializing = False
+        print("[DEBUG] Inicialización completa. Redimensionamiento inteligente habilitado.")
+
+    def _restore_panel_visibility(self):
+        """Método antiguo mantenido por compatibilidad si es necesario"""
+        self._restore_panel_visibility_safe()
+
+    def on_close(self):
+        """Se ejecuta al cerrar la aplicación"""
+        try:
+            self.save_ui_settings()
+        except:
+            pass
+        self.master.destroy()
+
+    def save_ui_settings(self):
+        """Guarda las preferencias actuales de la interfaz"""
+        try:
+            # 1. Geometría y posición
+            geometry = self.master.winfo_geometry()
+            self.config.set("window_geometry", geometry)
+            
+            # 2. Ancho manual de la app (si se redimensionó)
+            if hasattr(self, 'window_manager'):
+                self.config.set("manual_app_width", self.window_manager.manual_app_width)
+            
+            # 3. Tema actual
+            if hasattr(self, 'theme_manager'):
+                self.config.set("theme", self.theme_manager.tema_actual)
+            
+            # 4. Paneles abiertos
+            # IMPORTANTE: Capturar el estado REAL de los managers
+            show_history_val = False
+            if hasattr(self, 'historial_manager') and self.historial_manager:
+                show_history_val = self.historial_manager.visible
+            
+            show_explorer_val = False
+            if hasattr(self, 'file_explorer_manager') and self.file_explorer_manager:
+                show_explorer_val = self.file_explorer_manager.is_visible()
+                
+            self.config.set("show_history", show_history_val)
+            self.config.set("show_explorer", show_explorer_val)
+            
+            # 5. Anchos de paneles individuales (Validar > 50px)
+            if hasattr(self, 'file_explorer_manager'):
+                w = self.file_explorer_manager.get_current_width()
+                if w and w > 50: 
+                    self.config.set("explorer_width", w)
+            
+            if hasattr(self, 'historial_manager'):
+                w = self.historial_manager.get_current_width()
+                if w and w > 50: 
+                    self.config.set("history_width", w)
+            
+            # 6. Anchos de columnas y estados de TreeView (Delegado a TreeColumnConfig)
+            # Principal
+            if hasattr(self, 'results_column_config'):
+                self.results_column_config.save_config()
+            
+            # Explorador
+            if hasattr(self, 'file_explorer_manager') and self.file_explorer_manager.tree:
+                try:
+                    tree = self.file_explorer_manager.tree
+                    cols = ["#0"] + list(tree["columns"])
+                    widths = {str(col): tree.column(col, 'width') for col in cols}
+                    self.config.set("explorer_column_widths", widths)
+                except: pass
+                
+            # Historial (Si usa TreeColumnConfig o similar internamente)
+            if hasattr(self, 'historial_manager'):
+                # Si el historial tiene su propio gestor de columnas o guardamos manual
+                if hasattr(self.historial_manager, 'tree') and self.historial_manager.tree:
+                    tree = self.historial_manager.tree
+                    cols = list(tree["columns"])
+                    widths = {str(col): tree.column(col, 'width') for col in cols}
+                    self.config.set("history_column_widths", widths)
+
+            # Guardar a disco
+            self.config.guardar_config()
+            print(f"[DEBUG] Preferencias de UI y columnas guardadas (con delegación)")
+        except Exception as e:
+            print(f"[ERROR] Error guardando preferencias: {e}")
 
     def _cargar_cache_inteligente(self):
         """Carga cache solo si no existe"""
@@ -165,7 +286,8 @@ class BusquedaCarpetaApp:
         self.main_container.grid(row=0, column=0, sticky='nsew')
         
         # Crear UI dentro del main_container
-        ui = UIComponents(self.main_container, self.version).crear_interfaz_completa()
+        col_widths = self.config.get("main_column_widths")
+        ui = UIComponents(self.main_container, self.version).crear_interfaz_completa(col_widths=col_widths)
         
         # Asignar referencias
         for ref in ['entry', 'modo_label', 'btn_buscar', 'btn_cancelar', 'tree', 
@@ -196,8 +318,7 @@ class BusquedaCarpetaApp:
         self.ui_state_manager = UIStateManager(self)
         self.ui_state_manager.configurar_validacion()
 
-        # Inicializar gestor de temas
-        self.theme_manager = ThemeManager(self, tema_inicial="claro")
+        # El theme_manager ya fue inicializado arriba para cargar el tema correcto antes del primer renderizado
         self.theme_manager.aplicar_tema()
         
         self.search_manager = SearchManager(self.cache_manager, self.search_engine, None, self.ui_callbacks)
@@ -223,7 +344,7 @@ class BusquedaCarpetaApp:
         self.tree_expansion_handler = TreeExpansionHandler(self)
         # Configurar columnas para TreeView de resultados
         if hasattr(self, 'tree') and self.tree:
-            self.results_column_config = TreeColumnConfig(self.tree, "results")
+            self.results_column_config = TreeColumnConfig(self.tree, "results", app=self)
 
     def _configure_app(self):
         """Configuración final"""

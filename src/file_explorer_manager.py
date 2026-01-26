@@ -86,26 +86,46 @@ class FileExplorerManager:
     
     def show(self):
         """Muestra el explorador de archivos con posicionamiento dual"""
-        if not self.ui:
-            self.create_explorer()
-        
-        if self.frame:
-            self.assigned_column = self.app.assign_panel_position('explorador')
-            self.frame.grid(row=0, column=self.assigned_column, sticky='ns', padx=(0, 0))
+        try:
+            if not self.ui:
+                saved_width = self.app.config.get("explorer_width")
+                col_widths = self.app.config.get("explorer_column_widths")
+                self.create_explorer(saved_width=saved_width, col_widths=col_widths)
             
-            if hasattr(self.app, 'mostrar_explorador'):
-                self.app.mostrar_explorador.set(True)
-            
-            if hasattr(self.ui, 'update_scrollbars'):
-                self.frame.after(100, self.ui.update_scrollbars)
-                self.frame.after(300, self.ui.update_scrollbars)
-            
-            # FORZAR APLICACIÓN DE TEMA
-            # Asegura que los widgets recién creados o mostrados adopten el tema actual
-            if hasattr(self.app, 'theme_manager'):
-                self.app.theme_manager.aplicar_tema()
-            
-            print(f"[DEBUG] Explorador mostrado en columna {self.assigned_column}")
+            if self.frame:
+                self.assigned_column = self.app.assign_panel_position('explorador')
+                
+                # Cargar ancho guardado
+                saved_width = self.app.config.get("explorer_width", 350)
+                if saved_width <= 50: saved_width = 350 # Sanitizar
+                
+                # CONFIGURACIÓN CRÍTICA: Forzar ancho en el grid
+                if hasattr(self.app, 'app_frame'):
+                    self.app.app_frame.grid_columnconfigure(self.assigned_column, minsize=saved_width, weight=0)
+                    self.app.app_frame.grid_rowconfigure(0, weight=1)
+                
+                # RE-CONFIGURAR FRAME: Forzar visibilidad NSEW
+                self.frame.grid(row=0, column=self.assigned_column, sticky='nsew', padx=(0, 0))
+                self.frame.config(width=saved_width)
+                
+                if hasattr(self.app, 'mostrar_explorador'):
+                    self.app.mostrar_explorador.set(True)
+                
+                # Forzar actualización de layout
+                self.frame.update_idletasks()
+                
+                if hasattr(self.ui, 'update_scrollbars'):
+                    self.frame.after(100, self.ui.update_scrollbars)
+                
+                # FORZAR APLICACIÓN DE TEMA
+                if hasattr(self.app, 'theme_manager'):
+                    self.app.theme_manager.aplicar_tema()
+                
+                print(f"[DEBUG] Explorador activado en columna {self.assigned_column} con ancho {saved_width}px")
+        except Exception as e:
+            print(f"[ERROR] Fallo crítico al mostrar explorador: {e}")
+            import traceback
+            traceback.print_exc()
     
     def hide(self):
         """Oculta el explorador de archivos y libera su posici├│n"""
@@ -120,19 +140,31 @@ class FileExplorerManager:
             
             if hasattr(self.app, 'mostrar_explorador'):
                 self.app.mostrar_explorador.set(False)
+
+    def get_current_width(self):
+        """Obtiene el ancho actual del frame del explorador"""
+        try:
+            if self.frame:
+                return self.frame.winfo_width()
+        except:
+            pass
+        return None
     
-    def create_explorer(self):
+    def create_explorer(self, saved_width=None, col_widths=None):
         """Crea el widget del explorador"""
-        panel_width = 300
-        if hasattr(self.app, 'window_manager') and hasattr(self.app.window_manager, 'get_panel_width'):
-            panel_width = self.app.window_manager.get_panel_width()
+        # VALIDAR ANCHO: Si es menor a 50px, es un error de guardado (1px bug)
+        panel_width = saved_width if saved_width and saved_width > 50 else 350
+        
+        if not saved_width or saved_width <= 50:
+            if hasattr(self.app, 'window_manager') and hasattr(self.app.window_manager, 'get_panel_width'):
+                panel_width = self.app.window_manager.get_panel_width()
         
         print(f"[DEBUG] Explorador usando ancho: {panel_width}px (8cm)")
         
         parent_frame = getattr(self.app, 'app_frame', self.app.master)
         self.ui = ExplorerUI(parent_frame, self)
         
-        if self.ui.create(panel_width):
+        if self.ui.create(panel_width, col_widths=col_widths):
             self._configure_keyboard_shortcuts()
             self.load_directory(self.current_path)
             return True

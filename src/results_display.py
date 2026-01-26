@@ -67,31 +67,36 @@ class ResultsDisplay:
             self.app.ui_callbacks.habilitar_busqueda()
     
     def _agregar_resultados(self, resultados, metodo):
-        """Agrega resultados SIN batching - optimizado para 1-20 items"""
-        if len(resultados) <= 100:
-            # Caso típico (1-20 items): mostrar TODOS inmediatamente
-            self._agregar_batch(resultados, 0, metodo)
-        else:
-            # Caso excepcional (>100): usar batching
-            batch_size = 50
-            for i in range(0, len(resultados), batch_size):
-                batch = resultados[i:i+batch_size]
-                delay = (i // batch_size) * 3
-                self.app.master.after(delay, lambda b=batch, idx=i, m=metodo: 
+        """Agrega resultados con Lote Crítico para percepción instantánea"""
+        # LOTE CRÍTICO: Primeros 30 resultados (caben en pantalla) se muestran síncronos
+        lote_critico = resultados[:30]
+        self._agregar_batch(lote_critico, 0, metodo)
+        self.app.master.update_idletasks() # Forzar dibujado inmediato
+        
+        # RESTO: El resto se carga en batches asíncronos para no bloquear
+        if len(resultados) > 30:
+            resto = resultados[30:]
+            batch_size = 100
+            for i in range(0, len(resto), batch_size):
+                batch = resto[i:i+batch_size]
+                delay = (i // batch_size) * 1  # Delay mínimo (1ms)
+                self.app.master.after(delay, lambda b=batch, idx=30+i, m=metodo: 
                     self._agregar_batch(b, idx, m))
     
     def _agregar_resultados_multi(self, resultados):
-        """Agrega resultados multi SIN batching - optimizado para 1-20 items"""
-        if len(resultados) <= 100:
-            # Caso típico: mostrar TODOS inmediatamente
-            self._agregar_batch_multi(resultados, 0)
-        else:
-            # Caso excepcional: usar batching
-            batch_size = 50
-            for i in range(0, len(resultados), batch_size):
-                batch = resultados[i:i+batch_size]
-                delay = (i // batch_size) * 3
-                self.app.master.after(delay, lambda b=batch, idx=i: 
+        """Agrega resultados multi con Lote Crítico"""
+        # LOTE CRÍTICO: Primeros 30 síncronos
+        lote_critico = resultados[:30]
+        self._agregar_batch_multi(lote_critico, 0)
+        self.app.master.update_idletasks() # Forzar dibujado
+        
+        if len(resultados) > 30:
+            resto = resultados[30:]
+            batch_size = 100
+            for i in range(0, len(resto), batch_size):
+                batch = resto[i:i+batch_size]
+                delay = (i // batch_size) * 1
+                self.app.master.after(delay, lambda b=batch, idx=30+i: 
                     self._agregar_batch_multi(b, idx))
     
     def _agregar_batch(self, batch, start_index, metodo):

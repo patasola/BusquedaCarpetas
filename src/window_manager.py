@@ -4,9 +4,10 @@ from .ui_components import Colors
 class WindowManager:
     """Maneja configuración y propiedades de la ventana con redimensionamiento inteligente"""
     
-    def __init__(self, master, version):
+    def __init__(self, master, version, app):
         self.master = master
         self.version = version
+        self.app = app
         
         # Dimensiones de pantalla
         self.screen_width = None
@@ -20,12 +21,17 @@ class WindowManager:
         self.user_resized_manually = False
         self.manual_app_width = None
     
-    def configurar_ventana(self):
+    def configurar_ventana(self, saved_geometry=None, manual_app_width=None):
         """Configura las propiedades básicas de la ventana"""
         self.master.title(f"Búsqueda de Carpetas v{self.version}")
         self.master.configure(bg=Colors.BACKGROUND)
         self.master.resizable(True, True)
         
+        # Cargar ancho manual si existe
+        if manual_app_width:
+            self.manual_app_width = manual_app_width
+            print(f"[DEBUG] Ancho manual cargado: {manual_app_width}px")
+
         # Calcular dimensiones
         self.screen_width = self.master.winfo_screenwidth()
         self.screen_height = self.master.winfo_screenheight()
@@ -35,12 +41,21 @@ class WindowManager:
         panel_width_cm = 7.15  # AUMENTADO 10%: 6.5cm → 7.15cm (~550px en lugar de ~500px)
         self.panel_width = int(panel_width_cm * self.pixels_per_cm)
         
-        # Tamaño inicial
-        initial_height = 700
-        x = max(0, (self.screen_width - self.base_app_width) // 2)
-        y = max(0, (self.screen_height - initial_height) // 2)
+        # Tamaño inicial o cargado
+        initial_height = 700 # Definir aquí para evitar UnboundLocalError
         
-        self.master.geometry(f"{self.base_app_width}x{initial_height}+{x}+{y}")
+        if saved_geometry:
+            try:
+                self.master.geometry(saved_geometry)
+                print(f"[DEBUG] Geometría cargada: {saved_geometry}")
+            except:
+                x = max(0, (self.screen_width - self.base_app_width) // 2)
+                y = max(0, (self.screen_height - initial_height) // 2)
+                self.master.geometry(f"{self.base_app_width}x{initial_height}+{x}+{y}")
+        else:
+            x = max(0, (self.screen_width - self.base_app_width) // 2)
+            y = max(0, (self.screen_height - initial_height) // 2)
+            self.master.geometry(f"{self.base_app_width}x{initial_height}+{x}+{y}")
         self.master.minsize(400, 300)
         
         # Detectar redimensionamiento manual
@@ -81,12 +96,21 @@ class WindowManager:
     def add_panel(self):
         """Agrega un panel con redimensionamiento inteligente"""
         self.current_panel_count += 1
+        
+        # Bloquear si estamos inicializando para respetar la geometría guardada
+        if hasattr(self.app, '_is_initializing') and self.app._is_initializing:
+            return
+
         self._smart_resize()
         print(f"[DEBUG] Panel agregado. Total: {self.current_panel_count}")
     
     def remove_panel(self):
         """Remueve un panel con redimensionamiento inteligente"""
         self.current_panel_count = max(0, self.current_panel_count - 1)
+        
+        if hasattr(self.app, '_is_initializing') and self.app._is_initializing:
+            return
+
         self._smart_resize()
         print(f"[DEBUG] Panel removido. Total: {self.current_panel_count}")
     
@@ -181,6 +205,10 @@ class WindowManager:
             diff = count - self.current_panel_count
             self.current_panel_count = count
             
+            # Bloquear si estamos inicializando
+            if hasattr(self.app, '_is_initializing') and self.app._is_initializing:
+                return
+
             if diff > 0:
                 self._smart_resize()
             elif diff < 0:
