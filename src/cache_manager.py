@@ -1,4 +1,4 @@
-# src/cache_manager.py - Gestor de Cache V.4.5 - OPTIMIZADO
+# src/cache_manager.py - Gestor de Cache V.4.5.3 - ULTRA OPTIMIZADO
 import os
 import pickle
 import time
@@ -20,7 +20,7 @@ class CacheData:
         return (time.time() - self.timestamp > max_age_hours * 3600)
 
 class CacheManager:
-    """Gestor de cache de carpetas optimizado"""
+    """Gestor de cache de carpetas optimizado con scandir"""
     
     def __init__(self, ruta_base=None, cache_file=None):
         self.ruta_base = ruta_base
@@ -55,13 +55,11 @@ class CacheManager:
                 ruta_actual_norm = os.path.normpath(self.ruta_base).lower()
                 
                 if ruta_cache_norm != ruta_actual_norm:
-                    # NO invalidar automáticamente si es solo un cambio de nombre de carpeta padre similar (OneDrive)
                     if "onedrive" in ruta_cache_norm and "onedrive" in ruta_actual_norm:
                          print(f"[CACHE] OneDrive path variation detected, keeping cache: {self.cache_file}")
-                         self.cache.ruta_base = self.ruta_base # Actualizar ruta sin borrar datos
+                         self.cache.ruta_base = self.ruta_base
                     else:
                          print(f"[CACHE] Path mismatch in {self.cache_file}, but keeping for best-effort search")
-                         # No invalidar, permitir búsqueda aunque sea en rutas viejas (el buscador las validará)
             
             carpetas_count = self.cache.directorios.get('total', 0)
             if carpetas_count > 0:
@@ -92,7 +90,7 @@ class CacheManager:
                 pass
     
     def construir_cache(self):
-        """Construye el cache escaneando el sistema de archivos"""
+        """Construye el cache usando scandir recursivo (ULTRA RÁPIDO)"""
         if self.construyendo:
             return False
         
@@ -101,32 +99,37 @@ class CacheManager:
             if not self.ruta_base or not os.path.exists(self.ruta_base):
                 return False
             
-            print(f"[CACHE] Construyendo cache para: {self.ruta_base}")
+            print(f"[CACHE] Construyendo cache (scandir) para: {self.ruta_base}")
             carpetas = []
             start_time = time.time()
+            max_carpetas = 100000
             
-            # Límite de seguridad
-            MAX_CARPETAS = 100000
+            def scan_recursive(path):
+                if len(carpetas) >= max_carpetas:
+                    return
+                try:
+                    with os.scandir(path) as it:
+                        for entry in it:
+                            if len(carpetas) >= max_carpetas:
+                                break
+                            if entry.is_dir():
+                                try:
+                                    ruta_relativa = os.path.relpath(entry.path, self.ruta_base)
+                                    carpetas.append({
+                                        'nombre': entry.name,
+                                        'ruta_relativa': ruta_relativa,
+                                        'ruta_absoluta': entry.path
+                                    })
+                                    # Llamada recursiva
+                                    scan_recursive(entry.path)
+                                except:
+                                    continue
+                except PermissionError:
+                    pass
+                except Exception as e:
+                    print(f"[CACHE] Error escaneando {path}: {e}")
             
-            for root, dirs, files in os.walk(self.ruta_base):
-                for dirname in dirs:
-                    if len(carpetas) >= MAX_CARPETAS:
-                        break
-                    
-                    try:
-                        ruta_completa = os.path.join(root, dirname)
-                        ruta_relativa = os.path.relpath(ruta_completa, self.ruta_base)
-                        
-                        carpetas.append({
-                            'nombre': dirname,
-                            'ruta_relativa': ruta_relativa,
-                            'ruta_absoluta': ruta_completa
-                        })
-                    except:
-                        continue
-                
-                if len(carpetas) >= MAX_CARPETAS:
-                    break
+            scan_recursive(self.ruta_base)
             
             self.cache.directorios = {
                 'directorios': carpetas,
@@ -159,20 +162,36 @@ class CacheManager:
                     carpeta['ruta_relativa'], 
                     carpeta['ruta_absoluta']
                 ))
-                if len(resultados) >= 100: # Límite de resultados por ubicación
+                if len(resultados) >= 1000: # Límite aumentado
                     break
         
         return resultados
 
     def get_cache_stats(self):
-        """Retorna estadísticas del cache"""
-        return {
-            'carpetas': self.cache.directorios.get('total', 0), # Para locations_config_modal.py
-            'total': self.cache.directorios.get('total', 0),    # Alias común
-            'timestamp': self.cache.timestamp,
-            'valido': self.cache.valido,
-            'ruta_base': self.cache.ruta_base
-        }
+        """Retorna estadísticas del cache completas"""
+        try:
+            # Calcular edad
+            edad_str = "N/A"
+            if self.cache.timestamp > 0:
+                diff = time.time() - self.cache.timestamp
+                if diff < 60: edad_str = f"{int(diff)}s"
+                elif diff < 3600: edad_str = f"{int(diff/60)}m"
+                else: edad_str = f"{int(diff/3600)}h"
+
+            return {
+                'carpetas': self.cache.directorios.get('total', 0),
+                'total': self.cache.directorios.get('total', 0),
+                'timestamp': self.cache.timestamp,
+                'valido': self.cache.valido,
+                'ruta_base': self.cache.ruta_base,
+                'edad': edad_str # Requerido por search_coordinator.py
+            }
+        except:
+            return {'carpetas': 0, 'total': 0, 'valido': False, 'edad': "Error"}
 
     def necesita_construccion(self):
         return not self.cache.valido or len(self.cache.directorios.get('directorios', [])) == 0
+
+    def limpiar(self):
+        """Alias para limpiar para compatibilidad"""
+        self.invalidar_cache()
