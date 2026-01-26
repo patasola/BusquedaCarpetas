@@ -13,6 +13,7 @@ class SearchCoordinator:
         self.busqueda_silenciosa = False
         self.current_search_thread = None
         self.search_cancelled = False
+        self._multi_cache_managers = {} # Persistencia en memoria de caches por ruta
     
     def ejecutar_busqueda(self, criterio, silenciosa=False):
         """Ejecuta búsqueda completamente asíncrona"""
@@ -116,8 +117,11 @@ class SearchCoordinator:
             path_hash = hashlib.md5(location['path'].encode()).hexdigest()[:8]
             cache_filename = f"cache_{path_hash}.pkl"
             
-            # Usar el nuevo constructor optimizado
-            temp_cache = CacheManager(location['path'], cache_file=cache_filename)
+            # Persistencia: Solo crear el gestor si no existe o la ruta cambió
+            if location['path'] not in self._multi_cache_managers:
+                self._multi_cache_managers[location['path']] = CacheManager(location['path'], cache_file=cache_filename)
+            
+            temp_cache = self._multi_cache_managers[location['path']]
             
             if temp_cache.cache.valido and len(temp_cache.cache.directorios.get('directorios', [])) > 0:
                 results = temp_cache.buscar_en_cache(criterio)
@@ -139,7 +143,7 @@ class SearchCoordinator:
                         break
                     if entry.is_dir() and criterio_lower in entry.name.lower():
                         results.append((entry.name, entry.name, entry.path))
-                        if len(results) >= 100:
+                        if len(results) >= 500:
                             break
         except:
             pass
