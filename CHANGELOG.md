@@ -1,5 +1,12 @@
 # Changelog - BusquedaCarpetas V4.5
 
+## [4.5.3] - 2026-01-26
+
+### 🚀 Restauración de Performance (Veloce+)
+- **PERF:** Re-implementado motor recursivo con `os.scandir` en `CacheManager` para escaneos de red ultra-rápidos.
+- **PERF:** Implementada persistencia en memoria de gestores de caché en `SearchCoordinator`. Los archivos `.pkl` ahora se cargan una sola vez al inicio, eliminando latencias de disco en búsquedas sucesivas.
+- **FIX:** Agregados campos faltantes (`edad`) en estadísticas de caché para compatibilidad con diagnóstico.
+
 ## [4.5.2] - 2026-01-23
 
 ### 🔧 Correcciones y Estética
