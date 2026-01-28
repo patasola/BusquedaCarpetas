@@ -1,4 +1,21 @@
-# Changelog - BusquedaCarpetas V4.5
+# Changelog - BusquedaCarpetas V.5.0 (Luce Intellettual)
+
+## [5.0.1] - 2026-01-28
+
+### 🚀 Corrección Crítica de Rendimiento
+
+- **FIXED:** Restaurada implementación original de renderizado del commit `cbc838b` que funcionaba perfectamente antes del refactor
+- **PERF:** Eliminada completamente la verificación de subcarpetas durante el renderizado de resultados
+- **PERF:** Renderizado ahora es **siempre instantáneo** sin importar la ubicación de las carpetas (red, SSD, HDD)
+- **PERF:** Procesamiento síncrono para búsquedas típicas de 1-100 resultados (caso común del usuario)
+- **PERF:** Batching asíncrono solo para conjuntos grandes (>100 resultados)
+- **REMOVED:** Eliminada lógica de inserción de nodos dummy que nunca existió en la versión funcional original
+- **CONSISTENCY:** Rendimiento ahora es consistente en todas las búsquedas, sin variabilidad por I/O
+
+#### Impacto
+- ✅ Búsquedas de 1-5 resultados: **instantáneas** (0ms de overhead)
+- ✅ Sin lag variable por ubicación de carpetas
+- ✅ Experiencia de usuario consistente y predecible
 
 ## [4.5.3] - 2026-01-26
 

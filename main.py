@@ -1,6 +1,6 @@
 # main.py - VERSIÓN CORREGIDA (sin el método suelto)
 import tkinter as tk
-from src.app import BusquedaCarpetaApp
+from src.managers.app import BusquedaCarpetaApp
 
 def main():
     root = tk.Tk()
