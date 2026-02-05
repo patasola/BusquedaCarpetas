@@ -23,6 +23,7 @@ class ColumnManager:
             "Resultados": {"title": "Res.", "width": 50, "anchor": "center", "default_visible": True},
             "Tiempo": {"title": "Tiempo", "width": 55, "anchor": "center", "default_visible": True},
             "Fecha": {"title": "Hora", "width": 55, "anchor": "center", "default_visible": True},
+            "Fecha_C": {"title": "Fecha Completa", "width": 120, "anchor": "center", "default_visible": False},
             "Demandante": {"title": "Demandante", "width": 150, "anchor": "w", "default_visible": False},
             "Demandado": {"title": "Demandado", "width": 150, "anchor": "w", "default_visible": False},
             "Ruta": {"title": "Ruta", "width": 200, "anchor": "w", "default_visible": False}

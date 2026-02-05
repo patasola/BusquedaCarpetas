@@ -255,11 +255,11 @@ class FileExplorerManager:
             existing_items = len(self.tree.get_children(parent_item))
             tag = 'evenrow' if existing_items % 2 == 0 else 'oddrow'
             
-            # Crear item temporal en el ├írbol (sin crear carpeta f├¡sica a├║n)
+            # Crear item temporal en el árbol (sin crear carpeta física aún)
             temp_item = self.tree.insert(
                 parent_item,
                 'end',
-                text=f"­ƒôü {temp_name}",
+                text=f"📁 {temp_name}",
                 values=(datetime.now().strftime("%d/%m/%Y %H:%M"),),
                 tags=(tag,)
             )
@@ -344,8 +344,8 @@ class FileExplorerManager:
             # CREAR LA CARPETA F├ìSICAMENTE
             os.makedirs(nueva_ruta, exist_ok=False)
             
-            # Actualizar el item temporal con la informaci├│n real
-            self.tree.item(self.editing_item, text=f"­ƒôü {new_name}")
+            # Actualizar el item temporal con la información real
+            self.tree.item(self.editing_item, text=f"📁 {new_name}")
             
             # Agregar al mapeo
             self.path_to_item[nueva_ruta] = self.editing_item

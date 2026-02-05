@@ -259,20 +259,24 @@ class HistorialManager(BaseTreeManager):
             self.tree.column("Tiempo", width=cw.get("Tiempo", 60), anchor=tk.CENTER, minwidth=50)
             self.tree.column("Fecha", width=cw.get("Fecha", 60), anchor=tk.CENTER, minwidth=50)
             
-            # Definicion de columnas para ColumnManager (Lo mantenemos pero no lo aplicamos aun)
+            # Definición de columnas para el historial
             column_definitions = {
-                "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "minwidth": 80, "stretch": False, "default_visible": True},
-                "Metodo": {"title": "M", "width": 30, "anchor": "center", "minwidth": 25, "stretch": False, "default_visible": True},
-                "Resultados": {"title": "Res.", "width": 50, "anchor": "center", "minwidth": 45, "stretch": False, "default_visible": True},
-                "Tiempo": {"title": "Tiempo", "width": 55, "anchor": "center", "minwidth": 50, "stretch": False, "default_visible": True},
-                "Fecha": {"title": "Hora", "width": 55, "anchor": "center", "minwidth": 50, "stretch": False, "default_visible": True},
-                "Demandante": {"title": "Demandante", "width": 150, "anchor": "w", "minwidth": 100, "stretch": False, "default_visible": False},
-                "Demandado": {"title": "Demandado", "width": 150, "anchor": "w", "minwidth": 100, "stretch": False, "default_visible": False},
-                "Ruta": {"title": "Ruta", "width": 200, "anchor": "w", "minwidth": 150, "stretch": False, "default_visible": False}
+                "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "default_visible": True},
+                "Metodo": {"title": "M", "width": 30, "anchor": "center", "default_visible": True},
+                "Resultados": {"title": "Res.", "width": 50, "anchor": "center", "default_visible": True},
+                "Tiempo": {"title": "Tiempo", "width": 55, "anchor": "center", "default_visible": True},
+                "Fecha": {"title": "Hora", "width": 55, "anchor": "center", "default_visible": True},
+                "Fecha_C": {"title": "Fecha Completa", "width": 120, "anchor": "center", "default_visible": False},
+                "Demandante": {"title": "Demandante", "width": 150, "anchor": "w", "default_visible": False},
+                "Demandado": {"title": "Demandado", "width": 150, "anchor": "w", "default_visible": False},
+                "Ruta": {"title": "Ruta", "width": 200, "anchor": "w", "default_visible": False}
             }
             
-            # Inicializar ColumnManager
-            # self.column_manager = ColumnManager(self.tree, "historial_tree", column_definitions)
+            # Inicializar ColumnManager para el historial
+            self.column_manager = ColumnManager(self.tree, "historial", column_definitions)
+            
+            # Encabezado con clic derecho para gestionar columnas
+            self.tree.bind("<Button-3>", self._on_header_right_click, add="+")
             
             # Configurar scrollbars
             self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -338,6 +342,14 @@ class HistorialManager(BaseTreeManager):
         """Agrega una búsqueda al historial - SIEMPRE registra, sin importar si está visible"""
         print(f"[DEBUG] Intentando agregar búsqueda: {criterio}, {metodo}, {num_resultados}")
         try:
+            # Intentar enriquecer con info de BD si el coordinador está disponible
+            demandante = ""
+            demandado = ""
+            if hasattr(self.app, 'search_coordinator'):
+                radicado = self.app.search_coordinator._convertir_a_radicado(criterio)
+                if radicado and hasattr(self.app, 'database_manager') and self.app.database_manager:
+                    demandante, demandado = self.app.database_manager.obtener_info_proceso(radicado)
+
             # Crear entrada del historial
             entrada = {
                 'criterio': criterio,
@@ -345,6 +357,10 @@ class HistorialManager(BaseTreeManager):
                 'resultados': num_resultados,
                 'tiempo': f"{tiempo_total:.2f}s",
                 'fecha': datetime.now().strftime("%H:%M:%S"),
+                'fecha_c': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                'demandante': demandante,
+                'demandado': demandado,
+                'ruta': self.app.ruta_carpeta if hasattr(self.app, 'ruta_carpeta') else "",
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -388,11 +404,15 @@ class HistorialManager(BaseTreeManager):
                 self.tree.insert('', 'end', 
                                text=str(i + 1),
                                values=(
-                                   entrada['criterio'],
-                                   entrada['metodo'],
-                                   entrada['resultados'],
-                                   entrada['tiempo'],
-                                   entrada['fecha']
+                                   entrada.get('criterio', ''),
+                                   entrada.get('metodo', ''),
+                                   entrada.get('resultados', 0),
+                                   entrada.get('tiempo', '0.00s'),
+                                   entrada.get('fecha', ''),
+                                   entrada.get('fecha_c', ''), # Fecha completa
+                                   entrada.get('demandante', ''),
+                                   entrada.get('demandado', ''),
+                                   entrada.get('ruta', '')
                                ),
                                tags=(row_tag,))
             
@@ -406,6 +426,13 @@ class HistorialManager(BaseTreeManager):
             traceback.print_exc()
             print(f"[ERROR] Error actualizando vista historial: {e}")
     
+    def _on_header_right_click(self, event):
+        """Maneja clic derecho en el encabezado para gestionar columnas"""
+        region = self.tree.identify("region", event.x, event.y)
+        if region == "heading":
+            if hasattr(self, 'column_manager'):
+                self.column_manager.show_column_menu(event)
+        
     def cargar_historial(self):
         """Carga el historial desde archivo"""
         try:

@@ -70,11 +70,11 @@ class SearchCoordinator:
             # 1. REUNIR TODAS LAS UBICACIONES A BUSCAR
             locations_to_search = []
             
-            # Añadir ubicaciones adicionales habilitadas
+            # Ubicaciones adicionales
             if hasattr(self.app, 'multi_location_search'):
                 locations_to_search.extend(self.app.multi_location_search.get_enabled_locations())
             
-            # Añadir carpeta principal si no está ya en la lista
+            # Carpeta principal
             if hasattr(self.app, 'ruta_carpeta') and self.app.ruta_carpeta:
                 principal_path = os.path.normpath(self.app.ruta_carpeta).lower()
                 ya_incluida = any(os.path.normpath(l['path']).lower() == principal_path for l in locations_to_search)
@@ -85,28 +85,59 @@ class SearchCoordinator:
                 self.app.master.after(0, self._on_search_error, "No hay carpetas configuradas para buscar")
                 return
 
-            # 2. BUSCAR EN PARALELO EN TODAS LAS UBICACIONES
+            # --- FASE 1: BÚSQUEDA INSTANTÁNEA EN CACHÉ ---
             seen_paths = set()
+            total_resultados_contados = 0
             
+            for loc in locations_to_search:
+                if self.search_cancelled or search_id != self.current_search_id: return
+                
+                # Obtener solo de caché (muy rápido)
+                path = loc['path']
+                cache_filename = self._get_cache_filename(path)
+                
+                # Reutilizar o crear manager temporal
+                mgr = self._multi_cache_managers.get(path)
+                if not mgr:
+                    mgr = CacheManager(path, cache_file=cache_filename)
+                
+                if mgr.cache.valido:
+                    resultados_cache = mgr.buscar_en_cache(criterio)
+                    if resultados_cache:
+                        batch_cache = []
+                        for r in resultados_cache:
+                            p_key = os.path.normpath(r[2]).lower()
+                            if p_key not in seen_paths:
+                                seen_paths.add(p_key)
+                                batch_cache.append((r[0], r[1], r[2], r[3], loc['name']))
+                        
+                        if batch_cache:
+                            total_resultados_contados += len(batch_cache)
+                            enriched = self._enriquecer_resultados_con_bd(batch_cache, criterio)
+                            self.app.master.after(0, self._append_results_batch, 
+                                                enriched, criterio, loc['name'], start_time, silenciosa, search_id)
+
+            # --- FASE 2: BÚSQUEDA COMPLEMENTARIA EN DISCO (PARALELA) ---
             from concurrent.futures import ThreadPoolExecutor, as_completed
             max_workers = min(len(locations_to_search), 10)
             
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Solo buscar en disco (depth 1 o 5) para lo que no está en caché o carpetas nuevas
                 future_to_loc = {
-                    executor.submit(self._search_single_location_unified, loc, criterio): loc 
+                    executor.submit(self._search_complementary_disk_only, loc, criterio): loc 
                     for loc in locations_to_search
                 }
                 
                 num_completados = 0
                 for future in as_completed(future_to_loc):
-                    if self.search_cancelled: break
+                    if self.search_cancelled or search_id != self.current_search_id: break
                     num_completados += 1
                     loc = future_to_loc[future]
                     try:
                         loc_results = future.result()
                         if not loc_results: continue
                         
-                        # Filtrar duplicados GLOBALMENTE
+                        # Filtrar duplicados GLOBALMENTE (vs lo que ya se mostró del caché)
                         batch_to_show = []
                         for r in loc_results:
                             if self.search_cancelled or search_id != self.current_search_id: break
@@ -116,17 +147,16 @@ class SearchCoordinator:
                                 batch_to_show.append((r[0], r[1], r[2], r[3], loc['name']))
                         
                         if batch_to_show and not self.search_cancelled and search_id == self.current_search_id:
-                            # ENRIQUECER BATCH
+                            total_resultados_contados += len(batch_to_show)
                             enriched_batch = self._enriquecer_resultados_con_bd(batch_to_show, criterio)
-                            
-                            # MOSTRAR INMEDIATAMENTE
                             self.app.master.after(0, self._append_results_batch, 
                                                 enriched_batch, criterio, loc['name'], start_time, silenciosa, search_id)
                         
+                        # Callback final si es la última ubicación
                         if num_completados == len(locations_to_search) and not self.search_cancelled and search_id == self.current_search_id:
                             search_time = time.time() - start_time
                             self.app.master.after(100, self._on_search_completed_async, 
-                                               [], criterio, "Streaming", search_time, silenciosa, search_id)
+                                               total_resultados_contados, criterio, "Streaming", search_time, silenciosa, search_id)
                                                 
                     except Exception as e:
                         print(f"[ERROR] Ubicación {loc['name']} falló: {e}")
@@ -144,113 +174,22 @@ class SearchCoordinator:
             self.app.ui_manager.mostrar_resultados_incrementales(resultados, loc_name, tiempo_parcial)
             self.app.ui_manager.actualizar_estado(f"Streaming... {loc_name} listo ({len(resultados)} encontrados)")
     
-    def _search_multi_locations_fast(self, criterio):
-        """Búsqueda rápida en múltiples ubicaciones con agregación completa"""
-        all_results = []
+    def _search_complementary_disk_only(self, loc, criterio):
+        """Busca solo en disco para complementar lo que falte en el caché"""
         try:
-            if not hasattr(self.app, 'multi_location_search'):
-                return []
-                
-            enabled_locations = self.app.multi_location_search.get_enabled_locations()
-            print(f"[DEBUG] Buscando en {len(enabled_locations)} ubicaciones habilitadas (PARALELO)")
+            path = loc['path']
+            mgr = self._multi_cache_managers.get(path)
             
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            
-            # Usar ThreadPoolExecutor para buscar en paralelo
-            with ThreadPoolExecutor(max_workers=min(len(enabled_locations), 8)) as executor:
-                # Mapear cada ubicación a una tarea
-                future_to_location = {
-                    executor.submit(self._search_single_location_unified, loc, criterio): loc 
-                    for loc in enabled_locations
-                }
-                
-                for future in as_completed(future_to_location):
-                    if self.search_cancelled:
-                        break
-                    
-                    location = future_to_location[future]
-                    try:
-                        location_results = future.result()
-                        # Procesar resultados de esta ubicación
-                        for result in location_results:
-                            if isinstance(result, tuple) and len(result) >= 3:
-                                nombre, ruta_rel, ruta_abs = result[:3]
-                                tiene_hijos = result[3] if len(result) >= 4 else False
-                                # Unificar a 5 elementos: (nombre, rel, abs, tiene_hijos, loc_name)
-                                enhanced_result = (nombre, ruta_rel, ruta_abs, tiene_hijos, location['name'])
-                                all_results.append(enhanced_result)
-                        
-                        # Límite global razonable
-                        if len(all_results) >= 2000:
-                            break
-                    except Exception as exc:
-                        print(f"[ERROR] Ubicación {location['name']} generó una excepción: {exc}")
-                    
-            # Enriquecer TODOS los resultados con la base de datos
-            all_results = self._enriquecer_resultados_con_bd(all_results, criterio)
-            
+            # Profundidad: 1 si hay caché (solo carpetas nuevas), 5 si no hay caché
+            depth_fallback = 1 if (mgr and mgr.cache.valido) else 5
+            return self._search_direct_recursive(path, criterio, max_depth=depth_fallback)
         except Exception as e:
-            print(f"[ERROR] Error en búsqueda multi-ubicaciones: {e}")
-        return all_results
-    
-    def _search_single_location_unified(self, location, criterio):
-        """Búsqueda unificada en una ubicación (Cache -> Directo Recursivo)"""
-        try:
-            from ..core.cache_manager import CacheManager
-            
-            # Normalizar ruta para hash consistente usando el nuevo helper
-            path = os.path.normpath(location['path'])
-            cache_filename = self._get_cache_filename(path)
-            
-            # 1. INTENTAR CACHE (Usar manager principal si es la ruta base)
-            mgr = None
-            if hasattr(self.app, 'ruta_carpeta') and self.app.ruta_carpeta:
-                if path.lower() == os.path.normpath(self.app.ruta_carpeta).lower():
-                    mgr = self.app.cache_manager
-            
-            if not mgr:
-                if path not in self._multi_cache_managers:
-                    self._multi_cache_managers[path] = CacheManager(path, cache_file=cache_filename)
-                mgr = self._multi_cache_managers[path]
-            
-            cache_results = []
-            if mgr.cache.valido and len(mgr.cache.directorios.get('directorios', [])) > 0:
-                cache_results = mgr.buscar_en_cache(criterio)
-
-            # 2. COMPLEMENTAR CON BÚSQUEDA DIRECTA (Para capturar carpetas recién creadas)
-            # Si no hay cache, buscamos profundo (depth 5). Si hay cache, solo superficial (depth 1).
-            depth_fallback = 1 if cache_results else 5
-            direct_results = self._search_direct_recursive(path, criterio, max_depth=depth_fallback)
-            
-            # Combinar y deduplicar para ESTA ubicación
-            seen_here = set()
-            final_results = []
-            for r in (cache_results + direct_results):
-                try:
-                    p_key = os.path.normpath(r[2]).lower()
-                    if p_key not in seen_here:
-                        seen_here.add(p_key)
-                        final_results.append(r)
-                except: continue
-                
-            return final_results
-            
-            # Disparar construcción si no está en curso
-            if not mgr.construyendo:
-                def build_and_update():
-                    if mgr.construir_cache():
-                        # Actualizar metadato en MultiLocationSearch para persistencia visual
-                        if hasattr(self.app, 'multi_location_search'):
-                            stats = mgr.get_cache_stats()
-                            self.app.multi_location_search.update_location_cache_size(path, stats['total'])
-                
-                threading.Thread(target=build_and_update, daemon=True).start()
-
-            return self._search_direct_recursive(path, criterio)
-            
-        except Exception as e:
-            print(f"[ERROR] Error en búsqueda unificada para {location['path']}: {e}")
+            print(f"[ERROR] Complementary disk search failed for {loc['name']}: {e}")
             return []
+
+    def _search_single_location_unified(self, location, criterio):
+        """Mantenemos por retrocompatibilidad pero preferimos usar la lógica de fases en _perform_search_async"""
+        return self._search_complementary_disk_only(location, criterio)
     
     def _search_direct_recursive(self, path, criterio, max_depth=3):
         """Búsqueda directa usando BFS con scandir (Más rápido que os.walk)"""
@@ -416,17 +355,28 @@ class SearchCoordinator:
         except:
             return []
     
-    def _on_search_completed_async(self, resultados, criterio, metodo, tiempo, silenciosa, search_id):
+    def _on_search_completed_async(self, resultados_o_conteo, criterio, metodo, tiempo, silenciosa, search_id):
         """Callback cuando se completa búsqueda"""
         if self.search_cancelled or search_id != self.current_search_id: return
+        
+        # Obtener número total de resultados
+        if isinstance(resultados_o_conteo, list):
+            num_resultados = len(resultados_o_conteo)
+        else:
+            num_resultados = resultados_o_conteo
+
         if not silenciosa:
             self.app.btn_buscar.configure(state='normal', text='Buscar')
             self.app.btn_cancelar.configure(state='disabled')
         
-        # SI ES MODO STREAMING, los resultados ya se mostraron. NO limpiar ni sobreescribir.
+        # SI ES MODO STREAMING, actualización de estado y registro en historial
         if metodo == "Streaming":
-             mensaje = f"✅ Búsqueda finalizada ({metodo}) - {tiempo:.2f}s"
+             mensaje = f"✅ Búsqueda finalizada ({metodo}) - {num_resultados} resultados - {tiempo:.2f}s"
              self.app.ui_manager.actualizar_estado(mensaje)
+             
+             # REGISTRAR SIEMPRE EN HISTORIAL
+             if hasattr(self.app, 'historial_manager'):
+                 self.app.historial_manager.agregar_busqueda(criterio, "Híbrida", num_resultados, tiempo)
              return
              
         if metodo == "Multi" and hasattr(self.app, 'results_display'):
