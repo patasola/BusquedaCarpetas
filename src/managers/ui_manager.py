@@ -20,6 +20,7 @@ class UIManager:
         self._updating_vars = False
         self._last_adjust_time = 0
         self._ajuste_en_progreso = False
+        self._search_timer = None # Timer para búsqueda automática (debounce)
 
     # --- CONFIGURACIÓN E INICIALIZACIÓN ---
 
@@ -115,11 +116,30 @@ class UIManager:
         except: pass
 
     def on_entry_change(self, event):
-        """Callback al cambiar texto en entry"""
+        """Callback al cambiar texto en entry para activar búsqueda automática (DEBOUNCE)"""
         texto = self.app.entry.get().strip()
-        if self.app.entry['state'] == 'disabled':
-            self.app.entry.configure(state='normal')
-        self._actualizar_boton_buscar(bool(texto) and bool(getattr(self.app, 'ruta_carpeta', None)))
+        
+        # 1. Habilitar/Deshabilitar botón de búsqueda
+        habilitada = bool(texto) and bool(getattr(self.app, 'ruta_carpeta', None))
+        self._actualizar_boton_buscar(habilitada)
+        
+        # 2. Programar búsqueda automática si hay texto y no es numérico estricto
+        # No queremos disparar accidentalmente si está pegando un radicado largo de golpe
+        if len(texto) >= 3:
+            if self._search_timer:
+                self.app.master.after_cancel(self._search_timer)
+            
+            # Solo disparar automático si el cache está listo para que sea INSTANTANEO
+            if hasattr(self.app, 'cache_manager') and self.app.cache_manager.cache.valido:
+                self._search_timer = self.app.master.after(1200, self._trigger_auto_search)
+
+    def _trigger_auto_search(self):
+        """Dispara la búsqueda automática tras el debounce (Modo Silencioso)"""
+        if not self.app.entry.get().strip(): return
+        if self.app.btn_buscar['state'] == 'disabled': return
+        
+        print("[DEBUG] Disparando búsqueda automática (Silenciosa para no robar foco)")
+        self.app.buscar_carpeta(silenciosa=True)
 
     def cambiar_modo_entrada(self):
         """Alterna entre modo Numérico y Alfanumérico"""
@@ -169,15 +189,12 @@ class UIManager:
             print(f"[UIManager] Error limpiando resultados: {e}")
 
     def mostrar_resultados(self, resultados, metodo, tiempo_total):
-        """Renderiza resultados delegando en el ResultsRenderer"""
+        """Renderiza resultados limpiando previos (Legacy/Full)"""
         self.limpiar_resultados()
-        # Registrar en historial si no es silenciosa
-        if not getattr(self.app.search_coordinator, 'busqueda_silenciosa', False):
-            self.app.historial_manager.agregar_busqueda(
-                self.app.entry.get().strip(), metodo, 
-                len(resultados) if resultados else 0, tiempo_total
-            )
-        
+        return self.mostrar_resultados_incrementales(resultados, metodo, tiempo_total)
+
+    def mostrar_resultados_incrementales(self, resultados, metodo, tiempo_total):
+        """Añade resultados al TreeView sin limpiar los anteriores (Para Streaming)"""
         return ResultsRenderer.render_results(
             self.app, resultados, metodo, tiempo_total,
             actualizar_estado_callback=self.actualizar_estado
@@ -191,12 +208,16 @@ class UIManager:
                 self.app.master.update_idletasks()
         except: pass
 
-    def deshabilitar_busqueda(self):
+    def deshabilitar_busqueda(self, incluir_entry=True):
         """Bloquea controles durante búsqueda activa"""
         self.app.btn_buscar.config(state='disabled')
         if hasattr(self.app, 'btn_cancelar'):
             self.app.btn_cancelar.config(state='normal')
-        self.app.entry.config(state='disabled')
+        
+        # SIEMPRE mantener el entry habilitado si se solicita (ej: búsqueda automática)
+        # para evitar pérdida de foco mientras el usuario escribe.
+        if incluir_entry:
+            self.app.entry.config(state='disabled')
 
     def habilitar_busqueda(self):
         """Libera controles tras finalizar búsqueda"""

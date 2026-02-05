@@ -47,6 +47,9 @@ class ResultsDisplay:
             return
         
         try:
+            # Limpiar resultados anteriores antes de mostrar multi
+            self.app.ui_manager.limpiar_resultados()
+            
             # Optimizado para 1-20 resultados típicos
             self._agregar_resultados_multi(resultados)
             self._finalizar_multi(resultados, criterio)
@@ -128,11 +131,18 @@ class ResultsDisplay:
                         # Usar ruta absoluta si existe, sino relativa
                         ruta_completa = ruta_abs if ruta_abs else ruta_rel
                         
-                        # Insertar item (SIN dummy - implementación original cbc838b)
-                        self.app.tree.insert("", "end",
-                            text=f"📂 {nombre}",
-                            values=(letra_metodo, ruta_completa),
-                            tags=(tag,))
+                        # Insertar item: values[1]=visible(rel), values[2]=metadata(abs)
+                        # Insertar en TreeView
+                        item_id = self.app.tree.insert("", "end",
+                                       text=f"📂 {nombre}",
+                                       values=(letra_metodo, ruta_rel, ruta_abs),
+                                       tags=(tag,))
+                            
+                        # RECUPERAR INFO DE HIJOS PRE-CALCULADA
+                        tiene_hijos = resultado[3] if len(resultado) >= 4 else False
+                        
+                        if tiene_hijos:
+                            self.app.tree.insert(item_id, "end", text="Cargando...", values=("", "", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item: {e}")
@@ -153,15 +163,23 @@ class ResultsDisplay:
                         nombre = resultado[0]
                         ruta_rel = resultado[1]
                         ruta_abs = resultado[2]
-                        ubicacion = resultado[3]
-                        demandante = resultado[4] if len(resultado) > 4 else ""
-                        demandado = resultado[5] if len(resultado) > 5 else ""
+                        # En el formato unificado tiene_hijos está en 3, ubicacion en 4
+                        # demandante en 5, demandado en 6
+                        ubicacion = resultado[4] if len(resultado) > 4 else ""
+                        demandante = resultado[5] if len(resultado) > 5 else ""
+                        demandado = resultado[6] if len(resultado) > 6 else ""
                         
-                        # Insertar item (SIN dummy - implementación original cbc838b)
-                        self.app.tree.insert("", "end",
+                        # Insertar item: values[1]=visible(rel), values[2]=metadata(abs)
+                        item_id = self.app.tree.insert("", "end",
                             text=f"📂 {nombre}",
-                            values=(ubicacion, ruta_abs, demandante, demandado),
+                            values=(ubicacion, ruta_rel, ruta_abs, demandante, demandado),
                             tags=(tag,))
+                            
+                        # RECUPERAR INFO DE HIJOS PRE-CALCULADA (índice 3 en unificado)
+                        tiene_hijos = resultado[3] if len(resultado) >= 4 else False
+                        
+                        if tiene_hijos:
+                            self.app.tree.insert(item_id, "end", text="Cargando...", values=("", "", "", "", ""))
                             
                 except Exception as e:
                     print(f"[ERROR] Error agregando item multi: {e}")

@@ -223,13 +223,17 @@ class ThemeManager:
                 widget.configure(
                     bg=self.colores["entry_bg"],
                     fg=self.colores["entry_fg"],
-                    insertbackground=self.colores["entry_fg"]
+                    insertbackground=self.colores["entry_fg"],
+                    disabledbackground=self.colores["entry_bg"],
+                    disabledforeground=self.colores["fg_alt"] if "fg_alt" in self.colores else self.colores["fg"],
+                    readonlybackground=self.colores["entry_bg"]
                 )
             elif widget_class == "Text":
                 widget.configure(
                     bg=self.colores["entry_bg"],
                     fg=self.colores["entry_fg"],
-                    insertbackground=self.colores["entry_fg"]
+                    insertbackground=self.colores["entry_fg"],
+                    disabledbackground=self.colores["entry_bg"]
                 )
             elif widget_class == "Listbox":
                 widget.configure(

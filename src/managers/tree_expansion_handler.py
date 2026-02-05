@@ -35,9 +35,20 @@ class TreeExpansionHandler:
                 self.loading_items.discard(item)
                 return
             
-            ruta = values[1]  # La ruta está en la segunda columna
+            # DETERMINAR RUTA ABSOLUTA (Prioridad values[2] -> Metadata oculta)
+            if len(values) >= 3 and os.path.isabs(values[2]):
+                ruta = values[2]
+            else:
+                # Fallback: Resolver desde la segunda columna (values[1])
+                ruta_info = values[1]
+                if os.path.isabs(ruta_info):
+                    ruta = ruta_info
+                else:
+                    ruta_base = getattr(self.app, 'ruta_carpeta', '')
+                    ruta = os.path.join(ruta_base, ruta_info) if ruta_base else ruta_info
             
             if not os.path.exists(ruta) or not os.path.isdir(ruta):
+                print(f"[DEBUG] Ruta inválida para expansión: {ruta}")
                 self.loading_items.discard(item)
                 return
             
@@ -46,9 +57,9 @@ class TreeExpansionHandler:
             for child in children:
                 tree.delete(child)
             
-            # Verificar si tiene subcarpetas ANTES de cargar
+            # VERIFICACIÓN REAL POST-CLIC (Lazy Detection)
             if not self._tiene_subcarpetas(ruta):
-                # No tiene subcarpetas - marcar como cargado y salir
+                # No tiene subcarpetas - quitar el triangulito (dummy) y salir
                 self.loaded_items.add(item)
                 self.loading_items.discard(item)
                 return
@@ -111,7 +122,7 @@ class TreeExpansionHandler:
                     tags=(tag,)
                 )
                 
-                # Agregar nodo dummy si tiene subcarpetas
+                # Agregar nodo dummy si tiene subcarpetas (Verificación real para subniveles)
                 if self._tiene_subcarpetas(ruta):
                     self.app.tree.insert(child_item, 'end', text='Cargando...', values=('', ''))
             

@@ -1,4 +1,4 @@
-# src/menu_manager.py - Gestión de Menús V.4.5 - OPTIMIZADO SIN REDUNDANCIAS
+# src/managers/menu_manager.py - Gestión de Menús V.5.0 (Luce Intellettual) - OPTIMIZADO
 from tkinter import Menu, messagebox
 
 class MenuManager:
@@ -159,7 +159,11 @@ class MenuManager:
         """Abre el manual renderizado como HTML"""
         try:
             import os
-            base_dir = os.path.dirname(os.path.dirname(__file__))
+            # base_dir is src/managers/, we need to go 2 levels up to reach root (BusquedaCarpetas4.5/)
+            # src/managers/menu_manager.py -> src/managers/ -> src/ -> ROOT
+            # Actually dirname(__file__) is src/managers. dirname(dirname(__file__)) is src.
+            # So we need 3 levels of dirname to reach root if it's src/managers/menu_manager.py
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             readme_path = os.path.join(base_dir, 'README.md')
             
             if os.path.exists(readme_path):
@@ -175,7 +179,9 @@ class MenuManager:
         """Abre el changelog renderizado como HTML"""
         try:
             import os
-            changelog_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'CHANGELOG.md')
+            # src/managers/menu_manager.py -> src/managers/ -> src/ -> ROOT
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            changelog_path = os.path.join(base_dir, 'CHANGELOG.md')
             
             if os.path.exists(changelog_path):
                 with open(changelog_path, 'r', encoding='utf-8') as f:
@@ -278,7 +284,7 @@ class MenuManager:
         <body>
             {body_content}
             <div class="footer">
-                Generado automáticamente por Búsqueda Rápida de Carpetas V.4.5<br>
+                Generado automáticamente por Búsqueda Rápida de Carpetas V.5.0<br>
                 {title}
             </div>
         </body>
@@ -291,7 +297,8 @@ class MenuManager:
             with os.fdopen(fd, 'w', encoding='utf-8') as tmp:
                 tmp.write(full_html)
             
-            webbrowser.open(f'file:///{path}')
+            # Usar ruta absoluta directa para Windows
+            webbrowser.open(os.path.abspath(path))
         except Exception as e:
             print(f"Error generando HTML temporal: {e}")
             # Fallback a abrir el archivo original si falla la conversión

@@ -115,8 +115,8 @@ class TreeExplorer(BaseTreeManager):
             if node_id in self.expanded_nodes:
                 self.expanded_nodes.remove(node_id)
             
-            if hasattr(self.app, 'ui_callbacks') and hasattr(self.app.ui_callbacks, '_ajustar_columnas_inmediato'):
-                self.app.ui_callbacks._ajustar_columnas_inmediato()
+            if hasattr(self.app, 'ui_manager') and hasattr(self.app.ui_manager, '_ajustar_columnas_inmediato'):
+                self.app.ui_manager._ajustar_columnas_inmediato()
         
     def expand_node_async(self, node_id):
         """Expande nodo cargando subdirectorios"""
@@ -144,8 +144,8 @@ class TreeExplorer(BaseTreeManager):
         if path in self.temp_cache:
             self.populate_children_from_cache(node_id, path)
             
-            if hasattr(self.app, 'ui_callbacks') and hasattr(self.app.ui_callbacks, '_ajustar_columnas_inmediato'):
-                self.app.ui_callbacks._ajustar_columnas_inmediato()
+            if hasattr(self.app, 'ui_manager') and hasattr(self.app.ui_manager, '_ajustar_columnas_inmediato'):
+                self.app.ui_manager._ajustar_columnas_inmediato()
             return
             
         self.loading_nodes.add(node_id)
@@ -338,8 +338,8 @@ class TreeExplorer(BaseTreeManager):
             if node_id in self.expanded_nodes:
                 self.expanded_nodes.remove(node_id)
             
-            if hasattr(self.app, 'ui_callbacks') and hasattr(self.app.ui_callbacks, '_ajustar_columnas_inmediato'):
-                self.app.ui_callbacks._ajustar_columnas_inmediato()
+            if hasattr(self.app, 'ui_manager') and hasattr(self.app.ui_manager, '_ajustar_columnas_inmediato'):
+                self.app.ui_manager._ajustar_columnas_inmediato()
         else:
             parent = tree.parent(node_id)
             if parent:
@@ -364,8 +364,8 @@ class TreeExplorer(BaseTreeManager):
             if node_id in self.expanded_nodes:
                 self.expanded_nodes.remove(node_id)
             
-            if hasattr(self.app, 'ui_callbacks') and hasattr(self.app.ui_callbacks, '_ajustar_columnas_inmediato'):
-                self.app.ui_callbacks._ajustar_columnas_inmediato()
+            if hasattr(self.app, 'ui_manager') and hasattr(self.app.ui_manager, '_ajustar_columnas_inmediato'):
+                self.app.ui_manager._ajustar_columnas_inmediato()
         else:
             tree.item(node_id, open=True)
             self.expand_node_async(node_id)

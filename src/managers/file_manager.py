@@ -3,9 +3,9 @@ import os
 from tkinter import filedialog
 
 class FileManager:
-    def __init__(self, config_manager, ui_callbacks):
+    def __init__(self, config_manager, ui_manager):
         self.config = config_manager
-        self.ui_callbacks = ui_callbacks
+        self.ui_manager = ui_manager
     
     def seleccionar_ruta(self, ruta_actual=None):
         """Selecciona nueva ruta de búsqueda"""
@@ -22,7 +22,7 @@ class FileManager:
                 return ruta_normalizada
                 
         except Exception as e:
-            self.ui_callbacks.mostrar_error(f"Error al abrir diálogo:\n{str(e)}")
+            self.ui_manager.mostrar_error(f"Error al abrir diálogo:\n{str(e)}")
         
         return None
     
@@ -36,7 +36,7 @@ class FileManager:
         
         for condicion, mensaje in validaciones:
             if not condicion:
-                self.ui_callbacks.mostrar_error(mensaje)
+                self.ui_manager.mostrar_error(mensaje)
                 return False
         
         # Test de escritura
@@ -47,7 +47,7 @@ class FileManager:
             os.remove(test_file)
             return True
         except Exception as e:
-            self.ui_callbacks.mostrar_error(f"Sin permisos de escritura:\n{ruta}\n\n{str(e)}")
+            self.ui_manager.mostrar_error(f"Sin permisos de escritura:\n{ruta}\n\n{str(e)}")
             return False
     
     def abrir_carpeta(self, ruta):

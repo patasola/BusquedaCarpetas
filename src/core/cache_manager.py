@@ -12,6 +12,7 @@ class CacheData:
         self.timestamp = time.time()
         self.ruta_base = ""
         self.valido = False
+        self.padres_set = set() # Set de rutas absolutas que tienen al menos un hijo directo
     
     def is_expired(self, max_age_hours=48):
         """Verifica si el cache ha expirado"""
@@ -41,13 +42,27 @@ class CacheManager:
             print(f"[CACHE] Error en carga automática: {e}")
         
     def cargar_cache(self):
-        """Carga el cache desde archivo"""
+        """Carga el cache desde archivo con validación de integridad"""
         try:
             if not os.path.exists(self.cache_file):
                 return False
                 
             with open(self.cache_file, 'rb') as f:
-                self.cache = pickle.load(f)
+                loaded_data = pickle.load(f)
+            
+            # Validar que los datos cargados sean utilizables
+            if not hasattr(loaded_data, 'directorios'):
+                 print(f"[CACHE] Formato incompatible en {self.cache_file}, ignorando.")
+                 return False
+                 
+            self.cache = loaded_data
+            
+            # Asegurar que el atributo 'valido' exista (retrocompatibilidad)
+            if not hasattr(self.cache, 'valido'):
+                self.cache.valido = False
+            
+            if not hasattr(self.cache, 'padres_set'):
+                self.cache.padres_set = set()
             
             # Verificar validez con normalización de rutas
             if self.ruta_base:
@@ -58,17 +73,27 @@ class CacheManager:
                     if "onedrive" in ruta_cache_norm and "onedrive" in ruta_actual_norm:
                          print(f"[CACHE] OneDrive path variation detected, keeping cache: {self.cache_file}")
                          self.cache.ruta_base = self.ruta_base
+                         self.cache.valido = True
                     else:
-                         print(f"[CACHE] Path mismatch in {self.cache_file}, but keeping for best-effort search")
+                         print(f"[CACHE] Path mismatch in {self.cache_file}: {ruta_cache_norm} vs {ruta_actual_norm}")
+                         # No invalidar forzosamente, solo avisar. 
+                         # Si tiene carpetas, sigue siendo útil.
             
             carpetas_count = self.cache.directorios.get('total', 0)
             if carpetas_count > 0:
                 self.cache.valido = True
                 return True
+            
+            self.cache.valido = False
             return False
             
+        except (pickle.UnpicklingError, EOFError, AttributeError) as e:
+            print(f"[CACHE] Cache corrupto o incompatible {self.cache_file}: {e}")
+            # Si el cache está corrupto, mejor borrarlo
+            self.invalidar_cache()
+            return False
         except Exception as e:
-            print(f"[CACHE] Error cargando cache {self.cache_file}: {e}")
+            print(f"[CACHE] Error inesperado cargando cache {self.cache_file}: {e}")
             return False
     
     def guardar_cache(self):
@@ -102,34 +127,48 @@ class CacheManager:
             print(f"[CACHE] Construyendo cache (scandir) para: {self.ruta_base}")
             carpetas = []
             start_time = time.time()
-            max_carpetas = 100000
+            max_carpetas = 1000000 # Aumentado a 1 Millón para máxima cobertura
             
             def scan_recursive(path):
+                """Explora recursivamente encontrando todas las carpetas"""
                 if len(carpetas) >= max_carpetas:
-                    return
+                    return False
+                
+                encontrado_hijo = False
                 try:
                     with os.scandir(path) as it:
-                        for entry in it:
-                            if len(carpetas) >= max_carpetas:
-                                break
-                            if entry.is_dir():
-                                try:
-                                    ruta_relativa = os.path.relpath(entry.path, self.ruta_base)
-                                    carpetas.append({
-                                        'nombre': entry.name,
-                                        'nombre_lower': entry.name.lower(), # Pre-calculado
-                                        'ruta_relativa': ruta_relativa,
-                                        'ruta_absoluta': entry.path
-                                    })
-                                    # Llamada recursiva
-                                    scan_recursive(entry.path)
-                                except:
-                                    continue
-                except PermissionError:
-                    pass
-                except Exception as e:
-                    print(f"[CACHE] Error escaneando {path}: {e}")
+                        # Primero recolectar todos los directorios en este nivel
+                        entries = []
+                        try:
+                            for entry in it:
+                                if entry.is_dir(follow_symlinks=False):
+                                    entries.append(entry)
+                        except: pass # Ignorar errores parciales de lectura de dir
+                        
+                        for entry in entries:
+                            if len(carpetas) >= max_carpetas: break
+                            
+                            encontrado_hijo = True
+                            try:
+                                ruta_relativa = os.path.relpath(entry.path, self.ruta_base)
+                                carpetas.append({
+                                    'nombre': entry.name,
+                                    'nombre_lower': entry.name.lower(),
+                                    'ruta_relativa': ruta_relativa,
+                                    'ruta_absoluta': entry.path
+                                })
+                                
+                                # Explorar hijos de esta entrada
+                                if scan_recursive(entry.path):
+                                    self.cache.padres_set.add(entry.path)
+                            except:
+                                continue
+                                
+                    return encontrado_hijo
+                except (PermissionError, OSError):
+                    return False
             
+            # Iniciar escaneo recursivo
             scan_recursive(self.ruta_base)
             
             self.cache.directorios = {
@@ -162,7 +201,8 @@ class CacheManager:
                 resultados.append((
                     carpeta['nombre'],
                     carpeta['ruta_relativa'], 
-                    carpeta['ruta_absoluta']
+                    carpeta['ruta_absoluta'],
+                    carpeta['ruta_absoluta'] in self.cache.padres_set # Info precisa de hijos
                 ))
                 if len(resultados) >= 1000:
                     break
@@ -197,3 +237,37 @@ class CacheManager:
     def limpiar(self):
         """Alias para limpiar para compatibilidad"""
         self.invalidar_cache()
+
+    def limpiar_obsoletos(self, archivos_activos):
+        """
+        Elimina archivos de caché (.pkl) que no están en la lista de archivos activos.
+        Ayuda a mantener la carpeta limpia de 'mugre'.
+        """
+        import glob
+        try:
+            # Directorio base de los archivos de caché (el actual)
+            # Asumimos que los archivos están en la carpeta raíz o donde se ejecute la app
+            patrones = ["cache_*.pkl", "carpetas_cache.pkl"]
+            archivos_en_disco = []
+            for patron in patrones:
+                archivos_en_disco.extend(glob.glob(patron))
+            
+            # Normalizar nombres para comparación
+            archivos_activos_norm = [os.path.basename(a) for a in archivos_activos]
+            
+            count = 0
+            for archivo in archivos_en_disco:
+                if archivo not in archivos_activos_norm:
+                    try:
+                        os.remove(archivo)
+                        print(f"[CACHE] Eliminado caché obsoleto: {archivo}")
+                        count += 1
+                    except:
+                        pass
+            
+            if count > 0:
+                print(f"[CACHE] Limpieza completada: {count} archivos eliminados.")
+            return count
+        except Exception as e:
+            print(f"[CACHE] Error en limpieza de obsoletos: {e}")
+            return 0

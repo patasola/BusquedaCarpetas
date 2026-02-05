@@ -10,73 +10,21 @@ class SearchMethods:
     def __init__(self, app):
         self.app = app
     
-    def ejecutar_busqueda(self, criterio):
-        """Punto de entrada principal para búsquedas"""
-        self.app.ui_manager.limpiar_resultados()
-        self.app.ui_manager.actualizar_estado("Buscando...")
-        print(f"[PROFILE] Inicio búsqueda: {time.time()}")
-        
-        # 1. Multi-ubicaciones
-        if hasattr(self.app, 'multi_location_search'):
-            enabled_locations = self.app.multi_location_search.get_enabled_locations()
-            if enabled_locations:
-                self.app.master.after(5, lambda: self.buscar_multi_ubicaciones(criterio))
-                return
-        
-        # 2. Cache principal
-        if self._tiene_cache_valido():
-            resultados = self._buscar_cache(criterio)
-            if resultados:
-                from ..ui.results_display import ResultsDisplay
-                resultados = self._enriquecer_con_bd(resultados, criterio)
-                ResultsDisplay(self.app).mostrar_instantaneos(resultados, criterio, "Cache")
-                
-                # Registrar en historial
-                if hasattr(self.app, 'historial_manager'):
-                    # Tiempo aproximado ya que es instantáneo
-                    self.app.historial_manager.agregar_busqueda(criterio, "Cache", len(resultados), 0.01)
-                return
-        
-        # 3. Búsqueda tradicional
+    def ejecutar_busqueda(self, criterio, silenciosa=False):
+        """Punto de entrada principal para búsquedas - DELEGADO A COORDINATOR"""
         if hasattr(self.app, 'search_coordinator'):
-            self.app.search_coordinator.ejecutar_busqueda(criterio)
+            self.app.search_coordinator.ejecutar_busqueda(criterio, silenciosa=silenciosa)
+        else:
+            # Fallback de seguridad si no hay coordinator
+            self.buscar_tradicional_fallback(criterio)
     
     def buscar_multi_ubicaciones(self, criterio):
-        """Búsqueda asíncrona en múltiples ubicaciones"""
-        def worker():
-            start_time = time.time()
-            all_results = []
-            enabled_locations = self.app.multi_location_search.get_enabled_locations()
-            
-            for location in enabled_locations:
-                try:
-                    results = self._buscar_ubicacion(location, criterio)
-                    for result in results:
-                        if isinstance(result, tuple) and len(result) >= 3:
-                            nombre, ruta_rel, ruta_abs = result[:3]
-                            all_results.append((nombre, ruta_rel, ruta_abs, location['name']))
-                    
-                    if len(all_results) >= 1000:
-                        break
-                except Exception as e:
-                    print(f"[ERROR] Error buscando en {location.get('name')}: {e}")
-                    continue
-            
-            # Enriquecer resultados con BD (esto puede ser lento si hay muchos)
-            all_results = self._enriquecer_con_bd(all_results, criterio)
-            
-            print(f"[PROFILE] Fin búsqueda (encontrados {len(all_results)}): {time.time()}")
-            from ..ui.results_display import ResultsDisplay
-            self.app.master.after(0, lambda: 
-                ResultsDisplay(self.app).mostrar_multi(all_results, criterio))
-            
-            # Registrar en historial
-            if hasattr(self.app, 'historial_manager'):
-                tiempo_total = time.time() - start_time
-                self.app.master.after(0, lambda: 
-                    self.app.historial_manager.agregar_busqueda(criterio, "Multi", len(all_results), tiempo_total))
-        
-        threading.Thread(target=worker, daemon=True).start()
+        """Redirige a SearchCoordinator para consistencia"""
+        if hasattr(self.app, 'search_coordinator'):
+            self.app.search_coordinator.ejecutar_busqueda(criterio)
+        else:
+            # Fallback si no está inicializado
+            self.buscar_tradicional_fallback(criterio)
     
     def _buscar_ubicacion(self, location, criterio):
         """Busca en una ubicación específica"""
@@ -144,8 +92,8 @@ class SearchMethods:
             start_time = time.time()
             if not hasattr(self.app, 'ruta_carpeta') or not self.app.ruta_carpeta:
                 self.app.master.after(0, lambda: [
-                    self.app.ui_callbacks.actualizar_estado("No se encontraron resultados"),
-                    self.app.ui_callbacks.habilitar_busqueda()
+                    self.app.ui_manager.actualizar_estado("No se encontraron resultados"),
+                    self.app.ui_manager.habilitar_busqueda()
                 ])
                 return
             

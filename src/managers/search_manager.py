@@ -101,24 +101,24 @@ class SearchManager:
                 
                 def finalizar_busqueda():
                     if len(resultados) > 0:
-                        self.ui_callbacks.mostrar_resultados_async(
+                        self.ui_manager.mostrar_resultados_async(
                             resultados, "Tradicional", tiempo_total
                         )
                     else:
-                        self.ui_callbacks.mostrar_resultados_async(
+                        self.ui_manager.mostrar_resultados_async(
                             [], "Tradicional", tiempo_total
                         )
                 
-                self.ui_callbacks.app.master.after(0, finalizar_busqueda)
+                self.ui_manager.app.master.after(0, finalizar_busqueda)
                 
             else:
-                self.ui_callbacks.actualizar_estado_async("Error en la búsqueda tradicional")
+                self.ui_manager.actualizar_estado_async("Error en la búsqueda tradicional")
                 
         except Exception as e:
-            self.ui_callbacks.actualizar_estado_async(f"Error en búsqueda tradicional: {str(e)}")
+            self.ui_manager.actualizar_estado_async(f"Error en búsqueda tradicional: {str(e)}")
             
         finally:
-            self.ui_callbacks.finalizar_busqueda_async()
+            self.ui_manager.finalizar_busqueda_async()
             self.busqueda_activa = False
     
     def _finalizar_busqueda_exitosa(self, resultados, metodo):
@@ -127,14 +127,14 @@ class SearchManager:
         self.resultados = resultados
         self.busqueda_activa = False
         
-        self.ui_callbacks.mostrar_resultados(resultados, metodo, tiempo_total)
-        self.ui_callbacks.finalizar_busqueda_inmediata()
+        self.ui_manager.mostrar_resultados(resultados, metodo, tiempo_total)
+        self.ui_manager.finalizar_busqueda_inmediata()
     
     def cancelar(self):
         """Cancela búsqueda en curso"""
         if self.busqueda_activa:
             self.search_engine.cancelar_busqueda()
-            self.ui_callbacks.actualizar_estado("Búsqueda cancelada")
+            self.ui_manager.actualizar_estado("Búsqueda cancelada")
             self.busqueda_activa = False
     
     def actualizar_componentes(self, cache_manager, search_engine):

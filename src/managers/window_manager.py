@@ -1,4 +1,4 @@
-# src/window_manager.py - Gestión de Ventana V.4.5 - Con redimensionamiento adaptativo
+# src/managers/window_manager.py - Gestión de Ventana V.5.0 (Luce Intellettual)
 from ..ui.ui_components import Colors
 
 class WindowManager:
@@ -20,6 +20,7 @@ class WindowManager:
         self.base_app_width = 990  # AUMENTADO 10%: 900px → 990px
         self.user_resized_manually = False
         self.manual_app_width = None
+        self._is_auto_resizing = False  # Lock para evitar bucles de eventos
     
     def configurar_ventana(self, saved_geometry=None, manual_app_width=None):
         """Configura las propiedades básicas de la ventana"""
@@ -56,7 +57,7 @@ class WindowManager:
             x = max(0, (self.screen_width - self.base_app_width) // 2)
             y = max(0, (self.screen_height - initial_height) // 2)
             self.master.geometry(f"{self.base_app_width}x{initial_height}+{x}+{y}")
-        self.master.minsize(400, 300)
+        self.master.minsize(600, 400)
         
         # Detectar redimensionamiento manual
         self.master.bind('<Configure>', self._on_window_resize)
@@ -66,23 +67,38 @@ class WindowManager:
         print(f"  - Panel width: {self.panel_width}px ({panel_width_cm}cm)")
         print(f"  - Pantalla: {self.screen_width}x{self.screen_height}")
         
-        self.master.update_idletasks()
-    
     def _on_window_resize(self, event):
         """Detecta cuando el usuario redimensiona manualmente"""
+        # CRÍTICO: Ignorar eventos durante la inicialización o redimensionamientos automáticos
+        if self._is_auto_resizing or (hasattr(self.app, '_is_initializing') and self.app._is_initializing):
+            return
+
         # Solo procesar eventos de la ventana principal
         if event.widget != self.master:
             return
         
         # Calcular ancho esperado automático
         expected_width = self._calculate_expected_width()
-        current_width = self.master.winfo_width()
+        current_width = event.width # Usar el ancho del evento es más fiable
         
+        # Calcular ancho de paneles actuales
+        if hasattr(self.app, 'dual_panel_manager'):
+            current_panels_width = self.app.dual_panel_manager.get_total_panels_width()
+        else:
+            current_panels_width = self.current_panel_count * self.panel_width
+
         # Si difiere significativamente, el usuario está redimensionando
-        if abs(current_width - expected_width) > 30:
+        if abs(current_width - expected_width) > 35: # Margen aumentado un poco
             self.user_resized_manually = True
-            self.manual_app_width = current_width - (self.current_panel_count * self.panel_width)
-            print(f"[DEBUG] Redimensionamiento manual detectado: {current_width}px")
+            self.manual_app_width = current_width - current_panels_width
+            
+            # Guardar preferencias tras redimensionar (Debounced)
+            if hasattr(self.app, 'save_ui_settings'):
+                if not hasattr(self, '_save_timer'): self._save_timer = None
+                if self._save_timer: self.master.after_cancel(self._save_timer)
+                self._save_timer = self.master.after(1000, self.app.save_ui_settings)
+                
+            print(f"[DEBUG] Redimensionamiento manual detectado: {current_width}px (App: {self.manual_app_width}px)")
     
     def _calculate_expected_width(self):
         """Calcula el ancho esperado según paneles activos"""
@@ -91,7 +107,13 @@ class WindowManager:
         else:
             app_width = self.base_app_width
         
-        return app_width + (self.current_panel_count * self.panel_width)
+        # Usar ancho real de paneles si está disponible
+        if hasattr(self.app, 'dual_panel_manager'):
+            panels_width = self.app.dual_panel_manager.get_total_panels_width()
+        else:
+            panels_width = self.current_panel_count * self.panel_width
+            
+        return app_width + panels_width
     
     def add_panel(self):
         """Agrega un panel con redimensionamiento inteligente"""
@@ -117,12 +139,11 @@ class WindowManager:
     def _smart_resize(self):
         """Redimensionamiento inteligente: mezcla de encoger app + crecer ventana"""
         try:
-            # Obtener dimensiones actuales
-            current_total_width = self.master.winfo_width()
-            current_app_width = current_total_width - ((self.current_panel_count - 1) * self.panel_width)
-            
-            # Calcular ancho necesario para todos los paneles
-            panels_width = self.current_panel_count * self.panel_width
+            # Calcular ancho necesario para todos los paneles de forma precisa
+            if hasattr(self.app, 'dual_panel_manager'):
+                panels_width = self.app.dual_panel_manager.get_total_panels_width()
+            else:
+                panels_width = self.current_panel_count * self.panel_width
             
             # ESTRATEGIA MIXTA:
             # 1. Calcular ancho ideal (sin restricciones)
@@ -133,8 +154,8 @@ class WindowManager:
             
             ideal_total_width = ideal_app_width + panels_width
             
-            # 2. Verificar si cabe en pantalla (dejar margen de 50px)
-            max_available_width = self.screen_width - 50
+            # 2. Verificar si cabe en pantalla (dejar margen de 80px)
+            max_available_width = self.screen_width - 80
             
             if ideal_total_width > max_available_width:
                 # NO CABE: Aplicar estrategia mixta
@@ -154,39 +175,38 @@ class WindowManager:
                 print(f"  - App: {ideal_app_width}px → {int(new_app_width)}px")
                 print(f"  - Total: {ideal_total_width}px → {int(new_total_width)}px")
             else:
-                # SÍ CABE: Mezcla equilibrada (70% crece ventana, 30% encoge app)
-                if self.current_panel_count > 0:
-                    # Al agregar panel: app se encoge un 30% del ancho del panel
-                    shrink_amount = self.panel_width * 0.3
-                    new_app_width = ideal_app_width - (shrink_amount * self.current_panel_count)
-                    new_app_width = max(500, new_app_width)  # Mínimo razonable
-                else:
-                    # Sin paneles: volver al tamaño ideal
-                    new_app_width = ideal_app_width
+                # SÍ CABE: Priorizar mantener el tamaño de la app y solo crecer la ventana
+                new_app_width = ideal_app_width
+                new_total_width = ideal_total_width
                 
-                new_total_width = new_app_width + panels_width
-                
-                print(f"[DEBUG] Mezcla equilibrada (70-30):")
-                print(f"  - App: {ideal_app_width}px → {int(new_app_width)}px")
+                print(f"[DEBUG] Ventana crecida (app intacta):")
+                print(f"  - App: {ideal_app_width}px")
                 print(f"  - Paneles: {panels_width}px")
                 print(f"  - Total: {int(new_total_width)}px")
             
-            # 3. Centrar en pantalla
+            # 3. Mantener posición Y, ajustar X si es necesario para que quepa
             current_x = self.master.winfo_x()
             current_y = self.master.winfo_y()
             
-            # Si está primera vez o muy descentrado, centrar
-            if self.current_panel_count == 1:
-                current_x = max(0, (self.screen_width - int(new_total_width)) // 2)
+            if current_x + new_total_width > self.screen_width:
+                current_x = max(0, self.screen_width - int(new_total_width) - 40)
             
-            # 4. Aplicar geometría
-            self.master.geometry(f"{int(new_total_width)}x{self.master.winfo_height()}+{current_x}+{current_y}")
+            # 4. Aplicar geometría con LOCK
+            self._is_auto_resizing = True
+            try:
+                # Asegurar que el alto sea razonable
+                h = self.master.winfo_height()
+                if h < 300: h = 700 # Fallback si no está mapeada
+                
+                self.master.geometry(f"{int(new_total_width)}x{h}+{current_x}+{current_y}")
+                self.master.update_idletasks()
+            finally:
+                # Retrasar la liberación del lock para asegurar que los eventos se procesen
+                self.master.after(300, self._release_auto_resize_lock)
             
             # 5. Actualizar estado
             if not self.user_resized_manually:
                 self.base_app_width = int(new_app_width)
-            
-            self.master.update_idletasks()
             
             # Después de aplicar, permitir redimensionamiento manual
             self.master.after(100, self._enable_manual_resize)
@@ -194,6 +214,11 @@ class WindowManager:
         except Exception as e:
             print(f"[ERROR] Error en smart_resize: {e}")
     
+    def _release_auto_resize_lock(self):
+        """Libera el lock de redimensionamiento automático"""
+        self._is_auto_resizing = False
+        print("[DEBUG] Auto-resize lock liberado")
+
     def _enable_manual_resize(self):
         """Permite que eventos de resize sean detectados como manuales"""
         # Simplemente dejamos que _on_window_resize haga su trabajo

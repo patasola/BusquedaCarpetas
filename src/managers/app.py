@@ -86,7 +86,7 @@ class BusquedaCarpetaApp:
     def __init__(self, master):
         self.master = master
         start_time = time.time()
-        self.version = "4.5"
+        self.version = "5.0"
         self.mostrar_explorador = tk.BooleanVar(value=False)
         self.mostrar_historial = tk.BooleanVar(value=False)
         self._selection_timer = None
@@ -143,6 +143,9 @@ class BusquedaCarpetaApp:
         
         self.master.after(500, self._restore_panel_visibility_safe)
         
+        # Limpieza de 'mugre' (caches obsoletos) en segundo plano tras iniciar
+        self.master.after(2000, self.search_coordinator.verificar_problemas_cache_silencioso)
+        
         print(f"[PROFILE] App iniciada en: {time.time() - start_time:.3f}s")
         
         # Crear barra de atajos global
@@ -188,13 +191,26 @@ class BusquedaCarpetaApp:
     def save_ui_settings(self):
         """Guarda las preferencias actuales de la interfaz"""
         try:
-            # 1. Geometría y posición
-            geometry = self.master.winfo_geometry()
+            # 1. Geometría y posición ABSOLUTA
+            # master.winfo_geometry() puede devolver "+0+0" si se llama muy rápido
+            # Capturamos los valores reales del gestor de ventanas
+            self.master.update_idletasks()
+            w = self.master.winfo_width()
+            h = self.master.winfo_height()
+            x = self.master.winfo_x()
+            y = self.master.winfo_y()
+            
+            # Guardamos formato estandar: WxH+X+Y
+            geometry = f"{w}x{h}+{x}+{y}"
             self.config.set("window_geometry", geometry)
             
             # 2. Ancho manual de la app (si se redimensionó)
             if hasattr(self, 'window_manager'):
-                self.config.set("manual_app_width", self.window_manager.manual_app_width)
+                # Actualizar el ancho manual actual antes de guardar
+                if self.window_manager.user_resized_manually:
+                    self.config.set("manual_app_width", self.window_manager.manual_app_width)
+                else:
+                    self.config.set("manual_app_width", None)
             
             # 3. Tema actual
             if hasattr(self, 'theme_manager'):
@@ -246,9 +262,9 @@ class BusquedaCarpetaApp:
                     widths = {str(col): tree.column(col, 'width') for col in cols}
                     self.config.set("history_column_widths", widths)
 
-            # Guardar a disco
+            # Guardar a disco inmediatamente
             self.config.guardar_config()
-            print(f"[DEBUG] Preferencias de UI y columnas guardadas (con delegación)")
+            print(f"[DEBUG] Preferencias de UI (Geometría: {geometry}) y columnas guardadas")
         except Exception as e:
             print(f"[ERROR] Error guardando preferencias: {e}")
 
@@ -378,18 +394,22 @@ class BusquedaCarpetaApp:
         return status_frame, cache_frame
 
     # BÚSQUEDA - Delegada a SearchMethods
-    def buscar_carpeta(self):
+    def buscar_carpeta(self, silenciosa=False):
         """Búsqueda principal"""
         criterio = self.entry.get().strip()
         if not criterio:
-            self.ui_manager.mostrar_advertencia("Ingrese un criterio de búsqueda")
+            if not silenciosa:
+                self.ui_manager.mostrar_advertencia("Ingrese un criterio de búsqueda")
             return
         
-        self.ui_manager.deshabilitar_busqueda()
-        self.btn_buscar.configure(text='Buscando...')
-        self.ui_manager.actualizar_estado("Iniciando...")
+        # En búsqueda automática (silenciosa), NO deshabilitar el entry para no robar foco
+        self.ui_manager.deshabilitar_busqueda(incluir_entry=not silenciosa)
         
-        self.master.after(1, lambda: self.search_methods.ejecutar_busqueda(criterio))
+        if not silenciosa:
+            self.btn_buscar.configure(text='Buscando...')
+            self.ui_manager.actualizar_estado("Iniciando...")
+        
+        self.master.after(1, lambda: self.search_methods.ejecutar_busqueda(criterio, silenciosa=silenciosa))
 
     def cancelar_busqueda(self):
         """Cancela búsqueda"""

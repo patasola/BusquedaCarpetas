@@ -63,10 +63,25 @@ class ColumnManager:
         
         for col_id in all_columns_ordered:
             col_def = self.column_defs.get(col_id, {"title": col_id, "width": 100})
+            
+            # Prioridad: 1. Guardado en disco, 2. Default definicion
             w = saved_widths.get(col_id, col_def.get("width", 100))
+            if w < 10: w = col_def.get("width", 100) # Evitar 1px bug
+            
             self.tree.heading(col_id, text=col_def.get("title", col_id))
             self.tree.column(col_id, width=w, anchor=col_def.get("anchor", "w"), 
                             stretch=(col_id == "Ruta"))
+        
+        # Cargar visibilidad de columnas si está guardada
+        if self.app and hasattr(self.app, 'config'):
+            key = self.config_keys.get(self.config_id)
+            if key:
+                conf = self.app.config.get(key, {})
+                visible = conf.get('visible_columns')
+                if visible:
+                    valid_visible = [c for c in visible if c in all_columns_ordered]
+                    if valid_visible:
+                        self.tree.configure(displaycolumns=tuple(valid_visible))
         
         self.all_columns = all_columns_ordered
 
@@ -158,9 +173,11 @@ class ColumnManager:
         pass
 
     def _get_saved_widths(self):
-        if not self.app: return {}
-        conf = self.app.config.get(self.config_keys.get(self.config_id), {})
-        return conf.get('widths', {})
+        if not self.app or not hasattr(self.app, 'config'): return {}
+        key = self.config_keys.get(self.config_id)
+        if not key: return {}
+        conf = self.app.config.get(key, {})
+        return conf.get('widths', {}) if isinstance(conf, dict) else {}
 
     def _reconfigure_all_headings(self):
         for cid in list(self.tree["columns"]):

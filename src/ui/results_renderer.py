@@ -66,20 +66,45 @@ class ResultsRenderer:
                 for i, resultado in enumerate(batch, start=batch_start):
                     tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                     
-                    # Extraer datos del resultado
+                    # Extraer datos del resultado unificado: (nom, rel, abs, hijos, loc, dem1, dem2)
                     if isinstance(resultado, tuple) and len(resultado) >= 3:
                         nombre, ruta_rel, ruta_abs = resultado[:3]
+                        # En formato unificado: index 3 = hijos, index 4 = loc_name
+                        tiene_hijos = resultado[3] if len(resultado) >= 4 else False
+                        
+                        # Si hay un nombre de ubicación (index 4), usarlo en vez de la letra del método
+                        metodo_display = letra_metodo
+                        if len(resultado) >= 5 and resultado[4]:
+                            metodo_display = resultado[4]
+                        
+                        # Info de base de datos (si existe)
+                        extra_values = []
+                        if len(resultado) >= 7:
+                            extra_values = [resultado[5], resultado[6]]
                     elif isinstance(resultado, dict):
                         nombre = resultado.get('name', 'Sin nombre')
                         ruta_rel = resultado.get('path', '')
+                        ruta_abs = resultado.get('abs_path', ruta_rel)
+                        tiene_hijos = resultado.get('has_children', False)
+                        metodo_display = letra_metodo
+                        extra_values = []
                     else:
                         continue
                     
-                    # Insertar en TreeView (SIN dummy - implementación original cbc838b)
-                    app.tree.insert("", "end",
+                    # Insertar en TreeView: 
+                    # values[0]=Método/Loc, values[1]=RutaRel, values[2]=MetadataAbs, ...
+                    tree_values = [metodo_display, ruta_rel, ruta_abs] + extra_values
+                    
+                    item_id = app.tree.insert("", "end",
                                    text=f"📂 {nombre}",
-                                   values=(letra_metodo, ruta_rel),
+                                   values=tuple(tree_values),
                                    tags=(tag,))
+                    
+                    # RECUPERAR INFO DE HIJOS PRE-CALCULADA
+                    if tiene_hijos:
+                        # Insertar dummy con la misma cantidad de columnas para evitar errores de índice
+                        dummy_values = [""] * len(tree_values)
+                        app.tree.insert(item_id, "end", text="Cargando...", values=tuple(dummy_values))
                 
                 # Actualizar UI solo cada batch (no cada item)
                 if batch_end < total:

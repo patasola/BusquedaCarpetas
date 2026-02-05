@@ -79,8 +79,8 @@ class KeyboardManager:
             return
         else:
             # Si no está en el explorador, no hacer nada o mostrar mensaje
-            if hasattr(self.app, 'ui_callbacks'):
-                self.app.ui_callbacks.actualizar_estado("F2: Renombrar (solo en explorador de archivos)")
+            if hasattr(self.app, 'ui_manager'):
+                self.app.ui_manager.actualizar_estado("F2: Renombrar (solo en explorador de archivos)")
     
     def _handle_f6(self, event):
         """Maneja F6 - Copiar ruta según el componente que tenga el foco"""

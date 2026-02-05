@@ -1,4 +1,4 @@
-﻿# src/ui_components.py - Componentes de Interfaz V.4.2 (Tooltip Simple)
+﻿# src/ui/ui_components.py - Componentes de Interfaz V.5.0 (Luce Intellettual)
 import tkinter as tk
 from tkinter import ttk
 from .components.tree_tooltip import TreeViewTooltip

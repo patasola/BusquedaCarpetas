@@ -1,7 +1,7 @@
-# src/constants.py - Constantes V.4.5 (Refactored - sin clase Colors)
+# src/core/constants.py - Constantes V.5.0 (Luce Intellettual)
 
 # Información de la aplicación
-APP_VERSION = "V. 4.5 - Paneles Duales con Redimensión"
+APP_VERSION = "V. 5.0 - Luce Intellettual"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana

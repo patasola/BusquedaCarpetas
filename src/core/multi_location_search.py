@@ -135,3 +135,20 @@ class MultiLocationSearch:
         """Recarga ubicaciones desde archivo"""
         self.load_locations()
         self.rotation_index = 0
+
+    def update_location_cache_size(self, path, size):
+        """Actualiza el tamaño de cache para una ubicación y guarda en el JSON"""
+        modified = False
+        for loc in self.locations:
+            if os.path.normpath(loc['path']).lower() == os.path.normpath(path).lower():
+                loc['cache_size'] = size
+                loc['last_scanned'] = datetime.now().strftime("%H:%M:%S")
+                modified = True
+        
+        if modified:
+            try:
+                with open(self.config_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.locations, f, indent=2)
+                print(f"[MULTI-SEARCH] Metadata actualizada para: {path} ({size} carpetas)")
+            except Exception as e:
+                print(f"[ERROR] No se pudo guardar search_locations.json: {e}")
