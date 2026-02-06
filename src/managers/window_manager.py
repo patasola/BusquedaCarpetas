@@ -24,7 +24,8 @@ class WindowManager:
     
     def configurar_ventana(self, saved_geometry=None, manual_app_width=None):
         """Configura las propiedades básicas de la ventana"""
-        self.master.title(f"Búsqueda de Carpetas v{self.version}")
+        from ..core.constants import APP_TITLE
+        self.master.title(APP_TITLE)
         self.master.configure(bg=Colors.BACKGROUND)
         self.master.resizable(True, True)
         
