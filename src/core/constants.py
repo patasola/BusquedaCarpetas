@@ -2,7 +2,7 @@
 
 # Información de la aplicación
 APP_VERSION = "V. 5.1 - Luce Ultima"
-APP_TITLE = "Búsqueda Rápida de Carpetas V.5.1 (Luce Ultima)"
+APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana
 WINDOW_SIZE = "1200x700"

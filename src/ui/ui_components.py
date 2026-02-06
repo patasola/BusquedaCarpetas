@@ -15,6 +15,13 @@ class Colors:
     BUTTON_ACTIVE_BG = "#d0d0d0"
     CACHE_BAR_BG = "#e8e8e8"
     STATUS_BAR_BG = "#e8e8e8"
+    
+    # Colores adicionales para AboutDialog y otros
+    BLUE_BAR = "#1976D2"
+    DARK_GRAY = "#424242"
+    MEDIUM_GRAY = "#757575"
+    LIGHT_GRAY = "#e0e0e0"
+    WHITE = "#ffffff"
 
 class Fonts:
     BUTTONS = ("Segoe UI", 9)

@@ -82,11 +82,13 @@ class LocationTooltip:
             self.tooltip_window.destroy()
             self.tooltip_window = None
 
+from ..core.constants import APP_VERSION
+
 class BusquedaCarpetaApp:
     def __init__(self, master):
         self.master = master
         start_time = time.time()
-        self.version = "5.0"
+        self.version = APP_VERSION
         self.mostrar_explorador = tk.BooleanVar(value=False)
         self.mostrar_historial = tk.BooleanVar(value=False)
         self._selection_timer = None
