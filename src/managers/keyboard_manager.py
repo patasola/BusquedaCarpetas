@@ -47,8 +47,9 @@ class KeyboardManager:
         self.app.master.bind('<F12>', lambda e: self._toggle_tema())
         
         # Alt: Toggle menú (Auto-hide)
-        self.app.master.bind('<Alt_L>', lambda e: self._toggle_menu())
-        self.app.master.bind('<Alt_R>', lambda e: self._toggle_menu())
+        # Alt: Toggle menú (Auto-hide) - ELIMINADO para restaurar comportamiento nativo
+        # self.app.master.bind('<Alt_L>', lambda e: self._toggle_menu())
+        # self.app.master.bind('<Alt_R>', lambda e: self._toggle_menu())
 
         print("[DEBUG] Atajos de paneles configurados:")
         print("  - Ctrl+Shift+H: Historial")

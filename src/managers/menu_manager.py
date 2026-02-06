@@ -12,8 +12,8 @@ class MenuManager:
     def create_menu_bar(self):
         """Crea la barra de menú completa - OPTIMIZADA"""
         self.menubar = Menu(self.app.master)
-        # NO configurar menu al inicio para que arranque oculto
-        # self.app.master.config(menu=self.menubar)
+        # Configurar menu permanentemente para navegación nativa con Alt
+        self.app.master.config(menu=self.menubar)
         
         self._create_archivo_menu(self.menubar)
         self._create_ver_menu(self.menubar)
