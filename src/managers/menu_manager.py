@@ -22,45 +22,49 @@ class MenuManager:
     def _create_archivo_menu(self, menubar):
         """Crea menú Archivo - Con nomenclatura clara"""
         archivo = Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Archivo", menu=archivo)
+        menubar.add_cascade(label="Archivo", menu=archivo, underline=0)  # Alt+A
         
         # Carpeta PRINCIPAL (ruta_carpeta) - Base del sistema
         archivo.add_command(
             label="Carpeta Principal...", 
             command=self._seleccionar_carpeta,
-            accelerator="Ctrl+O"
+            accelerator="Ctrl+O",
+            underline=0  # Alt+C dentro del menú
         )
         
         # Ubicaciones ADICIONALES (multi_location_search)
         archivo.add_command(
             label="Ubicaciones Adicionales...", 
             command=self._show_locations_config,
-            accelerator="Ctrl+U"
+            accelerator="Ctrl+U",
+            underline=0  # Alt+U
         )
         
         archivo.add_separator()
-        archivo.add_command(label="Verificar problemas", command=self.app.search_coordinator.verificar_problemas_cache)
+        archivo.add_command(label="Verificar problemas", command=self.app.search_coordinator.verificar_problemas_cache, underline=0)
         archivo.add_separator()
-        archivo.add_command(label="Salir", command=self.app.master.quit)
+        archivo.add_command(label="Salir", command=self.app.master.quit, underline=0) # Alt+S
     
     def _create_ver_menu(self, menubar):
         """Crea menú Ver para paneles duales"""
         ver_menu = Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Ver", menu=ver_menu)
+        menubar.add_cascade(label="Ver", menu=ver_menu, underline=0) # Alt+V
         
         # Historial y explorador con checkbuttons - ATAJOS ACTUALIZADOS
         ver_menu.add_checkbutton(
             label="Historial de Búsquedas",
             variable=self.app.mostrar_historial,
             command=self.app.toggle_historial,
-            accelerator="Ctrl+Shift+H"
+            accelerator="Ctrl+Shift+H",
+            underline=0 # Alt+H
         )
         
         ver_menu.add_checkbutton(
             label="Explorador de Archivos", 
             variable=self.app.mostrar_explorador,
             command=self.app.toggle_explorador,
-            accelerator="Ctrl+Shift+E"
+            accelerator="Ctrl+Shift+E",
+            underline=0 # Alt+E
         )
         
         ver_menu.add_separator()
@@ -69,31 +73,34 @@ class MenuManager:
         ver_menu.add_checkbutton(
             label="Barra de Información de Cache",
             variable=self.app.mostrar_barra_cache,
-            command=self.app.toggle_barra_cache
+            command=self.app.toggle_barra_cache,
+            underline=9 # Barra de I-nformación
         )
         
         ver_menu.add_checkbutton(
             label="Barra de Estado",
             variable=self.app.mostrar_barra_estado,
-            command=self.app.toggle_barra_estado
+            command=self.app.toggle_barra_estado,
+            underline=9 # Barra de E-stado
         )
        
         ver_menu.add_separator()
         ver_menu.add_command(
             label="🌓 Cambiar Tema",
             command=lambda: self.app.theme_manager.toggle_tema(),
-            accelerator="F12"
+            accelerator="F12",
+            underline=3 # Cam-b-iar
         )
     
     def _create_ayuda_menu(self, menubar):
         """Crea menú Ayuda"""
         ayuda = Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Ayuda", menu=ayuda)
+        menubar.add_cascade(label="Ayuda", menu=ayuda, underline=2) # Ay-u-da (Alt+U para no chocar con A-rchivo)
         
-        ayuda.add_command(label="Manual de Usuario", command=self.mostrar_manual)
-        ayuda.add_command(label="Registro de Cambios", command=self.mostrar_changelog)
+        ayuda.add_command(label="Manual de Usuario", command=self.mostrar_manual, underline=0) # Alt+M
+        ayuda.add_command(label="Registro de Cambios", command=self.mostrar_changelog, underline=0) # Alt+R
         ayuda.add_separator()
-        ayuda.add_command(label="Acerca de", command=self.mostrar_acerca_de)
+        ayuda.add_command(label="Acerca de", command=self.mostrar_acerca_de, underline=0) # Alt+A
     
     def _seleccionar_carpeta(self):
         """Wrapper para seleccionar carpeta - MEJORADO para reconstruir cache automáticamente"""
