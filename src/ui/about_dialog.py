@@ -1,7 +1,8 @@
 # src/about_dialog.py - Diálogo Acerca de V.4.5 Simple con Scroll Automático
 import tkinter as tk
 from tkinter import ttk
-from ..core.constants import Colors, Fonts, APP_VERSION, APP_TITLE
+from .ui_components import Colors, Fonts
+from ..core.constants import APP_VERSION, APP_TITLE
 
 class AboutDialog:
     def __init__(self, parent, version):
