@@ -305,19 +305,17 @@ class MenuManager:
             pass
     
     def mostrar_acerca_de(self):
-        """Muestra información sobre la aplicación con messagebox nativo"""
+        """Muestra el diálogo 'Acerca de' sofisticado"""
         try:
-            version_info = f"Versión {self.app.version}" if hasattr(self.app, 'version') else "Versión desconocida"
-            messagebox.showinfo(
-                "Búsqueda de Carpetas",
-                f"Búsqueda Rápida de Carpetas\n\n"
-                f"{version_info}\n\n"
-                f"Desarrollado por: Elkin Darío Pérez Puyana\n"
-                f"© 2025\n\n"
-                f"Una herramienta para búsqueda eficiente de carpetas."
-            )
+            from ..ui.about_dialog import AboutDialog
+            from ..core.constants import APP_VERSION
+            
+            dialog = AboutDialog(self.app.master, APP_VERSION)
+            dialog.mostrar_acerca_de()
+            
         except Exception as e:
-            messagebox.showerror("Error", f"Error inesperado: {e}")
+            print(f"Error mostrando acerca de: {e}")
+            messagebox.showerror("Error", f"Error abriendo acerca de: {e}")
     
     def get_menu_state(self):
         """Obtiene el estado actual de las opciones del menú"""
