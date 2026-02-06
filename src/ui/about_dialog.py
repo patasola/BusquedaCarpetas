@@ -1,12 +1,12 @@
 # src/about_dialog.py - Diálogo Acerca de V.4.5 Simple con Scroll Automático
 import tkinter as tk
 from tkinter import ttk
-from .constants import Colors, Fonts
+from .constants import Colors, Fonts, APP_VERSION, APP_TITLE
 
 class AboutDialog:
     def __init__(self, parent, version):
         self.parent = parent
-        self.version = version
+        self.version = APP_VERSION
         self.dialog = None
         self.scroll_frame = None
         self.content_frame = None
@@ -32,7 +32,7 @@ class AboutDialog:
     def _crear_ventana(self):
         """Crea y configura la ventana"""
         self.dialog = tk.Toplevel(self.parent)
-        self.dialog.title("Acerca de Búsqueda Rápida de Carpetas")
+        self.dialog.title(f"Acerca de {APP_TITLE}")
         self.dialog.geometry("600x500")
         self.dialog.resizable(False, False)
         self.dialog.configure(bg=Colors.BACKGROUND)
@@ -283,7 +283,7 @@ class AboutDialog:
         
         # Copyright
         copyright_label = tk.Label(self.content_frame,
-                                 text="© 2025 - Búsqueda Rápida de Carpetas V.4.5\n"
+                                 text=f"© 2026 - {APP_TITLE}\n"
                                       "Desarrollado con ❤️ para mejorar tu productividad",
                                  font=("Segoe UI", 9),
                                  fg=Colors.MEDIUM_GRAY,
