@@ -164,9 +164,10 @@ class AboutDialog:
         
         evolution_text = ("V.4.2 → Refactorización completa: código optimizado\n"
                          "V.4.4 → Explorador de archivos refactorizado completo\n"
-                         "V.4.5 → Paneles duales con redimensión dinámica\n"
+        evolution_text = ("V.4.5 → Paneles duales con redimensión dinámica\n"
+                         "V.4.9 → Gran Refactor: Modularización (Managers) y limpieza de caché\n"
                          "V.5.0 → Luce Intellettual: Nueva estética consolidada\n"
-                         "V.5.1 → Luce Ultima: Startup instantáneo y foco estable")
+                         "V.5.1 → Luce Ultima: Startup instantáneo y correcciones finales")
         
         evolution_detail = tk.Label(self.content_frame,
                                    text=evolution_text,
