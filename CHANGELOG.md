@@ -1,5 +1,23 @@
 # Changelog - BusquedaCarpetas V.5.0 (Luce Intellettual)
 
+## [5.1.0] - 2026-02-06
+
+### 🚀 Optimización de Inicio y Estabilidad (Luce Ultima)
+
+#### Startup
+- **OPTIMIZED:** Implementado patrón "Hidden Loading" (`withdraw` -> `init` -> `deiconify`) para arranque invisible y sin parpadeos.
+- **THREADED:** Carga inicial de caché (`.pkl`) movida a hilo secundario para desbloquear el inicio inmediato.
+- **SYNC:** Restauración de paneles síncrona pre-visualización para layout perfecto desde el primer frame.
+
+#### Navegación y Foco
+- **FIXED:** Solucionado problema de "Tab Jumping" mediante validación de `search_id` en actualizaciones de fondo.
+- **PROTECTED:** Implementado mecanismo de preservación de foco (`focus_get` -> `update` -> `focus_set`) en `UIManager` y `HistorialManager`.
+- **VISUAL:** Añadido `highlightthickness=1` a botones para feedback de foco nativo y claro.
+
+#### Concurrencia
+- **SAFETY:** Añadidos IDs únicos por búsqueda (`current_search_id`) para prevenir "Ghost Updates" de búsquedas canceladas.
+- **STABILITY:** `SearchCoordinator` ahora aborta enriquecimientos en segundo plano si la búsqueda ha cambiado.
+
 ## [5.0.1] - 2026-01-28
 
 ### 🚀 Corrección Crítica de Rendimiento

@@ -139,14 +139,22 @@ class BusquedaCarpetaApp:
         self._init_managers()
         self._configure_app()
         self._start_location_rotation()
-        self._cargar_cache_inteligente()
+        self._init_managers()
+        self._configure_app()
+        self._start_location_rotation()
         
-        self.master.after(500, self._restore_panel_visibility_safe)
+        # Optimización: Cargar caché en hilo para no bloquear UI
+        import threading
+        threading.Thread(target=self._cargar_cache_inteligente, daemon=True).start()
+        
+        # Optimización: Restaurar paneles SÍNCRONAMENTE (mientras ventana está oculta)
+        # Ya no necesitamos 'after', porque main.py oculta la ventana
+        self._restore_panel_visibility_safe()
         
         # Limpieza de 'mugre' (caches obsoletos) en segundo plano tras iniciar
         self.master.after(2000, self.search_coordinator.verificar_problemas_cache_silencioso)
         
-        print(f"[PROFILE] App iniciada en: {time.time() - start_time:.3f}s")
+        print(f"[PROFILE] App inicializada en: {time.time() - start_time:.3f}s")
         
         # Crear barra de atajos global
         self.create_global_shortcuts_bar()
@@ -158,16 +166,29 @@ class BusquedaCarpetaApp:
             restaurar_historial = self.config.get("show_history", False)
             restaurar_explorador = self.config.get("show_explorer", False)
             
-            print(f"[DEBUG] Restaurando paneles - Historial: {restaurar_historial}, Explorador: {restaurar_explorador}")
+            print(f"[DEBUG] Restaurando paneles (Síncrono) - Historial: {restaurar_historial}, Explorador: {restaurar_explorador}")
             
             # Aplicar visibilidad
-            if restaurar_historial:
-                self.toggle_historial()
-            if restaurar_explorador:
-                self.toggle_explorador()
+            history_col = self.config.get("history_assigned_col", 1)
+            explorer_col = self.config.get("explorer_assigned_col", 2)
             
-            # Finalizar inicialización después de un breve delay para permitir el renderizado
-            self.master.after(500, self._finish_initialization)
+            if history_col == explorer_col:
+                history_col, explorer_col = 1, 2
+                
+            paneles = []
+            if restaurar_historial:
+                paneles.append(('historial', history_col, self.toggle_historial))
+            if restaurar_explorador:
+                paneles.append(('explorador', explorer_col, self.toggle_explorador))
+                
+            paneles.sort(key=lambda x: x[1] if x[1] is not None else 99)
+            
+            # Abrir en orden
+            for p_type, col, method in paneles:
+                method()
+            
+            # Finalizar inicialización
+            self._finish_initialization()
         except Exception as e:
             print(f"[ERROR] Error restaurando paneles: {e}")
             self._is_initializing = False
@@ -175,11 +196,30 @@ class BusquedaCarpetaApp:
     def _finish_initialization(self):
         self._is_initializing = False
         print("[DEBUG] Inicialización completa. Redimensionamiento inteligente habilitado.")
-
-    def _restore_panel_visibility(self):
-        """Método antiguo mantenido por compatibilidad si es necesario"""
-        self._restore_panel_visibility_safe()
-
+        
+    def _cargar_cache_inteligente(self):
+        """Carga cache en segundo plano"""
+        try:
+            # Carga síncrona del PKL (ahora corre en thread)
+            print("[CACHE] Iniciando carga en background...")
+            cache_cargado = self.cache_manager.cargar_cache()
+            
+            # Si se cargó correctamente
+            if cache_cargado and self.cache_manager.cache.valido:
+                stats = self.cache_manager.get_cache_stats()
+                print(f"[CACHE] Cache cargado exitosamente. Carpetas: {stats.get('carpetas', 0)}")
+                return True
+            
+            # Si no hay caché válido, iniciar construcción (ya es threaded internamente, pero aquí es seguro)
+            if self.ruta_carpeta and os.path.exists(self.ruta_carpeta):
+                print("[CACHE] Cache no válido o inexistente. Iniciando construcción...")
+                self.cache_manager.construir_cache()
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"[ERROR] Falló carga de caché en background: {e}")
+            return False
     def on_close(self):
         """Se ejecuta al cerrar la aplicación"""
         try:
@@ -216,18 +256,23 @@ class BusquedaCarpetaApp:
             if hasattr(self, 'theme_manager'):
                 self.config.set("theme", self.theme_manager.tema_actual)
             
-            # 4. Paneles abiertos
-            # IMPORTANTE: Capturar el estado REAL de los managers
+            # 4. Paneles abiertos e ÍNDICES de columna
             show_history_val = False
+            history_col = None
             if hasattr(self, 'historial_manager') and self.historial_manager:
                 show_history_val = self.historial_manager.visible
+                history_col = self.historial_manager.assigned_column
             
             show_explorer_val = False
+            explorer_col = None
             if hasattr(self, 'file_explorer_manager') and self.file_explorer_manager:
                 show_explorer_val = self.file_explorer_manager.is_visible()
+                explorer_col = self.file_explorer_manager.assigned_column
                 
             self.config.set("show_history", show_history_val)
+            self.config.set("history_assigned_col", history_col)
             self.config.set("show_explorer", show_explorer_val)
+            self.config.set("explorer_assigned_col", explorer_col)
             
             # 5. Anchos de paneles individuales (Validar > 50px)
             if hasattr(self, 'file_explorer_manager'):
@@ -461,14 +506,19 @@ class BusquedaCarpetaApp:
             if not values or len(values) < 2:
                 return None
             
-            metodo, ruta_info = values[0], values[1]
+            # Estrategia 1: Buscar en el último valor (Metadata AbsPath)
+            if len(values) >= 3:
+                posible_abs = values[-1]
+                if isinstance(posible_abs, str) and os.path.isabs(posible_abs):
+                    return posible_abs
             
-            if metodo == "M":
-                return ruta_info if os.path.isabs(ruta_info) else None
-            
+            # Estrategia 2: Valor en posición 1 (Ruta Relativa o Absoluta)
+            ruta_info = values[1]
             if os.path.isabs(ruta_info):
                 return ruta_info
-            elif hasattr(self, 'ruta_carpeta') and self.ruta_carpeta:
+            
+            # Estrategia 3: Construir desde ruta base
+            if hasattr(self, 'ruta_carpeta') and self.ruta_carpeta:
                 return os.path.normpath(os.path.join(self.ruta_carpeta, ruta_info))
             
             return None

@@ -85,6 +85,10 @@ class HistorialManager(BaseTreeManager):
     def hide(self):
         """Oculta el panel de historial y libera su posición"""
         if self.frame:
+            # Guardar configuración de columnas antes de ocultar
+            if hasattr(self, 'column_manager') and self.column_manager:
+                self.column_manager.save_config()
+                
             self.frame.grid_forget()
             self.visible = False
             
@@ -236,44 +240,39 @@ class HistorialManager(BaseTreeManager):
             vsb = ttk.Scrollbar(tree_frame, orient="vertical")
             hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
             
-            # TreeView con el MISMO estilo que el principal
+            # TreeView con TODAS las columnas desde el inicio
             self.tree = ttk.Treeview(
                 tree_frame,
-                columns=("Criterio", "Metodo", "Resultados", "Tiempo", "Fecha"),
-                show="headings", # Solo headings, sin columna #0
-                style="Treeview" # Estilo base
+                columns=("Criterio", "Metodo", "Resultados", "Tiempo", "Fecha", "Fecha_C", "Demandante", "Demandado", "Ruta"),
+                show="headings",
+                style="Treeview"
             )
             
-            # Configurar encabezados MANUALMENTE
+            # Configurar TODOS los encabezados
             self.tree.heading("Criterio", text="Criterio", anchor=tk.W)
             self.tree.heading("Metodo", text="M", anchor=tk.CENTER)
             self.tree.heading("Resultados", text="Res.", anchor=tk.CENTER)
             self.tree.heading("Tiempo", text="Tiempo", anchor=tk.CENTER)
             self.tree.heading("Fecha", text="Hora", anchor=tk.CENTER)
+            self.tree.heading("Fecha_C", text="Fecha Completa", anchor=tk.CENTER)
+            self.tree.heading("Demandante", text="Demandante", anchor=tk.W)
+            self.tree.heading("Demandado", text="Demandado", anchor=tk.W)
+            self.tree.heading("Ruta", text="Ruta", anchor=tk.W)
             
-            # Configurar columnas con anchos guardados o defaults
+            # Configurar TODAS las columnas con anchos
             cw = col_widths if col_widths else {}
             self.tree.column("Criterio", width=cw.get("Criterio", 120), anchor=tk.W, minwidth=80)
             self.tree.column("Metodo", width=cw.get("Metodo", 40), anchor=tk.CENTER, minwidth=25)
             self.tree.column("Resultados", width=cw.get("Resultados", 60), anchor=tk.CENTER, minwidth=45)
             self.tree.column("Tiempo", width=cw.get("Tiempo", 60), anchor=tk.CENTER, minwidth=50)
             self.tree.column("Fecha", width=cw.get("Fecha", 60), anchor=tk.CENTER, minwidth=50)
+            self.tree.column("Fecha_C", width=cw.get("Fecha_C", 120), anchor=tk.CENTER, minwidth=80)
+            self.tree.column("Demandante", width=cw.get("Demandante", 150), anchor=tk.W, minwidth=100)
+            self.tree.column("Demandado", width=cw.get("Demandado", 150), anchor=tk.W, minwidth=100)
+            self.tree.column("Ruta", width=cw.get("Ruta", 200), anchor=tk.W, minwidth=150)
             
-            # Definición de columnas para el historial
-            column_definitions = {
-                "Criterio": {"title": "Criterio", "width": 100, "anchor": "w", "default_visible": True},
-                "Metodo": {"title": "M", "width": 30, "anchor": "center", "default_visible": True},
-                "Resultados": {"title": "Res.", "width": 50, "anchor": "center", "default_visible": True},
-                "Tiempo": {"title": "Tiempo", "width": 55, "anchor": "center", "default_visible": True},
-                "Fecha": {"title": "Hora", "width": 55, "anchor": "center", "default_visible": True},
-                "Fecha_C": {"title": "Fecha Completa", "width": 120, "anchor": "center", "default_visible": False},
-                "Demandante": {"title": "Demandante", "width": 150, "anchor": "w", "default_visible": False},
-                "Demandado": {"title": "Demandado", "width": 150, "anchor": "w", "default_visible": False},
-                "Ruta": {"title": "Ruta", "width": 200, "anchor": "w", "default_visible": False}
-            }
-            
-            # Inicializar ColumnManager para el historial
-            self.column_manager = ColumnManager(self.tree, "historial", column_definitions)
+            # Inicializar ColumnManager (ya no necesita column_definitions, usa COLUMN_DEFINITIONS)
+            self.column_manager = ColumnManager(self.tree, "historial", self.app)
             
             # Encabezado con clic derecho para gestionar columnas
             self.tree.bind("<Button-3>", self._on_header_right_click, add="+")
@@ -339,18 +338,9 @@ class HistorialManager(BaseTreeManager):
         self.frame.configure(width=new_width)
     
     def agregar_busqueda(self, criterio, metodo, num_resultados, tiempo_total):
-        """Agrega una búsqueda al historial - SIEMPRE registra, sin importar si está visible"""
-        print(f"[DEBUG] Intentando agregar búsqueda: {criterio}, {metodo}, {num_resultados}")
+        """Agrega una búsqueda al historial - OPTIMIZADO para velocidad"""
         try:
-            # Intentar enriquecer con info de BD si el coordinador está disponible
-            demandante = ""
-            demandado = ""
-            if hasattr(self.app, 'search_coordinator'):
-                radicado = self.app.search_coordinator._convertir_a_radicado(criterio)
-                if radicado and hasattr(self.app, 'database_manager') and self.app.database_manager:
-                    demandante, demandado = self.app.database_manager.obtener_info_proceso(radicado)
-
-            # Crear entrada del historial
+            # Crear entrada básica (SIN enriquecimiento de BD para no bloquear)
             entrada = {
                 'criterio': criterio,
                 'metodo': metodo,
@@ -358,8 +348,8 @@ class HistorialManager(BaseTreeManager):
                 'tiempo': f"{tiempo_total:.2f}s",
                 'fecha': datetime.now().strftime("%H:%M:%S"),
                 'fecha_c': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                'demandante': demandante,
-                'demandado': demandado,
+                'demandante': "",  # Se puede enriquecer después si es necesario
+                'demandado': "",
                 'ruta': self.app.ruta_carpeta if hasattr(self.app, 'ruta_carpeta') else "",
                 'timestamp': datetime.now().isoformat()
             }
@@ -454,6 +444,45 @@ class HistorialManager(BaseTreeManager):
         except Exception as e:
             print(f"Error guardando historial: {e}")
     
+    def actualizar_ultima_busqueda(self, demandante, demandado):
+        """Actualiza la última entrada del historial con info de BD (Lazy)"""
+        if not self.historial_data: return
+        
+        # Actualizar dato en memoria
+        entrada = self.historial_data[0]
+        entrada['demandante'] = demandante
+        entrada['demandado'] = demandado
+        
+        # Guardar en disco
+        self.guardar_historial()
+        
+        # Actualizar vista (re-renderizar todo es rápido para pocas entradas visibles)
+        # O mejor, actualizar solo el item top si existe
+        try:
+            # PRESERVAR FOCO
+            foco_actual = self.tree.master.focus_get()
+            
+            items = self.tree.get_children()
+            if items:
+                top_item = items[0]
+                values = list(self.tree.item(top_item, 'values'))
+                # Indices de columnas:
+                # Criterio, Metodo, Resultados, Tiempo, Fecha, Fecha_C, Dem1, Dem2, Ruta
+                # 0, 1, 2, 3, 4, 5, 6, 7, 8
+                if len(values) >= 8:
+                    values[6] = demandante or ""
+                    values[7] = demandado or ""
+                    self.tree.item(top_item, values=tuple(values))
+            
+            # RESTAURAR FOCO
+            if foco_actual:
+                try:
+                    foco_actual.focus_set()
+                except: pass
+                
+        except Exception as e:
+            print(f"Error actualizando vista historial lazy: {e}")
+            
     def limpiar_historial(self):
         """Limpia todo el historial"""
         from tkinter import messagebox

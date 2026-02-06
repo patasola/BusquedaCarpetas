@@ -4,6 +4,8 @@ from src.managers.app import BusquedaCarpetaApp
 
 def main():
     root = tk.Tk()
+    root.withdraw() # OCULTAR VENTANA INICIALMENTE (Evitar "baile")
+    
     root.title("Búsqueda Rápida de Carpetas")
     
     # Configurar tamaño y posición inicial
@@ -18,6 +20,9 @@ def main():
     root.geometry(f"{width}x{height}+{x}+{y}")
     
     app = BusquedaCarpetaApp(root)
+    
+    # MOSTRAR VENTANA FINALMENTE (Todo cargado)
+    root.deiconify()
     root.mainloop()
 
 if __name__ == "__main__":

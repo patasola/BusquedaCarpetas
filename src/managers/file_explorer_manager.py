@@ -367,7 +367,7 @@ class FileExplorerManager:
         except PermissionError:
             messagebox.showerror(
                 "Error de permisos",
-                "No tiene permisos para crear carpetas en esta ubicaci├│n"
+                "No tiene permisos para crear carpetas en esta ubicación"
             )
             self._cancel_create_folder_cleanup()
         except OSError as e:
@@ -410,7 +410,7 @@ class FileExplorerManager:
         self.original_name = None
         
         if hasattr(self.app, 'label_estado'):
-            self.app.label_estado.config(text="Creaci├│n de carpeta cancelada")
+            self.app.label_estado.config(text="Creación de carpeta cancelada")
     
     def load_directory(self, path):
         """Carga el contenido de un directorio en estructura de ├írbol"""
@@ -418,7 +418,7 @@ class FileExplorerManager:
             return
         
         self.current_path = os.path.normpath(path)
-        self.path_label.configure(text=f"Ra├¡z: {self.current_path}")
+        self.path_label.configure(text=f"Raíz: {self.current_path}")
         
         from datetime import datetime as _datetime
         current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -429,7 +429,7 @@ class FileExplorerManager:
             self.tree.delete(item)
         self._clear_state()
         
-        # Crear nodo ra├¡z
+        # Crear nodo raíz
         root_name = os.path.basename(self.current_path) or self.current_path
         try:
             root_fecha = datetime.fromtimestamp(os.path.getmtime(self.current_path)).strftime("%d/%m/%Y %H:%M")
@@ -443,7 +443,7 @@ class FileExplorerManager:
         self.path_to_item[self.current_path] = root_item
         self.item_to_path[root_item] = self.current_path
         
-        # Cargar contenido del directorio ra├¡z
+        # Cargar contenido del directorio raíz
         self._load_directory_children_sync(root_item, self.current_path)
         
         # Iniciar monitoreo
@@ -712,17 +712,17 @@ class FileExplorerManager:
         if region != 'tree':
             context_menu = tk.Menu(self.tree, tearoff=0)
             context_menu.add_command(
-                label="­ƒôü Nueva carpeta", 
+                label="📁 Nueva carpeta", 
                 command=self.create_new_folder_inline,
                 accelerator="Ctrl+N"
             )
             context_menu.add_separator()
             context_menu.add_command(
-                label="­ƒöä Actualizar ├írbol", 
+                label="🔄 Actualizar Árbol", 
                 command=self.refresh_tree
             )
             context_menu.add_command(
-                label="­ƒÅá Ir a Home", 
+                label="🏠 Ir a Home", 
                 command=self.go_home
             )
             
@@ -745,17 +745,17 @@ class FileExplorerManager:
         
         context_menu.add_separator()
         context_menu.add_command(
-            label="­ƒôü Nueva carpeta", 
+            label="📁 Nueva carpeta", 
             command=self.create_new_folder_inline,
             accelerator="Ctrl+N"
         )
         context_menu.add_separator()
         context_menu.add_command(
-            label="­ƒöä Actualizar ├írbol", 
+            label="🔄 Actualizar Árbol", 
             command=self.refresh_tree
         )
         context_menu.add_command(
-            label="­ƒÅá Ir a Home", 
+            label="🏠 Ir a Home", 
             command=self.go_home
         )
         

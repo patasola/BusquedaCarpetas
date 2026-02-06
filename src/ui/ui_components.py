@@ -257,6 +257,14 @@ class UIComponents:
         )
         btn_abrir.pack(side=tk.LEFT)
         
+        btn_abrir.pack(side=tk.LEFT)
+        
+        # --- MEJORA VISUAL DE NAVEGACIÓN (TAB) ---
+        # Usamos highlightthickness=1 para que se vea el foco nativo (anillo punteado o borde)
+        # sin cambiar colores, respetando la preferencia "normal" del usuario.
+        for btn in [btn_buscar, btn_cancelar, btn_copiar, btn_abrir]:
+            btn.config(highlightthickness=1)
+
         # Barra de información de caché
         info_frame = tk.Frame(self.master, bg=Colors.CACHE_BAR_BG, height=22)
         info_frame.pack(side=tk.BOTTOM, fill=tk.X)

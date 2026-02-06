@@ -108,9 +108,24 @@ class ColumnManager:
 
     def save_config(self):
         """Envía el estado actual al ConfigManager central"""
-        if not self.app: return
+        if not self.app or not hasattr(self.app, 'config'): return
+        
         display = list(self.tree["displaycolumns"])
-        if display == ['#all']: display = list(self.tree["columns"])
+        # Normalizar displaycolumns (puede contener nombres o índices)
+        all_cols = list(self.tree["columns"])
+        if not display or display == ["#all"] or display == ("#all",):
+             display = all_cols
+        else:
+             # Convertir índices a nombres si es necesario
+             norm_display = []
+             for col in display:
+                 if isinstance(col, int):
+                     if 0 <= col < len(all_cols): 
+                         norm_display.append(all_cols[col])
+                 else:
+                     norm_display.append(col)
+             display = norm_display if norm_display else all_cols
+             
         widths = {str(c): self.tree.column(c, 'width') for c in ["#0"] + list(self.tree["columns"])}
         
         self.app.config.set(self.config_keys.get(self.config_id), {
@@ -125,14 +140,51 @@ class ColumnManager:
             return "break"
 
     def _show_column_menu(self, event):
+        """Muestra menú de columnas con checkmarks correctos"""
         menu = tk.Menu(self.tree, tearoff=0)
-        current_display = list(self.tree["displaycolumns"])
-        if current_display == ['#all']: current_display = list(self.tree["columns"])
         
+        # Obtener columnas visibles DIRECTAMENTE del TreeView
+        display_raw = self.tree["displaycolumns"]
+        all_cols = list(self.tree["columns"])
+        
+        # DEBUG COMPLETO
+        print(f"\n[DEBUG] === COLUMN MENU DEBUG ===")
+        print(f"[DEBUG] displaycolumns RAW: {display_raw}")
+        print(f"[DEBUG] displaycolumns TYPE: {type(display_raw)}")
+        print(f"[DEBUG] all_columns from tree: {all_cols}")
+        print(f"[DEBUG] self.all_columns: {self.all_columns}")
+        
+        # Determinar qué columnas están visibles
+        if display_raw == "" or display_raw == "#all" or display_raw == ("#all",) or display_raw == ["#all"]:
+            visible_cols = all_cols
+            print(f"[DEBUG] Using ALL columns as visible")
+        else:
+            # displaycolumns puede ser una tupla de strings o una string separada por espacios
+            if isinstance(display_raw, str):
+                visible_cols = display_raw.split()
+            elif isinstance(display_raw, (list, tuple)):
+                visible_cols = list(display_raw)
+            else:
+                visible_cols = all_cols
+            print(f"[DEBUG] visible_cols parsed: {visible_cols}")
+        
+        # Crear menú con checkmarks
+        self._check_vars = []  # IMPORTANTE: Guardar referencias para evitar GC
         for col_id in self.all_columns:
-            var = tk.BooleanVar(value=col_id in current_display)
-            menu.add_checkbutton(label=f"  {self.column_defs.get(col_id, {}).get('title', col_id)}",
-                                command=lambda c=col_id: self._toggle_column(c), variable=var)
+            is_visible = col_id in visible_cols
+            print(f"[DEBUG] Column '{col_id}' -> visible: {is_visible}")
+            
+            var = tk.BooleanVar(value=is_visible)
+            self._check_vars.append(var)
+            
+            title = self.column_defs.get(col_id, {}).get('title', col_id)
+            menu.add_checkbutton(
+                label=f"  {title}",
+                command=lambda c=col_id: self._toggle_column(c),
+                variable=var
+            )
+        
+        print(f"[DEBUG] === END DEBUG ===\n")
         
         menu.add_separator()
         menu.add_command(label="↩️ Restaurar", command=self._reset_defaults)
@@ -140,7 +192,21 @@ class ColumnManager:
 
     def _toggle_column(self, col_id):
         curr = list(self.tree["displaycolumns"])
-        if curr == ['#all']: curr = list(self.tree["columns"])
+        
+        # Normalizar displaycolumns (puede contener nombres o índices)
+        all_cols = list(self.tree["columns"])
+        if not curr or curr == ["#all"] or curr == ("#all",):
+             curr = all_cols
+        else:
+             # Convertir índices a nombres si es necesario
+             norm_curr = []
+             for col in curr:
+                 if isinstance(col, int):
+                     if 0 <= col < len(all_cols): 
+                         norm_curr.append(all_cols[col])
+                 else:
+                     norm_curr.append(col)
+             curr = norm_curr if norm_curr else all_cols
         
         if col_id in curr:
             if len(curr) > 1: curr.remove(col_id)

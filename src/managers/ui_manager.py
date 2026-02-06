@@ -221,10 +221,40 @@ class UIManager:
 
     def habilitar_busqueda(self):
         """Libera controles tras finalizar búsqueda"""
-        self.app.btn_buscar.config(state='normal')
+        self.app.btn_buscar.config(state='normal', text="Buscar")
         if hasattr(self.app, 'btn_cancelar'):
             self.app.btn_cancelar.config(state='disabled')
         self.app.entry.config(state='normal')
+
+    def actualizar_metadata_resultados(self, demandante, demandado):
+        """Actualiza los resultados visibles con info de BD (Lazy Loading)"""
+        try:
+            if not hasattr(self.app, 'tree'): return
+            
+            # PRESERVAR FOCO: Evitar que la actualización robe el foco
+            foco_actual = self.app.master.focus_get()
+            
+            items = self.app.tree.get_children()
+            for item_id in items:
+                values = list(self.app.tree.item(item_id, 'values'))
+                if len(values) >= 5:
+                    # Actualizar columnas de Demandante/Demandado
+                    # values: [Metodo, RutaRel, Dem1, Dem2, RutaAbs]
+                    # Dem1 -> idx 2, Dem2 -> idx 3
+                    values[2] = demandante or ""
+                    values[3] = demandado or ""
+                    
+                    self.app.tree.item(item_id, values=tuple(values))
+            
+            # RESTAURAR FOCO si se perdió
+            if foco_actual:
+                try:
+                    foco_actual.focus_set()
+                except: pass
+                    
+            print(f"[UI] Metadata actualizada: {demandante} / {demandado}")
+        except Exception as e:
+            print(f"[UI ERROR] Falló actualizar metadata: {e}")
 
     def copiar_ruta(self):
         """Copia la ruta de la carpeta seleccionada al portapapeles"""

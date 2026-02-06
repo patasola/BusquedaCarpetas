@@ -17,7 +17,19 @@ class FileOperations:
             items = []
             for entry in os.scandir(directory_path):
                 try:
-                    nombre = entry.name
+                    # Decodificar nombre de forma segura
+                    nombre = os.fsdecode(entry.name)
+                    
+                    # FILTRAR OCULTOS Y SISTEMA
+                    if nombre.startswith('.'): continue
+                    
+                    try:
+                        # En Windows, verificar atributo de oculto
+                        import stat
+                        if entry.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN:
+                            continue
+                    except: pass
+                    
                     es_dir = entry.is_dir()
                     
                     try:

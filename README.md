@@ -50,31 +50,31 @@ La carpeta se abrirá en el Explorador de Windows.
 Para copiar la ruta de una carpeta:
 
 1. Selecciona el resultado que te interesa
-2. Haz clic en "Copiar" o presiona **F3**
+2. Haz clic en "Copiar" o presiona **F6**
 3. La ruta completa se copiará al portapapeles
 4. Pégala donde necesites (Ctrl+V)
 
 ---
 
-### PASO 5: USANDO EL HISTORIAL (NUEVA FUNCIONALIDAD V.4.5)
+### PASO 5: USANDO EL HISTORIAL (MODIFICADO V.5.0)
 
-1. Presiona **F2** o ve a "Ver" → "Historial de Búsquedas"
+1. Presiona **Ctrl+Shift+H** o ve a "Ver" → "Historial de Búsquedas"
 2. Se abrirá un panel lateral con tus búsquedas anteriores
 3. Haz clic en cualquier búsqueda anterior para repetirla
-4. Para cerrar el historial, presiona F2 nuevamente
+4. Para cerrar el historial, usa el mismo atajo
 
-> **NOVEDAD V.4.5:** El historial aparece al LADO de la ventana principal, no encima. La ventana se agranda automáticamente.
+> **NOVEDAD V.5.0:** El historial aparece al LADO de la ventana principal.
 
 ---
 
-### PASO 6: USANDO EL EXPLORADOR DE ARCHIVOS (NUEVA FUNCIONALIDAD V.4.5)
+### PASO 6: USANDO EL EXPLORADOR DE ARCHIVOS (MODIFICADO V.5.0)
 
-1. Presiona **F3** o ve a "Ver" → "Explorador de Archivos"
+1. Presiona **Ctrl+Shift+E** o ve a "Ver" → "Explorador de Archivos"
 2. Se abrirá otro panel lateral con un navegador de carpetas
 3. Puedes navegar carpetas haciendo clic en las flechas
-4. Para cerrar el explorador, presiona F3 nuevamente
+4. Para cerrar el explorador, usa el mismo atajo
 
-> **NOVEDAD V.4.5:** Puedes tener AMBOS paneles abiertos al mismo tiempo. La primera que abras aparecerá pegada a la aplicación principal. La segunda aparecerá a la derecha de la primera.
+> **NOVEDAD V.5.0:** Puedes tener AMBOS paneles abiertos al mismo tiempo.
 
 ---
 
@@ -104,31 +104,33 @@ Para cambiar método: Selecciona el botón correspondiente antes de buscar.
 
 Si has creado carpetas nuevas y no aparecen en las búsquedas:
 
-1. Presiona **F5** o ve a "Archivo" → "Construir cache"
-2. Espera a que termine la actualización
+1. Ve a "Archivo" → "Construir cache"
+2. Espera a que termine la actualización en segundo plano
 3. Ahora las carpetas nuevas aparecerán en futuras búsquedas
 
-> El índice se actualiza automáticamente cada 24 horas.
+> El índice se actualiza automáticamente cada 24 horas y busca carpetas nuevas en tiempo real.
 
 ---
 
-### PASO 9: ATAJOS DE TECLADO ÚTILES
+### PASO 9: ATAJOS DE TECLADO ÚTILES (ACTUALIZADO V.5.1)
 
 **BÁSICOS:**
-- `Ctrl+L` - Ir al campo de búsqueda
-- `Enter` - Ejecutar búsqueda
+- `F4` - Cambiar Modo (Numérico/Texto)
+- `F5` - Enfocar campo de búsqueda
+- `Enter` - Ejecutar búsqueda / Abrir resultado
 - `Esc` - Limpiar campo de búsqueda
 - `↑↓` - Navegar resultados
+- `Tab` - Navegar entre botones y paneles (Ahora con indicador visual)
 
-**PANELES (NOVEDAD V.4.5):**
-- `F2` - Abrir/cerrar Historial
-- `F3` - Abrir/cerrar Explorador
-- `Tab` - Navegar entre todos los elementos
+**PANELES:**
+- `Ctrl+Shift+H` - Abrir/cerrar Historial
+- `Ctrl+Shift+E` - Abrir/cerrar Explorador
+- `F2` - Renombrar (Solo dentro del Explorador de Archivos)
 
 **ACCIONES:**
-- `Enter` - Abrir carpeta seleccionada
-- `F3` - Copiar ruta de carpeta seleccionada
-- `F5` - Actualizar índice
+- `F6` - Copiar ruta de carpeta seleccionada
+- `F7` - Abrir carpeta seleccionada
+- `F12` - Cambiar Tema (Claro/Oscuro)
 
 ---
 
@@ -155,40 +157,36 @@ Si has creado carpetas nuevas y no aparecen en las búsquedas:
 
 **PROBLEMA: "No encuentra carpetas que sé que existen"**
 **SOLUCIÓN:**
-1. Presiona F5 para actualizar el índice
+1. Ve al menú Archivo > Construir caché
 2. Si sigue sin aparecer, usa "Búsqueda Directa" como método
 
 **PROBLEMA: "La búsqueda está muy lenta"**
 **SOLUCIÓN:**
 1. Asegúrate de usar el método "Caché"
-2. Si es la primera vez, espera que termine de construir el índice
+2. La aplicación ahora tiene "Arranque Invisible", así que reiniciar es instantáneo si notas lentitud.
 
 **PROBLEMA: "Los paneles se superponen"**
 **SOLUCIÓN:**
-- Esto ya no ocurre en V.4.5. Los paneles aparecen lado a lado.
+- Esto ya no ocurre en V.5.0. Los paneles aparecen lado a lado.
 - La ventana se redimensiona automáticamente.
 
-**PROBLEMA: "La aplicación se ve muy pequeña/grande"**
+**PROBLEMA: "Cuesta ver qué botón está seleccionado"**
 **SOLUCIÓN:**
-- En V.4.5 esto es automático según los paneles que tengas abiertos
-- App sola: 15cm de ancho
-- Con 1 panel: 23cm de ancho
-- Con 2 paneles: 31cm de ancho
+- En V.5.1, usa la tecla `Tab`. Verás un recuadro negro fino alrededor del botón seleccionado.
 
 ---
 
 ### PASO 12: FLUJO DE TRABAJO RECOMENDADO
 
 **PARA USO DIARIO:**
-1. Abre la aplicación
-2. Presiona F2 y F3 para abrir ambos paneles
+1. Abre la aplicación (carga instantánea)
+2. Presiona F5 para ir directo al buscador
 3. Escribe tu búsqueda y presiona Enter
-4. Usa el historial para búsquedas repetitivas
-5. Usa el explorador para navegar dentro de carpetas encontradas
+4. Usa F6 para copiar la ruta o F7 para abrirla
 
 **PARA DESARROLLADORES:**
 1. Busca por tecnología: "node", "python", "react"
-2. Usa el historial para proyectos frecuentes
+2. Usa el historial (Ctrl+Shift+H) para proyectos frecuentes
 3. Combina múltiples palabras: "api proyecto"
 
 **PARA ADMINISTRADORES:**
@@ -204,9 +202,9 @@ Si has creado carpetas nuevas y no aparecen en las búsquedas:
 2. Escribe el nombre de la carpeta que buscas
 3. Presiona Enter
 4. Navega resultados con flechas ↑↓
-5. Abre carpetas con Enter o doble clic
-6. Usa F2 para historial, F3 para explorador
-7. Ambos paneles pueden estar abiertos al mismo tiempo (V.4.5)
+5. Abre carpetas con Enter o F7
+6. Usa Ctrl+Shift+H/E para paneles
+7. **Disfruta la velocidad mejorada de la V.5.1**
 
 **¡Con estos pasos básicos ya puedes usar la aplicación efectivamente!**
 
@@ -214,5 +212,5 @@ Para funciones avanzadas, experimenta con los diferentes métodos de búsqueda y
 
 ---
 
-© 2025 - Búsqueda Rápida de Carpetas V.5.0 (Luce Intellettual)
+© 2025 - Búsqueda Rápida de Carpetas V.5.1 (Luce Intellettual)
 ¡Encuentra tus carpetas más rápido que nunca!

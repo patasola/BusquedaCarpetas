@@ -90,21 +90,38 @@ class ResultsRenderer:
                         extra_values = []
                     else:
                         continue
-                    
                     # Insertar en TreeView: 
-                    # values[0]=Método/Loc, values[1]=RutaRel, values[2]=MetadataAbs, ...
-                    tree_values = [metodo_display, ruta_rel, ruta_abs] + extra_values
+                    # Columnas visibles: [Método, Ruta, Info1, Info2]
+                    # Metadata (oculta): [RutaAbsoluta]
+                    # El orden en 'values' debe coincidir con las columnas VISIBLES primero
+                    # y luego los datos extra que queramos recuperar
+                    
+                    # Asegurar que extra_values tenga al menos 2 elementos vacíos si no hay info
+                    if len(extra_values) < 2:
+                        extra_values = extra_values + [""] * (2 - len(extra_values))
+                    
+                    # Construir tupla: [Metodo, RutaRel, Dem1, Dem2, RutaAbs]
+                    # Metodo va a col 'Metodo'
+                    # RutaRel va a col 'Ruta'
+                    # Dem1 va a col 'Demandado'
+                    # Dem2 va a col 'Demandante'
+                    # RutaAbs queda al final (oculta/accesible por código)
+                    tree_values = [metodo_display, ruta_rel, extra_values[0], extra_values[1], ruta_abs]
+                    
+                    # Determinar si mostramos el triángulo (expander)
+                    # Si tiene_hijos es True, open=False
+                    open_state = False 
                     
                     item_id = app.tree.insert("", "end",
                                    text=f"📂 {nombre}",
                                    values=tuple(tree_values),
-                                   tags=(tag,))
+                                   tags=(tag,),
+                                   open=False)
                     
-                    # RECUPERAR INFO DE HIJOS PRE-CALCULADA
+                    # RECUPERAR INFO DE HIJOS (Triángulo)
                     if tiene_hijos:
-                        # Insertar dummy con la misma cantidad de columnas para evitar errores de índice
-                        dummy_values = [""] * len(tree_values)
-                        app.tree.insert(item_id, "end", text="Cargando...", values=tuple(dummy_values))
+                        # Insertar dummy para que aparezca el triángulo
+                        app.tree.insert(item_id, "end", text="Cargando...", values=tuple([""] * len(tree_values)))
                 
                 # Actualizar UI solo cada batch (no cada item)
                 if batch_end < total:
