@@ -302,9 +302,10 @@ class LocationsConfigModal:
     
     def _start_batch_cache_build(self, locations):
         """Inicia construcción de cache en batch"""
-        self.building_cache = True
-        self.progress_frame.pack(fill='x', pady=(10, 0))
-        self.progress_bar.start()
+        # Verificar que el widget aún existe antes de empaquetar
+        if hasattr(self, 'progress_frame') and self.progress_frame and self.progress_frame.winfo_exists():
+            self.progress_frame.pack(fill='x', pady=(10, 0))
+            self.progress_bar.start()
         self.progress_var.set("Preparando construcción de caches...")
         
         def build_worker():

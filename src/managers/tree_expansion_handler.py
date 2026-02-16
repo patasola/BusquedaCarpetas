@@ -35,19 +35,25 @@ class TreeExpansionHandler:
                 self.loading_items.discard(item)
                 return
             
-            # DETERMINAR RUTA ABSOLUTA (Prioridad values[2] -> Metadata oculta)
-            if len(values) >= 3 and os.path.isabs(values[2]):
-                ruta = values[2]
-            else:
-                # Fallback: Resolver desde la segunda columna (values[1])
-                ruta_info = values[1]
-                if os.path.isabs(ruta_info):
-                    ruta = ruta_info
-                else:
-                    ruta_base = getattr(self.app, 'ruta_carpeta', '')
-                    ruta = os.path.join(ruta_base, ruta_info) if ruta_base else ruta_info
+            # DETERMINAR RUTA ABSOLUTA (Búsqueda dinámica en values)
+            ruta = None
+            if values:
+                # Buscar en todos los valores hasta encontrar una ruta absoluta válida
+                for val in values:
+                    if val and isinstance(val, str) and os.path.isabs(val):
+                        if os.path.exists(val):
+                            ruta = val
+                            break
             
-            if not os.path.exists(ruta) or not os.path.isdir(ruta):
+            # Fallback si no se encontró en values: intentar con el texto del item (quitando el icono)
+            if not ruta:
+                base_text = tree.item(item, 'text').replace("📂 ", "").replace("📄 ", "")
+                ruta_base = getattr(self.app, 'ruta_carpeta', '')
+                potencial_ruta = os.path.join(ruta_base, base_text) if ruta_base else base_text
+                if os.path.exists(potencial_ruta):
+                    ruta = potencial_ruta
+
+            if not ruta or not os.path.isdir(ruta):
                 print(f"[DEBUG] Ruta inválida para expansión: {ruta}")
                 self.loading_items.discard(item)
                 return
@@ -124,7 +130,7 @@ class TreeExpansionHandler:
                 
                 # Agregar nodo dummy si tiene subcarpetas (Verificación real para subniveles)
                 if self._tiene_subcarpetas(ruta):
-                    self.app.tree.insert(child_item, 'end', text='Cargando...', values=('', ''))
+                    self.app.tree.insert(child_item, 'end', text='Buscando...', values=('', ''))
             
             print(f"[DEBUG] Cargadas {len(items)} subcarpetas de: {parent_path}")
             

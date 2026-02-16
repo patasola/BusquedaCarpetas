@@ -124,10 +124,17 @@ class UIManager:
         self._actualizar_boton_buscar(habilitada)
         
         # 2. Programar búsqueda automática si hay texto y no es numérico estricto
-        # No queremos disparar accidentalmente si está pegando un radicado largo de golpe
+        # CRÍTICO: NO disparar si el usuario está navegando en el TreeView
         if len(texto) >= 3:
+            # Cancelar búsqueda previa si existe
             if self._search_timer:
                 self.app.master.after_cancel(self._search_timer)
+            
+            # Verificar si el foco está en el TreeView - NO buscar si está navegando
+            foco_actual = self.app.master.focus_get()
+            if foco_actual and hasattr(foco_actual, 'winfo_class'):
+                if foco_actual.winfo_class() == 'Treeview':
+                    return  # Usuario navegando en TreeView, NO interrumpir
             
             # Solo disparar automático si el cache está listo para que sea INSTANTANEO
             if hasattr(self.app, 'cache_manager') and self.app.cache_manager.cache.valido:
@@ -137,6 +144,12 @@ class UIManager:
         """Dispara la búsqueda automática tras el debounce (Modo Silencioso)"""
         if not self.app.entry.get().strip(): return
         if self.app.btn_buscar['state'] == 'disabled': return
+        
+        # DOBLE VERIFICACIÓN: No buscar si el usuario está en el TreeView
+        foco_actual = self.app.master.focus_get()
+        if foco_actual and hasattr(foco_actual, 'winfo_class'):
+            if foco_actual.winfo_class() == 'Treeview':
+                return  # Usuario navegando, NO interrumpir
         
         print("[DEBUG] Disparando búsqueda automática (Silenciosa para no robar foco)")
         self.app.buscar_carpeta(silenciosa=True)
@@ -227,34 +240,36 @@ class UIManager:
         self.app.entry.config(state='normal')
 
     def actualizar_metadata_resultados(self, demandante, demandado):
-        """Actualiza los resultados visibles con info de BD (Lazy Loading)"""
+        """Actualiza los resultados visibles con info de BD (Lazy Loading)
+        
+        CRÍTICO: Esta función NO debe tocar el foco en absoluto.
+        Solo actualiza valores silenciosamente en el background.
+        """
         try:
             if not hasattr(self.app, 'tree'): return
+            tree = self.app.tree
             
-            # PRESERVAR FOCO: Evitar que la actualización robe el foco
-            foco_actual = self.app.master.focus_get()
-            
-            items = self.app.tree.get_children()
+            # Actualizar SOLO los valores, SIN tocar el foco
+            items = tree.get_children()
             for item_id in items:
-                values = list(self.app.tree.item(item_id, 'values'))
+                values = list(tree.item(item_id, 'values'))
                 if len(values) >= 5:
                     # Actualizar columnas de Demandante/Demandado
                     # values: [Metodo, RutaRel, Dem1, Dem2, RutaAbs]
-                    # Dem1 -> idx 2, Dem2 -> idx 3
                     values[2] = demandante or ""
                     values[3] = demandado or ""
-                    
-                    self.app.tree.item(item_id, values=tuple(values))
+                    tree.item(item_id, values=tuple(values))
             
-            # RESTAURAR FOCO si se perdió
-            if foco_actual:
-                try:
-                    foco_actual.focus_set()
-                except: pass
+            # NO restaurar foco, NO llamar focus_set(), NO tocar nada
+            # El usuario puede estar navegando y esto debe ser 100% silencioso
                     
-            print(f"[UI] Metadata actualizada: {demandante} / {demandado}")
+            print(f"[UI] Metadata actualizada silenciosamente: {demandante} / {demandado}")
+            import sys
+            sys.stdout.flush() 
         except Exception as e:
             print(f"[UI ERROR] Falló actualizar metadata: {e}")
+            import sys
+            sys.stdout.flush()
 
     def copiar_ruta(self):
         """Copia la ruta de la carpeta seleccionada al portapapeles"""

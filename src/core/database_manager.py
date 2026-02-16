@@ -2,6 +2,7 @@
 import pyodbc
 import threading
 import time
+import sys
 
 class DatabaseManager:
     """Gestor de conexión a SQL Server para consulta de expedientes"""
@@ -26,21 +27,37 @@ class DatabaseManager:
         self._auto_connect()    
         
     def conectar(self):
-        """Establece conexión con la BD"""
-        try:
-            # Intentar conectar usando DSN
-            conn_str = f"DSN={self.dsn};"
-            if self.user:
-                conn_str += f"UID={self.user};PWD={self.password};"
-            
-            # Opción alternativa con Driver directo si no hay DSN
-            # conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER=servidor;DATABASE=db;UID={user};PWD={pwd}"
-            
-            self.connection = pyodbc.connect(conn_str, timeout=3)
-            return True
-        except Exception as e:
-            print(f"[DB Error] No se pudo conectar: {e}")
-            return False
+        """Establece conexión con la BD con reintentos robustos para SSPI"""
+        intentos = [
+            # Intento 1: DSN Estándar
+            f"DSN={self.dsn};",
+            # Intento 2: Trusted_Connection explícito
+            f"DSN={self.dsn};Trusted_Connection=yes;",
+            # Intento 3: Integrated Security explícito
+            f"DSN={self.dsn};Integrated Security=SSPI;",
+            # Intento 4: Ambos flags de seguridad (algunos drivers lo requieren)
+            f"DSN={self.dsn};Trusted_Connection=yes;Integrated Security=SSPI;",
+            # Intento 5: Conexión directa (si el usuario provee credenciales)
+            f"DSN={self.dsn};UID={self.user};PWD={self.password};" if self.user else None
+        ]
+        
+        last_error = ""
+        for i, conn_str in enumerate(intentos):
+            if not conn_str: continue
+            try:
+                # print(f"[DB] Intentando variante {i+1}...") 
+                self.connection = pyodbc.connect(conn_str, timeout=3)
+                print(f"[DB] Conexión exitosa (Variante {i+1})")
+                sys.stdout.flush()
+                return True
+            except Exception as e:
+                last_error = str(e)
+                # print(f"[DB] Falló variante {i+1}: {last_error}")
+                continue
+
+        print(f"[DB Error] Sin conexión SQL tras {len(intentos)} intentos. Último error: {last_error}")
+        sys.stdout.flush()
+        return False
 
     def obtener_info_proceso(self, radicado):
         """

@@ -282,9 +282,14 @@ class HistorialManager(BaseTreeManager):
             vsb.configure(command=self.tree.yview)
             hsb.configure(command=self.tree.xview)
             
-            vsb.pack(side='right', fill='y')
-            hsb.pack(side='bottom', fill='x')
-            self.tree.pack(side='left', fill='both', expand=True)
+            # Auto-hide scrollbars usando grid
+            self.tree.grid(row=0, column=0, sticky='nsew')
+            self._update_scrollbars_hist = lambda: self._update_scrollbars(vsb, hsb)
+            self.tree.bind('<Configure>', lambda e: self.tree.after_idle(self._update_scrollbars_hist))
+            
+            # Configurar grid layout para auto-resize
+            tree_frame.grid_rowconfigure(0, weight=1)
+            tree_frame.grid_columnconfigure(0, weight=1)
             
             # Configurar tags SIMPLES
             self.tree.tag_configure('evenrow', background='#ffffff', foreground='#000000')
@@ -296,6 +301,26 @@ class HistorialManager(BaseTreeManager):
             print(f"Error creando historial: {e}")
             self.frame = None
     
+    def _update_scrollbars(self, vsb, hsb):
+        """Actualiza la visibilidad de las scrollbars - Auto-hide"""
+        try:
+            # Scrollbar vertical - verificar si el contenido excede el área visible
+            yview = self.tree.yview()
+            if yview[0] > 0.0 or yview[1] < 1.0:
+                vsb.grid(row=0, column=1, sticky='ns')
+            else:
+                vsb.grid_remove()
+            
+            # Scrollbar horizontal
+            xview = self.tree.xview()
+            if xview[0] > 0.0 or xview[1] < 1.0:
+                hsb.grid(row=1, column=0, sticky='ew')
+            else:
+                hsb.grid_remove()
+                    
+        except Exception as e:
+            print(f"Error actualizando scrollbars (historial): {e}")
+            
     def _create_tooltip(self, widget, text):
         """Crea un tooltip simple para un widget"""
         def show_tooltip(event):

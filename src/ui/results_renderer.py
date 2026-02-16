@@ -121,7 +121,7 @@ class ResultsRenderer:
                     # RECUPERAR INFO DE HIJOS (Triángulo)
                     if tiene_hijos:
                         # Insertar dummy para que aparezca el triángulo
-                        app.tree.insert(item_id, "end", text="Cargando...", values=tuple([""] * len(tree_values)))
+                        app.tree.insert(item_id, "end", text="Buscando...", values=tuple([""] * len(tree_values)))
                 
                 # Actualizar UI solo cada batch (no cada item)
                 if batch_end < total:

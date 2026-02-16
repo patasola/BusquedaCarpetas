@@ -455,14 +455,14 @@ class ExplorerUI:
     def _update_scrollbars(self, vsb, hsb):
         """Actualiza la visibilidad de las scrollbars"""
         try:
-            # Scrollbar vertical
-            if self.tree.get_children():
+            # Scrollbar vertical - verificar si el contenido excede el área visible
+            yview = self.tree.yview()
+            if yview[0] > 0.0 or yview[1] < 1.0:
                 vsb.grid(row=0, column=1, sticky='ns')
             else:
                 vsb.grid_remove()
             
             # Scrollbar horizontal
-            # Usar xview directamente sin after_idle para evitar condiciones de carrera
             xview = self.tree.xview()
             if xview[0] > 0.0 or xview[1] < 1.0:
                 hsb.grid(row=1, column=0, sticky='ew')

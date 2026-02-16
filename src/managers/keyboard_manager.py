@@ -189,27 +189,37 @@ class KeyboardManager:
                 if widget and widget.winfo_exists():
                     widget.configure(takefocus=True)
                     
-                    if i < len(widgets_principales) - 1:
-                        next_widget = widgets_principales[i + 1]
-                        widget.bind('<Tab>', lambda e, nw=next_widget: self.focus_widget_and_break(nw))
-                    else:
-                        first_widget = widgets_principales[0]
-                        widget.bind('<Tab>', lambda e, fw=first_widget: self.focus_widget_and_break(fw))
+                    # CRÍTICO: NO vincular Tab/Shift-Tab en TreeViews
+                    # Esto permite navegación nativa DENTRO del TreeView
+                    is_treeview = (hasattr(widget, 'winfo_class') and 
+                                 widget.winfo_class() == 'Treeview')
                     
-                    if i > 0:
-                        prev_widget = widgets_principales[i - 1]
-                        widget.bind('<Shift-Tab>', lambda e, pw=prev_widget: self.focus_widget_and_break(pw))
-                    else:
-                        last_widget = widgets_principales[-1]
-                        widget.bind('<Shift-Tab>', lambda e, lw=last_widget: self.focus_widget_and_break(lw))
+                    if not is_treeview:
+                        if i < len(widgets_principales) - 1:
+                            next_widget = widgets_principales[i + 1]
+                            widget.bind('<Tab>', lambda e, nw=next_widget: self.focus_widget_and_break(nw, e.widget))
+                        else:
+                            first_widget = widgets_principales[0]
+                            widget.bind('<Tab>', lambda e, fw=first_widget: self.focus_widget_and_break(fw, e.widget))
+                        
+                        if i > 0:
+                            prev_widget = widgets_principales[i - 1]
+                            widget.bind('<Shift-Tab>', lambda e, pw=prev_widget: self.focus_widget_and_break(pw, e.widget))
+                        else:
+                            last_widget = widgets_principales[-1]
+                            widget.bind('<Shift-Tab>', lambda e, lw=last_widget: self.focus_widget_and_break(lw, e.widget))
             
             print(f"[DEBUG] Navegación configurada para {len(widgets_principales)} widgets")
             
         except Exception as e:
             print(f"[DEBUG] Error configurando navegación: {e}")
     
-    def focus_widget_and_break(self, widget):
-        """Enfoca un widget y detiene la propagación del evento Tab"""
+    def focus_widget_and_break(self, widget, source_widget=None):
+        """Enfoca un widget y detiene la propagación del evento Tab
+        
+        IMPORTANTE: NO bloquea eventos si el source_widget es un TreeView,
+        para permitir navegación con flechas dentro del TreeView.
+        """
         try:
             if widget and widget.winfo_exists():
                 widget.focus_set()
@@ -226,6 +236,12 @@ class KeyboardManager:
                 print(f"[{current_time}] [DEBUG] Foco establecido en: {widget.winfo_class()}")
         except Exception as e:
             print(f"[DEBUG] Error enfocando widget: {e}")
+        
+        # CRÍTICO: NO retornar "break" si el source_widget es un TreeView
+        # Esto permite que las flechas naveguen naturalmente dentro del TreeView
+        if source_widget and hasattr(source_widget, 'winfo_class'):
+            if source_widget.winfo_class() == 'Treeview':
+                return None  # Permite que el evento continúe su propagación normal
         
         return "break"
     

@@ -522,7 +522,7 @@ class FileExplorerManager:
                 self.item_to_path[item_id] = full_path
                 
                 if self.file_ops.has_subdirectories(full_path):
-                    dummy = self.tree.insert(item_id, 'end', text='Cargando...', values=('',))
+                    dummy = self.tree.insert(item_id, 'end', text='Buscando...', values=('',))
             else:
                 display_name = f"📄 {name}"
                 item_id = self.tree.insert(parent_item, 'end', text=display_name,
@@ -545,7 +545,8 @@ class FileExplorerManager:
         
         children = self.tree.get_children(item)
         for child in children:
-            if self.tree.item(child, 'text') == 'Cargando...':
+            child_text = self.tree.item(child, 'text')
+            if child_text in ['Cargando...', 'Buscando...']:
                 self.tree.delete(child)
                 break
         
