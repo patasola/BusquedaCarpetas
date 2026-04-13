@@ -8,9 +8,14 @@ content_locations.json
 historial_busquedas.json
 config.json
 
-# Python
+# Python y Compilacin
 __pycache__/
 *.pyc
+build/
+dist/
+*.spec
+*.pkl
 
 # Logs
 app_log.txt
+app_log-*.txt
