@@ -67,8 +67,30 @@ class ChangelogViewer:
         self.changelog_window.focus_set()
 
     def _cargar_changelog(self):
-        changelog_content = """V. 4.5 - Purgatorio Perfeccionado (Paneles Duales con Redimensión) - VERSIÓN ACTUAL
+        changelog_content = """V. 6.0 - Empíreo (Búsqueda de Contenido y Snippets FTS5) - VERSIÓN ACTUAL
 ========================================
+
+🚀 BUSCADOR DE CONTENIDO ULTRA-RÁPIDO (FTS5)
+✅ Integración con SQLite FTS5 para búsquedas instantáneas en el interior de archivos
+✅ Soporte para PDF, Word, Excel y archivos de texto plano
+✅ Snippets de contexto inteligentes: Ver la frase exacta donde aparece la palabra buscada
+✅ Resaltado de texto en los resultados para una identificación visual rápida
+
+⌨️ ATAJOS GLOBALES BLINDADOS
+✅ ESC Omnipresente: Cierra cualquier ventana modal al instante sin importar el foco
+✅ Ctrl+O Contextual: Abre el archivo/carpeta seleccionado de forma inteligente
+✅ Ctrl+I / Ctrl+U: Acceso directo al buscador y configuración de ubicaciones
+✅ Navegación interna mejorada para el buscador de contenido
+
+🔧 ESTABILIZACIÓN Y REPARACIÓN
+✅ Corregidos errores de legibilidad (textos blancos sobre fondo claro) en About y Changelog
+✅ Reparado crash 'AttributeError' en la selección individual de carpetas para indexar
+✅ Limpieza profunda del repositorio: Removidos artefactos de compilación y cache local
+✅ Optimización del orden de inicio para evitar parpadeos visuales (Zero-Flicker)
+
+════════════════════════════════════════════════════════════════════════
+
+V. 5.1 - Luce Ultima (Startup Instantáneo)
 
 🚀 NUEVA FUNCIONALIDAD PRINCIPAL: PANELES DUALES SIN SOLAPAMIENTO
 ✅ Sistema de 3 columnas: Principal + Panel 1 + Panel 2
@@ -324,7 +346,7 @@ librerías que hacen posible esta aplicación.
         # Título principal
         self.text_widget.tag_configure("title", 
                                      font=Fonts.TITLE,
-                                     foreground=Colors.TREE_SELECT_FG)
+                                     foreground=Colors.BLUE_BAR)
         
         # Separadores
         self.text_widget.tag_configure("separator", 
