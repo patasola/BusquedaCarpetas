@@ -1,7 +1,7 @@
-# src/core/constants.py - Constantes V.5.0 (Luce Intellettual)
+# src/core/constants.py - Constantes V.6.0 (Empíreo)
 
 # Información de la aplicación
-APP_VERSION = "V. 5.1 - Luce Ultima"
+APP_VERSION = "V. 6.0 - Empíreo"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana

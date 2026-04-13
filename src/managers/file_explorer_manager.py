@@ -1,4 +1,4 @@
-﻿# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
+# src/file_explorer_manager.py - Gestor del Explorador V.4.5 - Crear carpeta inline
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
@@ -443,16 +443,15 @@ class FileExplorerManager:
         self.path_to_item[self.current_path] = root_item
         self.item_to_path[root_item] = self.current_path
         
-        # Cargar contenido del directorio raíz
-        self._load_directory_children_sync(root_item, self.current_path)
+        # Cargar contenido del directorio raíz de forma asíncrona
+        self._load_directory_children_async(root_item, self.current_path)
         
         # Iniciar monitoreo
         if self.is_visible():
             self.file_monitor.start(self.current_path)
         
-        # Actualizar scrollbars
-        if hasattr(self.ui, 'update_scrollbars'):
-            self.tree.after_idle(self.ui.update_scrollbars)
+        # Actualizar scrollbars después de un breve delay
+        self.tree.after(500, self.ui.update_scrollbars)
     
     def _clear_state(self):
         """Limpia el estado interno"""
@@ -462,35 +461,42 @@ class FileExplorerManager:
         self.loaded_items.clear()
         self.expanding_items.clear()
     
-    def _load_directory_children_sync(self, parent_item, directory_path):
-        """Carga los hijos de un directorio sincronizadamente"""
+    def _load_directory_children_async(self, parent_item, directory_path):
+        """Carga los hijos de un directorio de forma asíncrona sin bloquear la UI"""
         print(f"[DEBUG] Cargando hijos para: {directory_path}")
-        
-        if parent_item in self.loading_items or parent_item in self.loaded_items:
-            return
         
         self.loading_items.add(parent_item)
         
+        def _worker():
+            try:
+                items = self.file_ops.get_directory_contents(directory_path)
+                self.app.master.after(0, lambda: self._finalize_load(parent_item, items, directory_path))
+            except Exception as e:
+                print(f"[ERROR ASYNC] {directory_path}: {e}")
+                self.app.master.after(0, lambda: self._add_error_node(parent_item, f"Error: {e}"))
+            finally:
+                self.loading_items.discard(parent_item)
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _finalize_load(self, parent_item, items, directory_path):
+        """Actualiza la UI con los items cargados (Main Thread)"""
         try:
             self._clear_children(parent_item)
-            
-            items = self.file_ops.get_directory_contents(directory_path)
             if items is None:
-                self._add_error_node(parent_item, "ÔÜá Acceso denegado")
+                self._add_error_node(parent_item, "⚠️ Acceso denegado")
                 return
-            
             if not items:
-                print(f"[DEBUG] Directorio vac├¡o: {directory_path}")
+                self.loaded_items.add(parent_item)
                 return
-            
             self._add_directory_items(parent_item, items)
             self.loaded_items.add(parent_item)
-                    
+            if hasattr(self.ui, 'update_scrollbars'):
+                self.ui.update_scrollbars()
         except Exception as e:
-            print(f"[ERROR] Error cargando directorio {directory_path}: {e}")
-            self._add_error_node(parent_item, f'ÔØî Error: {str(e)}')
-        finally:
-            self.loading_items.discard(parent_item)
+            print(f"[ERROR FINALIZE] {e}")
+
     
     def _clear_children(self, parent_item):
         """Limpia los hijos de un item"""
@@ -551,7 +557,7 @@ class FileExplorerManager:
                 break
         
         try:
-            self._load_directory_children_sync(item, path)
+            self._load_directory_children_async(item, path)
         except Exception as e:
             print(f"[ERROR] Error expandiendo nodo: {e}")
         finally:
@@ -569,7 +575,7 @@ class FileExplorerManager:
             item = self.path_to_item[self.current_path]
             if self.tree.item(item, 'open'):
                 self.loaded_items.discard(item)
-                self._load_directory_children_sync(item, self.current_path)
+                self._load_directory_children_async(item, self.current_path)
     
     def go_home(self):
         """Va al directorio home"""

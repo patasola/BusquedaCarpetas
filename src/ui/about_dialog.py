@@ -103,7 +103,7 @@ class AboutDialog:
         version_label = tk.Label(self.content_frame,
                                text=f"Versión {self.version}",
                                font=Fonts.TITLE,
-                               fg=Colors.TREE_SELECT_FG,
+                               fg=Colors.DARK_GRAY,
                                bg=Colors.BACKGROUND)
         version_label.pack(pady=(0, 15))
         
@@ -133,20 +133,20 @@ class AboutDialog:
         right_column = tk.Frame(tech_frame, bg=Colors.BACKGROUND)
         right_column.pack(side='right')
         
-        # Características V.5.1
+        # Características V.6.0 (Empíreo)
         features_label = tk.Label(left_column,
-                                text="✨ Nuevas características V.5.1:",
+                                text="✨ Nuevas características V.6.0 (Empíreo):",
                                 font=("Segoe UI", 11, "bold"),
                                 fg=Colors.BLUE_BAR,
                                 bg=Colors.BACKGROUND,
                                 anchor='w')
         features_label.pack(anchor='w')
         
-        features_text = ("• Carga de inicio invisible (Zero-Flicker)\n"
-                        "• Protección de foco (Anti-Stealing)\n"
-                        "• Caché asíncrono inicial\n"
-                        "• Barra de atajos síncrono\n"
-                        "• IDs únicos por búsqueda")
+        features_text = ("• Buscador de contenido FTS5 (Ctrl+I)\n"
+                        "• Snippets de contexto inteligentes\n"
+                        "• Atajos globales blindados (O, U, Esc)\n"
+                        "• Carga de inicio invisible (Zero-Flicker)\n"
+                        "• Caché asíncrono y protección de foco")
         
         features_detail = tk.Label(left_column,
                                  text=features_text,
@@ -163,9 +163,9 @@ class AboutDialog:
         # ...
         
         evolution_text = ("V.4.5 → Paneles duales con redimensión dinámica\n"
-                         "V.4.9 → Gran Refactor: Modularización (Managers) y limpieza de caché\n"
                          "V.5.0 → Luce Intellettual: Nueva estética consolidada\n"
-                         "V.5.1 → Luce Ultima: Startup instantáneo y correcciones finales")
+                         "V.5.1 → Luce Ultima: Startup instantáneo y correcciones finales\n"
+                         "V.6.0 → Empíreo: Búsqueda de contenido FTS5 y snippets nativos")
         
         evolution_detail = tk.Label(self.content_frame,
                                    text=evolution_text,
@@ -181,21 +181,21 @@ class AboutDialog:
         dante_label1 = tk.Label(self.content_frame,
                               text="\"Nel mezzo del cammin di nostra vita",
                               font=("Segoe UI", 11, "italic"),
-                              fg=Colors.TREE_SELECT_FG,
+                              fg=Colors.DARK_GRAY,
                               bg=Colors.BACKGROUND)
         dante_label1.pack(pady=2)
         
         dante_label2 = tk.Label(self.content_frame,
                               text="mi ritrovai per una selva oscura,",
                               font=("Segoe UI", 11, "italic"),
-                              fg=Colors.TREE_SELECT_FG,
+                              fg=Colors.DARK_GRAY,
                               bg=Colors.BACKGROUND)
         dante_label2.pack(pady=2)
         
         dante_label3 = tk.Label(self.content_frame,
                               text="ché la diritta via era smarrita.\"",
                               font=("Segoe UI", 11, "italic"),
-                              fg=Colors.TREE_SELECT_FG,
+                              fg=Colors.DARK_GRAY,
                               bg=Colors.BACKGROUND)
         dante_label3.pack(pady=2)
         

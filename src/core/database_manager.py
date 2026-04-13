@@ -14,6 +14,7 @@ class DatabaseManager:
         self.user = ""
         self.password = ""
         self._lock = threading.Lock()
+        self._conociendo = False # Flag para evitar múltiples hilos conectando a la vez
 
         # Cache en memoria para optimizar búsquedas repetidas
         self._cache = {}  # {radicado: (demandante, demandado)}
@@ -23,41 +24,46 @@ class DatabaseManager:
         self.last_query_time = 0
         self.keep_alive_timer = None
 
-        # Auto-conectar al inicio
-        self._auto_connect()    
+        # Ya no auto-conectamos aquí para no bloquear el hilo que crea el manager
+        # La conexión ocurrirá de forma perezosa (Lazy) o mediante iniciar_conexion_asincrona()
         
     def conectar(self):
         """Establece conexión con la BD con reintentos robustos para SSPI"""
-        intentos = [
-            # Intento 1: DSN Estándar
-            f"DSN={self.dsn};",
-            # Intento 2: Trusted_Connection explícito
-            f"DSN={self.dsn};Trusted_Connection=yes;",
-            # Intento 3: Integrated Security explícito
-            f"DSN={self.dsn};Integrated Security=SSPI;",
-            # Intento 4: Ambos flags de seguridad (algunos drivers lo requieren)
-            f"DSN={self.dsn};Trusted_Connection=yes;Integrated Security=SSPI;",
-            # Intento 5: Conexión directa (si el usuario provee credenciales)
-            f"DSN={self.dsn};UID={self.user};PWD={self.password};" if self.user else None
-        ]
+        with self._lock:
+            if self.connection: return True
+            if self._conociendo: return False
+            self._conociendo = True
         
-        last_error = ""
-        for i, conn_str in enumerate(intentos):
-            if not conn_str: continue
-            try:
-                # print(f"[DB] Intentando variante {i+1}...") 
-                self.connection = pyodbc.connect(conn_str, timeout=3)
-                print(f"[DB] Conexión exitosa (Variante {i+1})")
-                sys.stdout.flush()
-                return True
-            except Exception as e:
-                last_error = str(e)
-                # print(f"[DB] Falló variante {i+1}: {last_error}")
-                continue
+        try:
+            intentos = [
+                f"DSN={self.dsn};",
+                f"DSN={self.dsn};Trusted_Connection=yes;",
+                f"DSN={self.dsn};Integrated Security=SSPI;",
+                f"DSN={self.dsn};Trusted_Connection=yes;Integrated Security=SSPI;",
+                f"DSN={self.dsn};UID={self.user};PWD={self.password};" if self.user else None
+            ]
+            
+            last_error = ""
+            for i, conn_str in enumerate(intentos):
+                if not conn_str: continue
+                try:
+                    self.connection = pyodbc.connect(conn_str, timeout=2) # Timeout más corto
+                    print(f"[DB] Conexión exitosa (Variante {i+1})")
+                    self._start_keep_alive() # Iniciar mantenimiento
+                    return True
+                except Exception as e:
+                    last_error = str(e)
+                    continue
 
-        print(f"[DB Error] Sin conexión SQL tras {len(intentos)} intentos. Último error: {last_error}")
-        sys.stdout.flush()
-        return False
+            print(f"[DB Error] Sin conexión SQL tras {len(intentos)} intentos. {last_error}")
+            return False
+        finally:
+            with self._lock:
+                self._conociendo = False
+
+    def iniciar_conexion_asincrona(self):
+        """Lanza la conexión en un hilo independiente"""
+        threading.Thread(target=self.conectar, daemon=True).start()
 
     def obtener_info_proceso(self, radicado):
         """
@@ -164,17 +170,25 @@ class DatabaseManager:
             'max_size': self._cache_max_size
         }
       
-    def _auto_connect(self):
+    def _start_keep_alive(self):
         """Mantiene conexión viva con keep-alive timer"""
-        if not self.connection or self._connection_stale():
-            self.conectar()
-        
         if self.keep_alive_timer:
             self.keep_alive_timer.cancel()
         
-        self.keep_alive_timer = threading.Timer(300, self._auto_connect)
+        def _check():
+            if self.connection and self._connection_stale():
+                print("[DB] Refrescando conexión inactiva...")
+                self.connection = None
+                self.conectar()
+            self._start_keep_alive()
+
+        self.keep_alive_timer = threading.Timer(300, _check)
         self.keep_alive_timer.daemon = True
         self.keep_alive_timer.start()
+
+    def _auto_connect(self):
+        # Mantenido por compatibilidad pero redirigido
+        self.conectar()
 
     def _connection_stale(self):
         """Verifica si conexión inactiva >10 min"""

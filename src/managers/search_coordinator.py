@@ -24,7 +24,7 @@ class SearchCoordinator:
         path_hash = hashlib.md5(path_norm.encode()).hexdigest()[:8]
         return f"cache_{path_hash}.pkl"
     
-    def ejecutar_busqueda(self, criterio, silenciosa=False):
+    def ejecutar_busqueda(self, criterio, silenciosa=False, incluir_contenido=False):
         """Ejecuta búsqueda completamente asíncrona"""
         if not criterio:
             if not silenciosa:
@@ -42,22 +42,19 @@ class SearchCoordinator:
             
         self.search_cancelled = False
         
-        # Limpiar resultados siempre para evitar acumulación (Feedback del usuario)
-        self.app.ui_manager.limpiar_resultados()
-        
         if not silenciosa:
             self.app.ui_manager.deshabilitar_busqueda()
             self.app.ui_manager.actualizar_estado("Iniciando búsqueda...")
         
         self.current_search_thread = threading.Thread(
             target=self._perform_search_async,
-            args=(criterio, silenciosa, my_search_id),
+            args=(criterio, silenciosa, my_search_id, incluir_contenido),
             daemon=True
         )
         self.current_search_thread.start()
     
-    def _perform_search_async(self, criterio, silenciosa, search_id):
-        """Búsqueda SIMPLIFICADA: Caché primero, luego disco"""
+    def _perform_search_async(self, criterio, silenciosa, search_id, incluir_contenido=False):
+        """Búsqueda optimizada por niveles: Nombres (Caché/Disco) y opcionalmente Contenido"""
         try:
             if search_id != self.current_search_id: return
             
@@ -65,19 +62,33 @@ class SearchCoordinator:
             self.app.master.after(0, self.app.ui_manager.limpiar_resultados)
             start_time = time.time()
             
+            # PASO 0: Búsqueda por CONTENIDO (FTS5) - SOLO SI SE SOLICITA EXPLICITAMENTE
+            resultados_contenido = []
+            if incluir_contenido:
+                if not hasattr(self.app, 'content_indexer'):
+                    from ..core.content_indexer import ContentIndexer
+                    self.app.content_indexer = ContentIndexer(self.app)
+                resultados_contenido = self.app.content_indexer.search(criterio)
+            
             # PASO 1: Intentar caché (INSTANTÁNEO)
             resultados_cache = []
             if hasattr(self.app, 'cache_manager') and self.app.cache_manager:
                 if self.app.cache_manager.cache.valido:
                     resultados_cache = self.app.cache_manager.buscar_en_cache(criterio)
             
-            # Si hay resultados en caché, mostrarlos INMEDIATAMENTE
-            if resultados_cache:
-                print(f"[SEARCH] Caché hit: {len(resultados_cache)} resultados")
-                # Convertir formato de caché a formato de UI
-                # Formato caché: (nombre, ruta_rel, ruta_abs, timestamp)
-                # Formato UI esperado: (nombre, ruta_rel, ruta_abs, tiene_hijos, loc_name, demandante, demandado)
+            # Si hay resultados en caché o contenido, mostrarlos
+            if resultados_cache or resultados_contenido:
+                print(f"[SEARCH] Resultados: {len(resultados_cache)} cache, {len(resultados_contenido)} contenido")
+                
+                # Unificar para UI
                 resultados_ui = []
+                
+                # Agregar archivos encontrados por contenido primero
+                for r in resultados_contenido:
+                    # r: {'name', 'path', 'abs_path', 'has_children'}
+                    resultados_ui.append((r['name'], r['path'], r['abs_path'], False, "Contenido", "", ""))
+
+                # Agregar carpetas de caché
                 for r in resultados_cache:
                     # r[0]=nombre, r[1]=ruta_rel, r[2]=ruta_abs, r[3]=timestamp
                     resultados_ui.append((r[0], r[1], r[2], True, "Caché", "", ""))

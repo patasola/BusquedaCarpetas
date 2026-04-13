@@ -13,7 +13,26 @@ class MultiLocationSearch:
         self.config_file = "search_locations.json"
         self.location_caches = {}
         self.rotation_index = 0
+        self._path_exists_cache = {} # Cache para no bloquear con os.path.exists
         self.load_locations()
+        self._start_existence_checker()
+
+    def _start_existence_checker(self):
+        """Hilo para verificar existencia de rutas sin bloquear UI"""
+        def _check():
+            while True:
+                for loc in self.locations:
+                    path = loc.get('path')
+                    if path:
+                        try:
+                            # Operación potencialmente lenta en red
+                            self._path_exists_cache[path] = os.path.exists(path)
+                        except:
+                            self._path_exists_cache[path] = False
+                time.sleep(30) # Solo verificar cada 30 segundos
+        
+        import threading
+        threading.Thread(target=_check, daemon=True).start()
     
     def load_locations(self):
         """Carga ubicaciones desde archivo"""
@@ -22,6 +41,11 @@ class MultiLocationSearch:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     locations_data = json.load(f)
                     self.locations = locations_data
+                    # Inicializar cache de existencia para evitar None
+                    for loc in self.locations:
+                        p = loc.get('path')
+                        if p and p not in self._path_exists_cache:
+                            self._path_exists_cache[p] = True # Asumir True hasta el primer check
             else:
                 self.locations = []
         except Exception as e:
@@ -29,8 +53,8 @@ class MultiLocationSearch:
             self.locations = []
     
     def get_enabled_locations(self):
-        """Obtiene ubicaciones habilitadas"""
-        return [loc for loc in self.locations if loc.get('enabled', True) and os.path.exists(loc['path'])]
+        """Obtiene ubicaciones habilitadas usando cache de existencia"""
+        return [loc for loc in self.locations if loc.get('enabled', True) and self._path_exists_cache.get(loc['path'], True)]
     
     def search_in_all_locations(self, criterio):
         """Busca en todas las ubicaciones habilitadas"""

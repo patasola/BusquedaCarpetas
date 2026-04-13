@@ -1,4 +1,4 @@
-﻿# src/results_renderer.py - Renderizador centralizado de resultados
+# src/results_renderer.py - Renderizador centralizado de resultados
 """
 Módulo centralizado para renderizar resultados en el TreeView.
 Elimina duplicación de código entre ui_callbacks.py y dynamic_column_manager.py.
@@ -108,12 +108,11 @@ class ResultsRenderer:
                     # RutaAbs queda al final (oculta/accesible por código)
                     tree_values = [metodo_display, ruta_rel, extra_values[0], extra_values[1], ruta_abs]
                     
-                    # Determinar si mostramos el triángulo (expander)
-                    # Si tiene_hijos es True, open=False
-                    open_state = False 
+                    # Determinar icono: Carpeta si tiene_hijos es True, si no, Archivo
+                    icon = "📂" if tiene_hijos else "📄"
                     
                     item_id = app.tree.insert("", "end",
-                                   text=f"📂 {nombre}",
+                                   text=f"{icon} {nombre}",
                                    values=tuple(tree_values),
                                    tags=(tag,),
                                    open=False)

@@ -18,10 +18,8 @@ class UIManager:
         # Estado de UI
         self.modo_entrada = "normal"
         self._updating_vars = False
-        self._last_adjust_time = 0
-        self._ajuste_en_progreso = False
-        self._search_timer = None # Timer para búsqueda automática (debounce)
-
+        self.search_timer = None # Temporizador para búsqueda automática
+    
     # --- CONFIGURACIÓN E INICIALIZACIÓN ---
 
     def configurar_referencias(self, status_frame, cache_frame):
@@ -35,7 +33,8 @@ class UIManager:
         try:
             vcmd = (self.app.master.register(self._validar_entrada), '%P')
             self.app.entry.configure(validate="key", validatecommand=vcmd)
-            self.app.entry.bind('<KeyRelease>', self.on_entry_change)
+            # NO vinculamos nada a KeyRelease para evitar lag al escribir
+            # La validación se hace vía validatecommand (vcmd)
         except Exception as e:
             print(f"[UIManager] Error configurando validación: {e}")
 
@@ -115,44 +114,17 @@ class UIManager:
                 self.app.btn_buscar.configure(state='disabled')
         except: pass
 
-    def on_entry_change(self, event):
-        """Callback al cambiar texto en entry para activar búsqueda automática (DEBOUNCE)"""
-        texto = self.app.entry.get().strip()
+    def on_entry_change(self, event=None):
+        """Dispara búsqueda automática con retardo (debounce)"""
+        if self.search_timer:
+            self.app.master.after_cancel(self.search_timer)
         
-        # 1. Habilitar/Deshabilitar botón de búsqueda
-        habilitada = bool(texto) and bool(getattr(self.app, 'ruta_carpeta', None))
-        self._actualizar_boton_buscar(habilitada)
-        
-        # 2. Programar búsqueda automática si hay texto y no es numérico estricto
-        # CRÍTICO: NO disparar si el usuario está navegando en el TreeView
-        if len(texto) >= 3:
-            # Cancelar búsqueda previa si existe
-            if self._search_timer:
-                self.app.master.after_cancel(self._search_timer)
-            
-            # Verificar si el foco está en el TreeView - NO buscar si está navegando
-            foco_actual = self.app.master.focus_get()
-            if foco_actual and hasattr(foco_actual, 'winfo_class'):
-                if foco_actual.winfo_class() == 'Treeview':
-                    return  # Usuario navegando en TreeView, NO interrumpir
-            
-            # Solo disparar automático si el cache está listo para que sea INSTANTANEO
-            if hasattr(self.app, 'cache_manager') and self.app.cache_manager.cache.valido:
-                self._search_timer = self.app.master.after(1200, self._trigger_auto_search)
-
-    def _trigger_auto_search(self):
-        """Dispara la búsqueda automática tras el debounce (Modo Silencioso)"""
-        if not self.app.entry.get().strip(): return
-        if self.app.btn_buscar['state'] == 'disabled': return
-        
-        # DOBLE VERIFICACIÓN: No buscar si el usuario está en el TreeView
-        foco_actual = self.app.master.focus_get()
-        if foco_actual and hasattr(foco_actual, 'winfo_class'):
-            if foco_actual.winfo_class() == 'Treeview':
-                return  # Usuario navegando, NO interrumpir
-        
-        print("[DEBUG] Disparando búsqueda automática (Silenciosa para no robar foco)")
-        self.app.buscar_carpeta(silenciosa=True)
+        criterio = self.app.entry.get().strip()
+        if len(criterio) >= 2:
+            # Esperar 350ms de inactividad antes de buscar
+            self.search_timer = self.app.master.after(350, lambda: self.app.search_coordinator.ejecutar_busqueda(criterio, silenciosa=True))
+        elif not criterio:
+            self.limpiar_resultados()
 
     def cambiar_modo_entrada(self):
         """Alterna entre modo Numérico y Alfanumérico"""
@@ -214,11 +186,12 @@ class UIManager:
         )
 
     def actualizar_estado(self, mensaje):
-        """Actualiza el mensaje en la barra de estado"""
+        """Actualiza el mensaje en la barra de estado de forma ligera"""
         try:
             if hasattr(self.app, 'label_estado') and self.app.label_estado:
                 self.app.label_estado.config(text=mensaje)
-                self.app.master.update_idletasks()
+                # NO llamar a update_idletasks() aquí, dejar que el mainloop maneje el dibujo
+                # para evitar saturar el hilo principal durante procesos asíncronos.
         except: pass
 
     def deshabilitar_busqueda(self, incluir_entry=True):
@@ -307,7 +280,12 @@ class UIManager:
             self.mostrar_error(f"Error al abrir carpeta: {e}")
 
     def obtener_seleccion_tabla(self):
-        """Retorna un diccionario con los datos del elemento seleccionado en el TreeView principal"""
+        """Retorna un diccionario con los datos del elemento seleccionado en el TreeView principal.
+        
+        Soporta items de dos formatos:
+        - Root (5 values): [Metodo, RutaRel, Dem1, Dem2, RutaAbs]
+        - Child/Expandido (2 values): [Metodo, RutaAbsoluta]
+        """
         try:
             selection = self.app.tree.selection()
             if not selection:
@@ -318,23 +296,37 @@ class UIManager:
             values = item_data.get('values', [])
             texto = item_data.get('text', "")
             
-            if not values:
+            if not values or len(values) < 2:
                 return None
             
             # Limpiar nombre (quitar emoji si existe)
-            nombre = texto.replace("📁 ", "").replace("📂 ", "").strip()
+            nombre = texto.replace("📁 ", "").replace("📂 ", "").replace("📄 ", "").strip()
             
-            # Según ResultsRenderer, values[0] es método, values[1] es ruta_rel
             metodo = values[0]
             ruta_info = values[1]
             
-            # Determinar ruta absoluta
-            if os.path.isabs(ruta_info):
-                ruta_abs = ruta_info
-                ruta_rel = os.path.relpath(ruta_info, self.app.ruta_carpeta) if hasattr(self.app, 'ruta_carpeta') else ruta_info
+            # Determinar ruta absoluta según formato
+            if len(values) >= 5:
+                # Formato root: [Metodo, RutaRel, Dem1, Dem2, RutaAbs]
+                ruta_abs_candidate = values[4]
+                if ruta_abs_candidate and os.path.isabs(str(ruta_abs_candidate)):
+                    ruta_abs = str(ruta_abs_candidate)
+                    ruta_rel = str(ruta_info)
+                elif os.path.isabs(str(ruta_info)):
+                    ruta_abs = str(ruta_info)
+                    ruta_rel = os.path.relpath(ruta_abs, self.app.ruta_carpeta) if hasattr(self.app, 'ruta_carpeta') else ruta_abs
+                else:
+                    ruta_rel = str(ruta_info)
+                    ruta_abs = os.path.join(self.app.ruta_carpeta, ruta_rel) if hasattr(self.app, 'ruta_carpeta') else ruta_rel
             else:
-                ruta_rel = ruta_info
-                ruta_abs = os.path.join(self.app.ruta_carpeta, ruta_info) if hasattr(self.app, 'ruta_carpeta') else ruta_info
+                # Formato child (2 values): [Metodo, RutaAbsoluta]
+                ruta_info_str = str(ruta_info)
+                if os.path.isabs(ruta_info_str):
+                    ruta_abs = ruta_info_str
+                    ruta_rel = os.path.relpath(ruta_abs, self.app.ruta_carpeta) if hasattr(self.app, 'ruta_carpeta') else ruta_abs
+                else:
+                    ruta_rel = ruta_info_str
+                    ruta_abs = os.path.join(self.app.ruta_carpeta, ruta_rel) if hasattr(self.app, 'ruta_carpeta') else ruta_rel
             
             return {
                 'id': item_id,

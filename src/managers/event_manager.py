@@ -30,10 +30,21 @@ class EventManager:
             "<Control-R>": lambda e: self.app.window_manager.restaurar_ventana(),
             "<Control-h>": lambda e: self.app.ui_manager.toggle_historial(),
             "<Control-H>": lambda e: self.app.ui_manager.toggle_historial(),
+            "<Control-i>": lambda e: self.app.content_search_modal.show_modal(),
+            "<Control-I>": lambda e: self.app.content_search_modal.show_modal(),
+            "<Control-f>": lambda e: self.app.ui_manager.enfocar_y_seleccionar_campo(),
+            "<Control-F>": lambda e: self.app.ui_manager.enfocar_y_seleccionar_campo(),
+            "<Control-c>": lambda e: self.copiar_ruta_seleccionada(),
+            "<Control-C>": lambda e: self.copiar_ruta_seleccionada(),
+            "<Control-o>": lambda e: self.abrir_carpeta_seleccionada(),
+            "<Control-O>": lambda e: self.abrir_carpeta_seleccionada(),
+            "<Control-l>": lambda e: self.app.ui_manager.limpiar(),
+            "<Control-L>": lambda e: self.app.ui_manager.limpiar(),
+            "<F12>": lambda e: self.app.theme_manager.toggle_tema(),
         }
         
         for key, cmd in atajos.items():
-            self.app.master.bind(key, cmd)
+            self.app.master.bind_all(key, cmd)
     
     def _fix_f2_focus(self):
         """Corrige el F2 para que funcione correctamente"""

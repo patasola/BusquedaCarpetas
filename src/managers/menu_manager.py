@@ -40,6 +40,14 @@ class MenuManager:
             underline=0  # Alt+U
         )
         
+        # Búsqueda por CONTENIDO (ContentIndexer)
+        archivo.add_command(
+            label="Búsqueda por Contenido...", 
+            command=self._show_content_search_config,
+            accelerator="Ctrl+I",
+            underline=13 # Búsqueda por -C-ontenido
+        )
+        
         archivo.add_separator()
         archivo.add_command(label="Verificar problemas", command=self.app.search_coordinator.verificar_problemas_cache, underline=0)
         archivo.add_separator()
@@ -161,6 +169,18 @@ class MenuManager:
         except Exception as e:
             print(f"Error abriendo configuración de ubicaciones: {e}")
             messagebox.showerror("Error", f"No se pudo abrir la configuración: {str(e)}")
+
+    def _show_content_search_config(self):
+        """Muestra modal de configuración de búsqueda por contenido"""
+        try:
+            from ..ui.content_search_modal import ContentSearchModal
+            modal = ContentSearchModal(self.app.master, self.app)
+            modal.show_modal()
+        except Exception as e:
+            print(f"Error abriendo configuración de contenido: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Error", f"No se pudo abrir la búsqueda por contenido: {str(e)}")
     
     def mostrar_manual(self):
         """Abre el manual renderizado como HTML"""

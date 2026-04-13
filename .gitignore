@@ -1,41 +1,16 @@
+# Bases de datos SQLite y temporales (Buscador de Contenido)
+content_index.db
+content_index.db-shm
+content_index.db-wal
+
+# Archivos de configuración local
+content_locations.json
+historial_busquedas.json
+config.json
+
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
 *.pyc
 
-# Cache files
-cache_*.pkl
-*.pkl
-
-# Config files (datos del usuario)
-config.json
-historial_busquedas.json
-search_locations.json
-column_preferences.json
-tree_column_config.json
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
 # Logs
-*.log
-
-# Virtual environment
-venv/
-env/
-ENV/
+app_log.txt

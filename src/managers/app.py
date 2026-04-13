@@ -97,69 +97,82 @@ class BusquedaCarpetaApp:
         self.modo_numerico = True
         self._is_initializing = True  # Bloquear redimensionamientos automáticos en el arranque
         
-        # 1. Configuración (Necesaria para todo lo demás)
+        # 1. Configuración y Estilo (Crítico)
         self.config = ConfigManager()
         self.ruta_carpeta = self.config.cargar_ruta()
+        self.theme_manager = ThemeManager(self, tema_inicial=self.config.get("theme", "claro"))
         
-        # 2. Window Manager (Necesita self.config y self)
+        # 2. Window Manager
         self.window_manager = WindowManager(master, self.version, self)
-        
-        # 3. Otros Managers
-        self.cache_manager = CacheManager(self.ruta_carpeta)
-        self.search_engine = SearchEngine(self.ruta_carpeta)
-        self.multi_location_search = MultiLocationSearch(self)
-        self.dual_panel_manager = DualPanelManager(self)
-        
-        # Módulos extraídos
-        self.search_methods = SearchMethods(self)
-        self.results_display = ResultsDisplay(self)
-                
-        # Cargar tema guardado
-        tema_guardado = self.config.get("theme", "claro")
-        self.theme_manager = ThemeManager(self, tema_inicial=tema_guardado)
-        
-        # ODBC Database Manager
-        try:
-            from ..core.database_manager import DatabaseManager
-            self.database_manager = DatabaseManager(self)
-        except ImportError:
-            self.database_manager = None
-        
-        # Configurar ventana usando preferencias guardadas
         self.window_manager.configurar_ventana(
             saved_geometry=self.config.get("window_geometry"),
             manual_app_width=self.config.get("manual_app_width")
         )
         
-        # Protocolo de cierre para guardar preferencias
-        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
+        # 3. Motores de Búsqueda Básicos
+        self.cache_manager = CacheManager(self.ruta_carpeta)
+        self.search_engine = SearchEngine(self.ruta_carpeta)
+        self.multi_location_search = MultiLocationSearch(self)
+        self.dual_panel_manager = DualPanelManager(self)
         
-        self.tree_explorer = None
-        
-        # Inicializar
+        # 4. Inicialización de UI Core
         self._init_ui()
-        self._init_managers()
-        self._configure_app()
-        self._start_location_rotation()
-        self._init_managers()
-        self._configure_app()
-        self._start_location_rotation()
+        self._init_managers_core()
         
-        # Optimización: Cargar caché en hilo para no bloquear UI
+        # 5. CARGA DIFERIDA (Para arranque instantáneo)
+        # Retrasamos lo más pesado unos milisegundos para que la ventana aparezca YA
+        self.master.after(50, self._deferred_initialization)
+        
+        # Protocolo de cierre
+        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
+        print(f"[PROFILE] App Skeleton cargado en: {time.time() - start_time:.3f}s")
+
+    def _deferred_initialization(self):
+        """Inicialización escalonada para evitar congelamiento de UI"""
+        print("[INIT] Iniciando carga diferida por micro-tareas...")
+        
+        # 1. Base de Datos (ODBC) - Totalmente asíncrona
+        try:
+            from ..core.database_manager import DatabaseManager
+            self.database_manager = DatabaseManager(self)
+            self.database_manager.iniciar_conexion_asincrona()
+        except: pass
+
+        # 2. Siguiente paso: Búsqueda por Contenido (con 100ms de respiro para la UI)
+        self.master.after(100, self._deferred_step_content_search)
+
+    def _deferred_step_content_search(self):
+        """Paso 2: Inicializar búsqueda por contenido"""
+        self._init_content_search()
+        # 3. Siguiente paso: Configuración de managers y atajos
+        self.master.after(100, self._deferred_step_configure_app)
+
+    def _deferred_step_configure_app(self):
+        """Paso 3: Configuración de managers y atajos"""
+        self._configure_app()
+        self.create_global_shortcuts_bar()
+        self._start_location_rotation()
+        # 4. Siguiente paso: Cargas pesadas de cache en background
+        self.master.after(100, self._deferred_step_background_loads)
+
+    def _deferred_step_background_loads(self):
+        """Paso 4: Cargas pesadas en hilos separados"""
         import threading
         threading.Thread(target=self._cargar_cache_inteligente, daemon=True).start()
         
-        # Optimización: Restaurar paneles SÍNCRONAMENTE (mientras ventana está oculta)
-        # Ya no necesitamos 'after', porque main.py oculta la ventana
-        self._restore_panel_visibility_safe()
+        # 5. Restaurar visibilidad de paneles (último paso)
+        self.master.after(200, self._restore_panel_visibility_safe)
         
-        # Limpieza de 'mugre' (caches obsoletos) en segundo plano tras iniciar
-        self.master.after(2000, self.search_coordinator.verificar_problemas_cache_silencioso)
+        # 6. Limpieza final retardada
+        self.master.after(3000, self._deferred_step_final_cleanup)
+
+    def _deferred_step_final_cleanup(self):
+        """Limpieza periódica tras el arranque"""
+        if hasattr(self, 'search_coordinator'):
+            self.search_coordinator.verificar_problemas_cache_silencioso()
         
-        print(f"[PROFILE] App inicializada en: {time.time() - start_time:.3f}s")
         
-        # Crear barra de atajos global
-        self.create_global_shortcuts_bar()
+        
 
     def _restore_panel_visibility_safe(self):
         """Restaura la visibilidad de los paneles de forma segura sin disparar resizes"""
@@ -371,39 +384,38 @@ class BusquedaCarpetaApp:
         self.label_carpeta_info.config(text=self.multi_location_search.get_rotation_text())
         self.master.after(3000, self._start_location_rotation)
 
-    def _init_managers(self):
-        """Inicializa managers"""
+    def _init_managers_core(self):
+        """Inicializa solo los managers esenciales para el UI base"""
+        self.search_methods = SearchMethods(self)
+        self.results_display = ResultsDisplay(self)
+        self.theme_manager.aplicar_tema()
         self.ui_manager = UIManager(self)
         self.ui_manager.configurar_validacion()
-
-        # El theme_manager ya fue inicializado arriba
-        self.theme_manager.aplicar_tema()
-        
         self.search_manager = SearchManager(self.cache_manager, self.search_engine, None, self.ui_manager)
         self.search_coordinator = SearchCoordinator(self)
         self.event_manager = EventManager(self)
         self.navigation_manager = NavigationManager(self)
         self.file_manager = FileManager(self.config, self.ui_manager)
         self.historial_manager = HistorialManager(self)
-        
-        # Configurar columnas para TreeView de historial (inicializar cuando esté listo)
         self.historial_column_config = ColumnManager(None, "historial", app=self)
-        
         self.file_explorer_manager = FileExplorerManager(self)
         self.file_explorer_manager.on_file_change_callback = self._on_explorer_file_change
-        
         self.keyboard_manager = KeyboardManager(self)
         self.menu_manager = MenuManager(self)
         from .tree_expansion_handler import TreeExpansionHandler
         self.tree_expansion_handler = TreeExpansionHandler(self)
-        # Configurar columnas para TreeView de resultados
         if hasattr(self, 'tree') and self.tree:
             self.results_column_config = ColumnManager(self.tree, "results", app=self)
+
+    def _init_managers(self):
+        # Mantenemos este para compatibilidad, pero usamos core y deferred
+        pass
 
     def _configure_app(self):
         """Configuración final"""
         self.menu_manager.create_menu_bar()
         self.keyboard_manager.configure_all_shortcuts()
+        self.event_manager.configurar_eventos()  # ACTIVAR ATAJOS NUEVOS
         self.navigation_manager.configurar_navegacion()
         
         # Eventos de botones
@@ -672,10 +684,45 @@ class BusquedaCarpetaApp:
         diff = event.x_root - self.resize_start_x
         new_width = self.resize_start_width + diff
         
-        # Limitar ancho (mínimo 600px, máximo según pantalla)
-        screen_width = self.master.winfo_screenwidth()
-        new_width = max(600, min(screen_width - 300, new_width))
+        # Limitar ancho (mínimo 600px, máxim        new_width = max(600, min(screen_width - 300, new_width))
         
         # Aplicar nuevo ancho al wrapper del main container
         self.main_container_wrapper.config(width=new_width)
         self.main_container_wrapper.pack_propagate(False)
+
+    def _init_content_search(self):
+        """Inicializa los componentes de búsqueda por contenido"""
+        try:
+            from ..core.content_indexer import ContentIndexer
+            from ..core.content_locations_manager import ContentLocationsManager
+            self.content_indexer = ContentIndexer(self)
+            self.content_locations_manager = ContentLocationsManager()
+            from ..ui.content_search_modal import ContentSearchModal
+            self.content_search_modal = ContentSearchModal(self.master, self)
+            # ATAJOS DE EMERGENCIA
+            self.master.bind_all("<Control-i>", lambda e: self.content_search_modal.show_modal())
+            self.master.bind_all("<Control-I>", lambda e: self.content_search_modal.show_modal())
+            self.master.bind_all("<Control-o>", lambda e: self._handle_ctrl_o())
+            self.master.bind_all("<Control-O>", lambda e: self._handle_ctrl_o())
+            self.master.bind_all("<Control-u>", lambda e: self.menu_manager._show_locations_config())
+            self.master.bind_all("<Control-U>", lambda e: self.menu_manager._show_locations_config())
+            self.master.bind_all("<Escape>", lambda e: self.cancelar_busqueda())
+        except Exception as e:
+            print(f"[CONTENT] Error inicializando búsqueda por contenido: {e}")
+
+    def _handle_ctrl_o(self):
+        """Maneja Ctrl+O de forma contextual"""
+        # 1. Si el buscador de contenido está abierto, abrir su resultado
+        if hasattr(self, 'content_search_modal') and self.content_search_modal.modal and self.content_search_modal.modal.winfo_exists():
+            # No importa el foco exacto, si el buscador es visible, abrimos de ahí
+            self.content_search_modal._open_selected_result()
+            return
+
+        # 2. Si el explorador de archivos está visible, abrir de ahí
+        if hasattr(self, 'file_explorer_manager') and self.file_explorer_manager.is_visible():
+            self.file_explorer_manager.open_selected_item()
+            return
+        
+        # 3. Por defecto, usar la lógica estándar del EventManager
+        if hasattr(self, 'event_manager'):
+            self.event_manager.abrir_carpeta_seleccionada()

@@ -17,7 +17,7 @@ def main():
     root = tk.Tk()
     root.withdraw() # OCULTAR VENTANA INICIALMENTE (Evitar "baile")
     
-    root.title("Búsqueda Rápida de Carpetas")
+    root.title("Búsqueda Rápida de Carpetas V.6.0 - Empíreo")
     
     # Configurar tamaño y posición inicial
     root.geometry("900x600")
