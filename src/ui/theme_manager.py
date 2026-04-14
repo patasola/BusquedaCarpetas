@@ -1,4 +1,4 @@
-﻿# src/theme_manager.py - V3 con callbacks y actualización dinámica
+# src/theme_manager.py - V3 con callbacks y actualización dinámica
 import tkinter as tk
 from tkinter import ttk
 import ctypes
@@ -163,16 +163,20 @@ class ThemeManager:
         self._aplicar_tema_recursivo(self.app.master)
         self._configurar_estilos_ttk()
         self._actualizar_treeviews()
-        self._aplicar_modo_oscuro_windows()
+        self.set_dark_mode_to_window(self.app.master)
     
-    def _aplicar_modo_oscuro_windows(self):
-        """Intenta aplicar modo oscuro a la barra de título de Windows"""
+    def set_dark_mode_to_window(self, window):
+        """Aplica modo oscuro a la barra de título de la ventana especificada (Windows)"""
         try:
             if sys.platform != "win32":
                 return
                 
-            # Obtener HWND
-            hwnd = ctypes.windll.user32.GetParent(self.app.master.winfo_id())
+            # Forzar actualización para obtener el ID de ventana correcto si es nueva
+            window.update_idletasks()
+            
+            # Obtener HWND (el parent del ID de winfo suele ser el decorador de la ventana)
+            hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+            if not hwnd: hwnd = window.winfo_id() # Fallback
             
             # Constantes DWM
             DWMWA_USE_IMMERSIVE_DARK_MODE = 20
@@ -183,26 +187,22 @@ class ThemeManager:
             value = ctypes.c_int(value)
             
             # Intentar aplicar (Windows 11 / 10 20H1+)
-            try:
-                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            result = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, 
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value), 
+                ctypes.sizeof(value)
+            )
+            
+            if result != 0: # Fallback para versiones anteriores de Windows 10
+                 ctypes.windll.dwmapi.DwmSetWindowAttribute(
                     hwnd, 
-                    DWMWA_USE_IMMERSIVE_DARK_MODE,
+                    DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
                     ctypes.byref(value), 
                     ctypes.sizeof(value)
                 )
-            except:
-                # Fallback para versiones anteriores de Windows 10
-                try:
-                    ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                        hwnd, 
-                        DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
-                        ctypes.byref(value), 
-                        ctypes.sizeof(value)
-                    )
-                except:
-                    pass
         except Exception as e:
-            print(f"[ThemeManager] Error aplicando modo oscuro Windows: {e}")
+            pass # Silencioso si falla (generalmente por SO no compatible)
     
     def _aplicar_tema_recursivo(self, widget):
         try:

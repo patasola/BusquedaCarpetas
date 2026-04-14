@@ -27,6 +27,12 @@ class ColumnManager:
             "Demandante": {"title": "Demandante", "width": 150, "anchor": "w", "default_visible": False},
             "Demandado": {"title": "Demandado", "width": 150, "anchor": "w", "default_visible": False},
             "Ruta": {"title": "Ruta", "width": 200, "anchor": "w", "default_visible": False}
+        },
+        "index_config": {
+            "path": {"title": "Carpeta", "width": 350, "anchor": "w", "default_visible": True},
+            "status": {"title": "Estado", "width": 100, "anchor": "center", "default_visible": True},
+            "last": {"title": "Última Indexación", "width": 150, "anchor": "center", "default_visible": True},
+            "duration": {"title": "⏳ Duración", "width": 100, "anchor": "center", "default_visible": True}
         }
     }
     
@@ -39,7 +45,8 @@ class ColumnManager:
         
         self.config_keys = {
             "results": "main_column_widths",
-            "historial": "history_column_widths"
+            "historial": "history_column_widths",
+            "index_config": "index_config_column_widths"
         }
         
         if self.tree:

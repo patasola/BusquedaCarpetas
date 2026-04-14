@@ -1,5 +1,6 @@
-# src/managers/menu_manager.py - Gestión de Menús V.5.0 (Luce Intellettual) - OPTIMIZADO
 from tkinter import Menu, messagebox
+import os
+import sys
 
 class MenuManager:
     """Gestiona la creación y manejo de menús - SIN opciones redundantes del caché"""
@@ -8,6 +9,18 @@ class MenuManager:
         self.app = app
         self.menubar = None
         self.menu_visible = False  # Estado inicial: oculto
+
+    def _resource_path(self, relative_path):
+        """Obtiene la ruta absoluta de los recursos, compatible con PyInstaller"""
+        try:
+            # PyInstaller crea una carpeta temporal y guarda la ruta en _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            # En desarrollo, usar la estructura de carpetas normal (src/managers/menu_manager.py)
+            # Ir 3 niveles arriba para llegar al root donde están README.md y CHANGELOG.md
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+        return os.path.join(base_path, relative_path)
     
     def create_menu_bar(self):
         """Crea la barra de menú completa - OPTIMIZADA"""
@@ -185,37 +198,28 @@ class MenuManager:
     def mostrar_manual(self):
         """Abre el manual renderizado como HTML"""
         try:
-            import os
-            # base_dir is src/managers/, we need to go 2 levels up to reach root (BusquedaCarpetas4.5/)
-            # src/managers/menu_manager.py -> src/managers/ -> src/ -> ROOT
-            # Actually dirname(__file__) is src/managers. dirname(dirname(__file__)) is src.
-            # So we need 3 levels of dirname to reach root if it's src/managers/menu_manager.py
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            readme_path = os.path.join(base_dir, 'README.md')
+            readme_path = self._resource_path('README.md')
             
             if os.path.exists(readme_path):
                 with open(readme_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 self._abrir_como_html(content, "Manual de Usuario")
             else:
-                messagebox.showinfo("Manual", "Manual no encontrado (README.md)")
+                messagebox.showinfo("Manual", f"Manual no encontrado en: {readme_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Error abriendo manual: {e}")
     
     def mostrar_changelog(self):
         """Abre el changelog renderizado como HTML"""
         try:
-            import os
-            # src/managers/menu_manager.py -> src/managers/ -> src/ -> ROOT
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            changelog_path = os.path.join(base_dir, 'CHANGELOG.md')
+            changelog_path = self._resource_path('CHANGELOG.md')
             
             if os.path.exists(changelog_path):
                 with open(changelog_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 self._abrir_como_html(content, "Registro de Cambios")
             else:
-                messagebox.showinfo("Changelog", "No hay registro de cambios disponible")
+                messagebox.showinfo("Changelog", f"No hay registro de cambios disponible en: {changelog_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Error abriendo changelog: {e}")
 

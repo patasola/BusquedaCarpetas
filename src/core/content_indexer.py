@@ -1,4 +1,4 @@
-# src/core/content_indexer.py - Motor de Búsqueda de Contenido V.1.2
+# src/core/content_indexer.py - Motor de Búsqueda de Contenido V.6.1
 import os
 import sqlite3
 import threading
@@ -22,6 +22,7 @@ class ContentIndexer:
         self.db_lock = threading.Lock()
         self.indexing_in_progress = False
         self.stop_requested = False
+        self._executor = None
         self._init_db()
 
     def _init_db(self, retry=True):
@@ -50,8 +51,25 @@ class ContentIndexer:
             cursor.execute('''CREATE TABLE IF NOT EXISTS file_metadata (
                 path TEXT PRIMARY KEY, mtime REAL, indexed_at TIMESTAMP)''')
             try:
+                # V.6.1 - Indexamos 'path' para permitir búsquedas por nombre de archivo
                 cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS content_fts USING fts5(
-                    path UNINDEXED, content, tokenize="unicode61")''')
+                    path, content, tokenize="unicode61 tokenchars '-._0123456789'")''')
+                
+                # MIGRACIÓN AUTOMÁTICA: Detectar si 'path' está UNINDEXED (esquema V.6.0)
+                needs_migration = False
+                try:
+                    cursor.execute("SELECT path FROM content_fts WHERE path MATCH 'schema_check_6_1' LIMIT 1")
+                except sqlite3.OperationalError:
+                    needs_migration = True
+                
+                if needs_migration:
+                    print("[CONTENT] Detectado esquema antiguo (path UNINDEXED). Migrando a V.6.1...")
+                    cursor.execute("DROP TABLE IF EXISTS content_fts")
+                    cursor.execute('''CREATE VIRTUAL TABLE content_fts USING fts5(
+                        path, content, tokenize="unicode61 tokenchars '-._0123456789'")''')
+                    cursor.execute("DELETE FROM file_metadata")
+                    print("[CONTENT] Migración completada. Re-indexación necesaria.")
+                    
             except sqlite3.OperationalError as oe:
                 if "malformed" in str(oe).lower() and retry:
                     self.conn.close()
@@ -72,11 +90,31 @@ class ContentIndexer:
         text = ""
         try:
             if ext in ('.txt', '.log'):
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f: text = f.read()
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    text = f.read()
             elif ext == '.pdf':
                 from pypdf import PdfReader
                 reader = PdfReader(file_path)
-                text = " ".join([p.extract_text() for p in reader.pages if p.extract_text()])
+                pages = reader.pages
+                
+                # OPTIMIZACIÓN: muestrear primeras 3 páginas
+                # Si no tienen texto → PDF escaneado → descartar sin procesar el resto
+                sample = ""
+                for page in pages[:3]:
+                    t = page.extract_text()
+                    if t: sample += t
+                
+                if not sample.strip():
+                    return ""  # PDF escaneado → salida rápida
+                
+                # Tiene texto → extraer todo, respetando señal de stop
+                texts = [sample]
+                for page in pages[3:]:
+                    if self.stop_requested: break
+                    t = page.extract_text()
+                    if t: texts.append(t)
+                text = " ".join(texts)
+                
             elif ext == '.docx':
                 import docx
                 doc = docx.Document(file_path)
@@ -136,7 +174,8 @@ class ContentIndexer:
             pending_batch = []
             last_ui_update = 0
             
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+            with self._executor as executor:
                 future_to_path = {executor.submit(self._extract_text, p): (p, m) for p, m in files_to_index}
                 
                 for future in concurrent.futures.as_completed(future_to_path):
@@ -144,13 +183,12 @@ class ContentIndexer:
                     if self.stop_requested: break
                     path, mtime = future_to_path[future]
                     try:
-                        content = future.result(timeout=30) # Más tiempo para archivos pesados
+                        content = future.result(timeout=30)
                         percent = (processed_count / total) * 100
                         if percent - last_ui_update >= 1 or processed_count == total:
                             if progress_callback: progress_callback(f"[{folder_name}] {processed_count}/{total}", percent)
                             last_ui_update = percent
                         
-                        # Guardar siempre en lote, incluso si content es ""
                         pending_batch.append((path, content, mtime))
                             
                         if len(pending_batch) >= batch_size or processed_count >= total:
@@ -180,7 +218,6 @@ class ContentIndexer:
                 cursor.execute("DELETE FROM content_fts")
                 cursor.execute("DELETE FROM file_metadata")
                 self.conn.commit()
-                # VACUUM debe ir fuera de una transacción
                 self.conn.execute("VACUUM")
                 print("[CONTENT] Índice borrado por completo y optimizado (VACUUM)")
             return True
@@ -191,15 +228,12 @@ class ContentIndexer:
     def purge_location(self, folder_path):
         """Elimina todos los archivos del índice que pertenezcan a esta carpeta"""
         try:
-            # Asegurar que la ruta termine en separador para match exacto de subcarpetas
             prefix = os.path.abspath(folder_path)
             if not prefix.endswith(os.sep): prefix += os.sep
             
             with self.db_lock:
                 cursor = self.conn.cursor()
-                # 1. Borrar de metadata
                 cursor.execute("DELETE FROM file_metadata WHERE path LIKE ? OR path = ?", (prefix + '%', folder_path))
-                # 2. Borrar de FTS
                 cursor.execute("DELETE FROM content_fts WHERE path LIKE ? OR path = ?", (prefix + '%', folder_path))
                 self.conn.commit()
                 print(f"[CONTENT] Índice purgado para: {folder_path}")
@@ -208,37 +242,74 @@ class ContentIndexer:
             print(f"[CONTENT] Error purgando índice: {e}")
             return False
 
-    def search(self, query):
-        if not self.conn: return []
-        is_exact = query.startswith('"') and query.endswith('"')
-        normalized_query = self.normalize_text(query.strip('"'))
-        if not normalized_query: return []
-        
-        fts_query = f'"{normalized_query}"' if is_exact else normalized_query
+    def search(self, query, search_field="content"):
+        """
+        Búsqueda unificada:
+        - search_field='content': FTS5 en el cuerpo de los archivos (con snippet resaltado)
+        - search_field='path':    SQL LIKE en la ruta del archivo (todos los indexados,
+                                  incluyendo archivos sin contenido extraíble)
+        """
+        if not self.conn or not query.strip():
+            return []
+        query = query.strip()
+
         try:
             with self.db_lock:
                 cursor = self.conn.cursor()
-                # USAR SNIPPET NATIVO PARA CONTEXTO PERFECTO
-                cursor.execute("""
-                    SELECT path, snippet(content_fts, 1, '[', ']', '...', 8) 
-                    FROM content_fts 
-                    WHERE content MATCH ? 
-                    LIMIT 10000""", (fts_query,))
-                rows = cursor.fetchall()
-            
-            results = []
-            for row in rows:
-                p = row[0]
-                snippet = row[1]
-                if os.path.exists(p):
-                    results.append({
-                        'name': os.path.basename(p),
-                        'path': os.path.relpath(p, self.app.ruta_carpeta) if hasattr(self.app, 'ruta_carpeta') else p,
-                        'abs_path': p,
-                        'snippet': snippet
-                    })
-            return results
-        except: return []
+
+                if search_field == "path":
+                    # Buscar por NOMBRE DE ARCHIVO únicamente (no por ruta completa)
+                    # Filtramos en Python para usar basename limpio
+                    cursor.execute("SELECT path FROM file_metadata ORDER BY path LIMIT 50000")
+                    rows = cursor.fetchall()
+                    q_lower = query.lower()
+                    results = []
+                    for (p,) in rows:
+                        if q_lower in os.path.basename(p).lower() and os.path.exists(p):
+                            results.append({
+                                'name': os.path.basename(p),
+                                'path': os.path.relpath(p, self.app.ruta_carpeta) if hasattr(self.app, 'ruta_carpeta') else p,
+                                'abs_path': p,
+                                'snippet': p
+                            })
+                    return results
+
+                else:
+                    # Búsqueda FTS5 en el contenido de los archivos
+                    is_exact = query.startswith('"') and query.endswith('"')
+                    normalized = self.normalize_text(query.strip('"'))
+                    if not normalized:
+                        return []
+                    fts_query = f'"{normalized}"' if is_exact else normalized
+
+                    cursor.execute("""
+                        SELECT path, snippet(content_fts, 1, '[', ']', '...', 8)
+                        FROM content_fts
+                        WHERE content MATCH ?
+                        LIMIT 10000""", (fts_query,))
+                    rows = cursor.fetchall()
+                    results = []
+                    for p, snippet in rows:
+                        if os.path.exists(p):
+                            results.append({
+                                'name': os.path.basename(p),
+                                'path': os.path.relpath(p, self.app.ruta_carpeta) if hasattr(self.app, 'ruta_carpeta') else p,
+                                'abs_path': p,
+                                'snippet': snippet
+                            })
+                    return results
+
+        except Exception as e:
+            print(f"[CONTENT] Error en búsqueda ({search_field}): {e}")
+            return []
 
     def stop_indexing(self):
+        """Detiene la indexación de forma inmediata cancelando futuros pendientes"""
         self.stop_requested = True
+        if hasattr(self, '_executor') and self._executor:
+            try:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                self._executor.shutdown(wait=False)
+            except Exception:
+                pass

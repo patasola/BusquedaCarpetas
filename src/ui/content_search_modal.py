@@ -15,7 +15,9 @@ class ContentSearchModal:
         self.app = app
         self.modal = None
         self.config_tree = None
-        self.results_tree = None
+        self.results_tree = None      # Árbol para búsqueda de contenido
+        self.files_results_tree = None # Árbol para búsqueda de archivos
+        self.config_col_manager = None
         
         # Managers
         if not hasattr(self.app, 'content_indexer'):
@@ -60,9 +62,16 @@ class ContentSearchModal:
         self._create_modal_window()
         self._create_modal_content()
         self._populate_config_tree()
+        
+        # Integrar ColumnManager para la tabla de configuración
+        from ..managers.column_manager import ColumnManager
+        self.config_col_manager = ColumnManager(self.config_tree, "index_config", self.app)
+        
         if hasattr(self.app, 'theme_manager'):
             self.app.theme_manager.register_callback(self.aplicar_tema)
             self.aplicar_tema()
+            # Aplicar modo oscuro nativo a la ventana modal
+            self.app.theme_manager.set_dark_mode_to_window(self.modal)
     
     def _create_modal_window(self):
         self.modal = tk.Toplevel(self.parent)
@@ -72,21 +81,51 @@ class ContentSearchModal:
         x = (self.modal.winfo_screenwidth() - 900) // 2
         y = (self.modal.winfo_screenheight() - 780) // 2
         self.modal.geometry(f"900x780+{x}+{y}")
+        self._closing = False
         
-        # BIND_ALL PARA ESCAPE - CIERRE GARANTIZADO
-        self.modal.bind_all("<Escape>", lambda e: self.modal.destroy())
+        # Cierre controlado: interceptar X, ESC y Alt+F4
+        self.modal.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.modal.bind("<Escape>", lambda e: self._on_close())
         
         self.modal.bind("<F12>", lambda e: self.app.theme_manager.toggle_tema())
         self.modal.bind("<Control-l>", lambda e: self._clear_search())
         self.modal.bind("<Control-L>", lambda e: self._clear_search())
+
+    def _on_close(self):
+        """Cierre seguro: detiene el indexador y destruye la ventana sin bloquear la app"""
+        if self._closing:
+            return  # Evitar doble llamado
+        self._closing = True
         
+        # Desregistrar callback de tema para evitar llamadas post-destroy
+        if hasattr(self.app, 'theme_manager'):
+            try:
+                self.app.theme_manager.theme_callbacks = [
+                    cb for cb in self.app.theme_manager.theme_callbacks
+                    if cb != self.aplicar_tema
+                ]
+            except: pass
+        
+        # Si está indexando, enviar señal de stop y dejar que el hilo termine solo
+        if self.is_indexing:
+            self.indexer.stop_indexing()
+        
+        # Destruir inmediatamente - el hilo tiene guardas para modal destruido
+        try:
+            self.modal.destroy()
+        except: pass
+
     def _create_modal_content(self):
         self.notebook = ttk.Notebook(self.modal)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=(10, 0))
         
         self.tab_search = tk.Frame(self.notebook)
         self.notebook.add(self.tab_search, text="  🔍 Buscar Texto  ")
-        self._create_search_tab()
+        self.results_tree = self._setup_search_view(self.tab_search, "content")
+        
+        self.tab_files = tk.Frame(self.notebook)
+        self.notebook.add(self.tab_files, text="  📂 Buscar Archivos  ")
+        self.files_results_tree = self._setup_search_view(self.tab_files, "path")
         
         self.tab_config = tk.Frame(self.notebook)
         self.notebook.add(self.tab_config, text="  ⚙️ Configuración e Índice  ")
@@ -99,48 +138,85 @@ class ContentSearchModal:
         self.lbl_timer = tk.Label(self.status_bar_frame, textvariable=self.timer_str_var, font=("Consolas", 10, "bold"), padx=15, pady=8)
         self.lbl_timer.pack(side='right')
 
-    def _create_search_tab(self):
-        header = tk.Frame(self.tab_search, padx=20, pady=20)
+    def _setup_search_view(self, container, search_type):
+        """Crea una vista de búsqueda reutilizable para cualquier tipo de campo"""
+        header = tk.Frame(container, padx=20, pady=20)
         header.pack(fill='x')
-        tk.Label(header, text="Buscar texto en los archivos:", font=("Segoe UI", 10)).pack(anchor='w')
-        self.lbl_ocr_warning = tk.Label(header, text="⚠ PDFs escaneados (imágenes) son invisibles sin OCR.", font=("Segoe UI", 8, "italic"))
-        self.lbl_ocr_warning.pack(anchor='w', pady=(0, 5))
+        
+        label_text = "Buscar texto en los archivos:" if search_type == "content" else "Buscar entre los nombres de archivos:"
+        tk.Label(header, text=label_text, font=("Segoe UI", 10)).pack(anchor='w')
+        
+        if search_type == "content":
+            self.lbl_ocr_warning = tk.Label(header, text="⚠ PDFs escaneados (imágenes) son invisibles sin OCR.", font=("Segoe UI", 8, "italic"))
+            self.lbl_ocr_warning.pack(anchor='w', pady=(0, 5))
         
         entry_cnt = tk.Frame(header)
         entry_cnt.pack(fill='x')
-        self.search_entry = tk.Entry(entry_cnt, textvariable=self.search_query_var, font=("Segoe UI", 11), relief='solid', bd=1)
-        self.search_entry.pack(side='left', fill='x', expand=True, ipady=8, padx=(0, 10))
-        self.search_entry.bind("<Return>", lambda e: self._do_search())
-        self.search_entry.focus_set()
         
-        self.btn_do_search = tk.Button(entry_cnt, text="🔍 Buscar", command=self._do_search, font=("Segoe UI", 10, "bold"), relief='flat', padx=20, pady=8, cursor="hand2")
-        self.btn_do_search.pack(side='left', padx=(0, 5))
+        # Variables locales para este componente
+        query_var = tk.StringVar()
+        entry = tk.Entry(entry_cnt, textvariable=query_var, font=("Segoe UI", 11), relief='solid', bd=1)
+        entry.pack(side='left', fill='x', expand=True, ipady=8, padx=(0, 10))
         
-        self.btn_clear_search = tk.Button(entry_cnt, text="🧹 Limpiar", command=self._clear_search, font=("Segoe UI", 9), relief='flat', padx=12, pady=8, cursor="hand2")
-        self.btn_clear_search.pack(side='left')
+        # Helper para disparar la búsqueda
+        def trigger_search(): self._do_search(query_var.get(), search_type, tree)
 
-        res_cnt = tk.Frame(self.tab_search, padx=20)
+        entry.bind("<Return>", lambda e: trigger_search())
+        if search_type == "content": entry.focus_set()
+        
+        btn_go = tk.Button(entry_cnt, text="🔍 Buscar", command=trigger_search, font=("Segoe UI", 10, "bold"), relief='flat', padx=20, pady=8, cursor="hand2")
+        btn_go.pack(side='left', padx=(0, 5))
+        
+        btn_clear = tk.Button(entry_cnt, text="🧹 Limpiar", command=lambda: [query_var.set(""), tree.delete(*tree.get_children())], font=("Segoe UI", 9), relief='flat', padx=12, pady=8, cursor="hand2")
+        btn_clear.pack(side='left')
+
+        res_cnt = tk.Frame(container, padx=20)
         res_cnt.pack(fill='both', expand=True)
-        self.results_tree = ttk.Treeview(res_cnt, columns=("file", "path"), show="headings", style="Treeview")
-        self.results_tree.heading("file", text="Archivo", anchor='w')
-        self.results_tree.heading("path", text="Ubicación Relativa", anchor='w')
-        self.results_tree.column("file", width=250, stretch=False)
-        self.results_tree.column("path", width=500, stretch=False)
         
-        v_scroll = ttk.Scrollbar(res_cnt, orient="vertical", command=self.results_tree.yview)
-        h_scroll = ttk.Scrollbar(self.tab_search, orient="horizontal", command=self.results_tree.xview)
-        self.results_tree.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+        tree = ttk.Treeview(res_cnt, columns=("file", "path"), show="headings", style="Treeview")
+        tree.heading("file", text="Archivo", anchor='w')
+        tree.heading("path", text="Ubicación Relativa", anchor='w')
+        tree.column("file", width=250, stretch=False)
+        tree.column("path", width=500, stretch=False)
         
-        self.results_tree.pack(side='left', fill='both', expand=True)
+        v_scroll = ttk.Scrollbar(res_cnt, orient="vertical", command=tree.yview)
+        h_scroll = ttk.Scrollbar(container, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+        
+        tree.pack(side='left', fill='both', expand=True)
         v_scroll.pack(side='right', fill='y')
         h_scroll.pack(fill='x', padx=20)
         
-        # MENÚ CONTEXTUAL DE RESULTADOS
-        self.results_context_menu = tk.Menu(self.modal, tearoff=0)
-        self.results_tree.bind("<Button-3>", self._show_results_context_menu)
-        self.results_tree.bind("<Button-2>", self._show_results_context_menu)
+        tree.bind("<Button-3>", lambda e: self._show_results_context_menu(e, tree))
+        tree.bind("<Button-2>", lambda e: self._show_results_context_menu(e, tree))
+        tree.bind("<Double-1>", lambda e: self._open_selected_result(tree))
         
-        self.results_tree.bind("<Double-1>", lambda e: self._open_selected_result())
+        # Ordenamiento por columna al hacer clic en el encabezado
+        tree._sort_reverse = {"file": False, "path": False}
+        tree.heading("file", text="Archivo", anchor='w',
+                     command=lambda: self._sort_tree(tree, "file", 0))
+        tree.heading("path", text="Ubicación Relativa", anchor='w',
+                     command=lambda: self._sort_tree(tree, "path", 1))
+        # Guardar referencias para coloreado
+        if not hasattr(self, '_search_buttons'): self._search_buttons = []
+        self._search_buttons.append((btn_go, btn_clear))
+        
+        return tree
+
+    def _sort_tree(self, tree, col, col_index):
+        """Ordena las filas del árbol por la columna indicada, alternando asc/desc"""
+        reverse = tree._sort_reverse.get(col, False)
+        rows = [(tree.item(k)["values"], k) for k in tree.get_children("")]
+        rows.sort(key=lambda x: str(x[0][col_index]).lower(), reverse=reverse)
+        for i, (_, k) in enumerate(rows):
+            tree.move(k, "", i)
+        # Actualizar indicador en el encabezado
+        labels = {"file": "Archivo", "path": "Ubicación Relativa"}
+        arrow = " ▼" if reverse else " ▲"
+        other = "path" if col == "file" else "file"
+        tree.heading(col, text=labels[col] + arrow)
+        tree.heading(other, text=labels[other])  # Limpiar indicador de la otra columna
+        tree._sort_reverse[col] = not reverse
 
     def _create_config_tab(self):
         main = tk.Frame(self.tab_config, padx=20, pady=20)
@@ -192,12 +268,12 @@ class ContentSearchModal:
             self.config_tree.selection_set(item)
             self.context_menu.post(event.x_root, event.y_root)
 
-    def _show_results_context_menu(self, event):
-        item_id = self.results_tree.identify_row(event.y)
+    def _show_results_context_menu(self, event, tree):
+        item_id = tree.identify_row(event.y)
         if not item_id: return
-        self.results_tree.selection_set(item_id)
+        tree.selection_set(item_id)
         
-        tags = self.results_tree.item(item_id).get('tags', [])
+        tags = tree.item(item_id).get('tags', [])
         if not tags: return
         
         path = tags[0]
@@ -207,15 +283,15 @@ class ContentSearchModal:
         snippet = snippet.replace('\n', ' ').replace('\r', ' ')
         
         self.results_context_menu.delete(0, tk.END)
-        self.results_context_menu.add_command(label=f"📝 Contexto: {snippet}", command=self._open_selected_result)
+        self.results_context_menu.add_command(label=f"📝 Contexto: {snippet}", command=lambda: self._open_selected_result(tree))
         self.results_context_menu.add_separator()
-        self.results_context_menu.add_command(label="📂 Abrir Archivo", command=self._open_selected_result)
+        self.results_context_menu.add_command(label="📂 Abrir Archivo", command=lambda: self._open_selected_result(tree))
         self.results_context_menu.post(event.x_root, event.y_root)
 
-    def _open_selected_result(self):
-        sel = self.results_tree.selection()
+    def _open_selected_result(self, tree):
+        sel = tree.selection()
         if not sel: return
-        path = self.results_tree.item(sel[0]).get('tags', [None])[0]
+        path = tree.item(sel[0]).get('tags', [None])[0]
         if path and os.path.exists(path): os.startfile(path)
 
     def aplicar_tema(self):
@@ -231,13 +307,19 @@ class ContentSearchModal:
             self.lbl_status_bar.configure(bg=c.get("status_bg", "#007acc"), fg=c.get("status_fg", "#ffffff"))
             self.lbl_timer.configure(bg=c.get("status_bg", "#007acc"), fg=c.get("status_fg", "#ffffff"))
         
-        self.btn_do_search.configure(bg=c.get("accent_primary", "#3498db"), fg="white")
-        self.btn_clear_search.configure(bg=c.get("button_bg", "#e0e0e0"), fg=c.get("button_fg", "#000000"))
+        # Colorear botones de búsqueda (reutilizables)
+        if hasattr(self, '_search_buttons'):
+            for btn_go, btn_clear in self._search_buttons:
+                btn_go.configure(bg=c.get("accent_primary", "#3498db"), fg="white")
+                btn_clear.configure(bg=c.get("button_bg", "#e0e0e0"), fg=c.get("button_fg", "#000000"))
+        
         self.btn_clear_index.configure(bg="#e74c3c", fg="white")
         
         if not self.is_indexing: self.btn_index.configure(bg=c.get("success", "#10b981"), fg="white")
-        tm._apply_theme_to_tree(self.results_tree, "Results", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
-        tm._apply_theme_to_tree(self.config_tree, "Config", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
+        
+        if self.results_tree: tm._apply_theme_to_tree(self.results_tree, "ResultsContent", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
+        if self.files_results_tree: tm._apply_theme_to_tree(self.files_results_tree, "ResultsFiles", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
+        if self.config_tree: tm._apply_theme_to_tree(self.config_tree, "Config", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
 
     def _colorear_recursivo(self, widget, c):
         try:
@@ -262,37 +344,49 @@ class ContentSearchModal:
 
     def _handle_clear_all_index(self):
         if messagebox.askyesno("Confirmar Borrado Total", "¿Estás seguro de que deseas borrar ABSOLUTAMENTE TODO el índice de contenido?\n\nEsta acción no se puede deshacer y también limpiará todos los tiempos registrados.", parent=self.modal):
-            if self.indexer.clear_all_index():
-                # RESETEAR TIEMPOS
-                for loc in self.loc_manager.locations:
-                    loc['last_duration'] = "-"
-                    loc['last_indexed'] = "Nunca"
-                self.loc_manager.save()
-                
-                messagebox.showinfo("Éxito", "El índice y los tiempos han sido vaciados.", parent=self.modal)
-                self.status_var.set("📊 Índice eliminado")
-                self._populate_config_tree()
-                self._update_status_from_locs()
+            self.btn_clear_index.config(text="🗑️ Borrando...", state='disabled')
+            self.modal.update()
+            
+            def run():
+                success = self.indexer.clear_all_index()
+                if self.modal and self.modal.winfo_exists():
+                    self.modal.after(0, lambda: self._post_clear(success))
+                    
+            threading.Thread(target=run, daemon=True).start()
 
-    def _do_search(self):
-        query = self.search_query_var.get().strip()
+    def _post_clear(self, success):
+        self.btn_clear_index.config(text="🗑️ Borrar Todo el Índice", state='normal')
+        if success:
+            # RESETEAR TIEMPOS
+            for loc in self.loc_manager.locations:
+                loc['last_duration'] = "-"
+                loc['last_indexed'] = "Nunca"
+            self.loc_manager.save()
+            
+            messagebox.showinfo("Éxito", "El índice y los tiempos han sido vaciados.", parent=self.modal)
+            self.status_var.set("📊 Índice eliminado")
+            self._populate_config_tree()
+            self._update_status_from_locs()
+
+
+    def _do_search(self, query, search_field, tree):
+        query = query.strip()
         if not query: return
-        self.results_tree.delete(*self.results_tree.get_children())
+        tree.delete(*tree.get_children())
         def run():
             try:
-                results = self.indexer.search(query)
-                self.modal.after(0, lambda: self._display_results(results))
+                results = self.indexer.search(query, search_field=search_field)
+                self.modal.after(0, lambda: self._display_results(results, tree))
             except Exception as e: print(e)
         threading.Thread(target=run, daemon=True).start()
 
-    def _display_results(self, results):
+    def _display_results(self, results, tree):
         if not results:
-            self.results_tree.insert("", "end", values=("Sin resultados", "Intenta con otra palabra"))
+            tree.insert("", "end", values=("Sin resultados", "Intenta con otra palabra"))
             return
         for r in results:
-            # GUARDAR SNIPPET EN TAGS
-            item = self.results_tree.insert("", "end", values=(r['name'], r['path']), tags=(r['abs_path'], r['snippet']))
-            self.app.theme_manager.apply_theme_to_item(self.results_tree, item)
+            item = tree.insert("", "end", values=(r['name'], r['path']), tags=(r['abs_path'], r['snippet']))
+            self.app.theme_manager.apply_theme_to_item(tree, item)
 
     def _populate_config_tree(self):
         self.config_tree.delete(*self.config_tree.get_children())
@@ -346,8 +440,21 @@ class ContentSearchModal:
         threading.Thread(target=run, daemon=True).start()
 
     def _add_folder(self):
-        p = filedialog.askdirectory(parent=self.modal)
-        if p and self.loc_manager.add_location(p, os.path.basename(p)): self._populate_config_tree()
+        """Selección múltiple: repite el diálogo hasta que el usuario cancele"""
+        added = 0
+        initial_dir = None  # Recordar directorio padre para abrirse en el nivel correcto
+        while True:
+            title = f"Agregar carpeta  ({added} añadida{'s' if added != 1 else ''} — Cancelar para terminar)" if added else "Seleccionar carpeta(s) para indexar"
+            p = filedialog.askdirectory(parent=self.modal, title=title, initialdir=initial_dir)
+            if not p:
+                break
+            # Guardar el PADRE para que el siguiente diálogo abra al mismo nivel
+            initial_dir = os.path.dirname(p)
+            if self.loc_manager.add_location(p, os.path.basename(p)):
+                added += 1
+                self._populate_config_tree()  # Refresca en tiempo real
+        if added > 0:
+            self.status_var.set(f"✅ {added} carpeta{'s' if added != 1 else ''} añadida{'s' if added != 1 else ''} al índice")
 
     def _remove_folder(self):
         sel = self.config_tree.selection()
