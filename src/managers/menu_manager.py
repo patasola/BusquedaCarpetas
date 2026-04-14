@@ -183,12 +183,12 @@ class MenuManager:
             print(f"Error abriendo configuración de ubicaciones: {e}")
             messagebox.showerror("Error", f"No se pudo abrir la configuración: {str(e)}")
 
-    def _show_content_search_config(self):
+    def _show_content_search_config(self, initial_path=None):
         """Muestra modal de configuración de búsqueda por contenido"""
         try:
             from ..ui.content_search_modal import ContentSearchModal
             modal = ContentSearchModal(self.app.master, self.app)
-            modal.show_modal()
+            modal.show_modal(initial_path=initial_path)
         except Exception as e:
             print(f"Error abriendo configuración de contenido: {e}")
             import traceback

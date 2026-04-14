@@ -54,7 +54,7 @@ class ContentSearchModal:
         if latest: self.status_var.set(f"📊 Índice actualizado: {latest.strftime('%d/%m/%Y %H:%M')}")
         else: self.status_var.set("📊 Índice no construido aún")
 
-    def show_modal(self):
+    def show_modal(self, initial_path=None):
         if self.modal and self.modal.winfo_exists():
             self.modal.lift()
             self.modal.focus_force()
@@ -72,6 +72,13 @@ class ContentSearchModal:
             self.aplicar_tema()
             # Aplicar modo oscuro nativo a la ventana modal
             self.app.theme_manager.set_dark_mode_to_window(self.modal)
+            
+        # PROCESAR RUTA INICIAL SI SE PROPORCIONA
+        if initial_path and os.path.exists(initial_path) and os.path.isdir(initial_path):
+            if self.loc_manager.add_location(initial_path, os.path.basename(initial_path)):
+                self._populate_config_tree()
+                self.notebook.select(self.tab_config) # Cambiar a la pestaña de configuración
+                self.status_var.set(f"✅ Carpeta añadida dinámicamente: {os.path.basename(initial_path)}")
     
     def _create_modal_window(self):
         self.modal = tk.Toplevel(self.parent)
@@ -250,12 +257,12 @@ class ContentSearchModal:
         self.context_menu = tk.Menu(self.modal, tearoff=0)
         self.context_menu.add_command(label="➕ Agregar Carpeta", command=self._add_folder)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="⚡ Indexar solo esta carpeta", command=self._index_single_selected)
+        self.context_menu.add_command(label="🔄 Actualizar índice de esta carpeta", command=self._index_single_selected)
         self.context_menu.add_command(label="📂 Abrir en explorador", command=self._open_folder_selected)
         self.context_menu.add_separator()
         self.context_menu.add_command(label="❌ Quitar de la lista", command=self._remove_folder)
-        self.config_tree.bind("<Button-3>", self._show_context_menu)
-        self.config_tree.bind("<Button-2>", self._show_context_menu)
+        self.config_tree.bind("<Button-3>", self._show_context_menu, add="+")
+        self.config_tree.bind("<Button-2>", self._show_context_menu, add="+")
 
         prog_f = tk.Frame(main, pady=15, padx=10)
         prog_f.pack(fill='x', pady=(15, 0))
@@ -269,21 +276,24 @@ class ContentSearchModal:
         if item:
             self.config_tree.selection_set(item)
             try:
-                # Usar índices numéricos es más robusto ante problemas de encoding con emojis
-                self.context_menu.entryconfig(2, state="normal") # Indexar solo esta carpeta
-                self.context_menu.entryconfig(3, state="normal") # Abrir en explorador
-                self.context_menu.entryconfig(5, state="normal") # Quitar de la lista
+                # Usar Etiquetas de texto para entryconfig es más seguro que índices numéricos
+                self.context_menu.entryconfig("🔄 Actualizar índice de esta carpeta", state="normal")
+                self.context_menu.entryconfig("📂 Abrir en explorador", state="normal")
+                self.context_menu.entryconfig("❌ Quitar de la lista", state="normal")
             except Exception as e:
                 print(f"[DEBUG] Error config menu (con item): {e}")
         else:
             try:
-                self.context_menu.entryconfig(2, state="disabled")
-                self.context_menu.entryconfig(3, state="disabled")
-                self.context_menu.entryconfig(5, state="disabled")
+                self.context_menu.entryconfig("🔄 Actualizar índice de esta carpeta", state="disabled")
+                self.context_menu.entryconfig("📂 Abrir en explorador", state="disabled")
+                self.context_menu.entryconfig("❌ Quitar de la lista", state="disabled")
             except Exception as e:
                 print(f"[DEBUG] Error config menu (sin item): {e}")
             
-        self.context_menu.post(event.x_root, event.y_root)
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
 
     def _show_results_context_menu(self, event, tree):
         item_id = tree.identify_row(event.y)
@@ -303,7 +313,10 @@ class ContentSearchModal:
         self.results_context_menu.add_command(label=f"📝 Contexto: {snippet}", command=lambda: self._open_selected_result(tree))
         self.results_context_menu.add_separator()
         self.results_context_menu.add_command(label="📂 Abrir Archivo", command=lambda: self._open_selected_result(tree))
-        self.results_context_menu.post(event.x_root, event.y_root)
+        try:
+            self.results_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.results_context_menu.grab_release()
 
     def _open_selected_result(self, tree):
         sel = tree.selection()

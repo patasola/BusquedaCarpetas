@@ -242,7 +242,7 @@ class UIManager:
         except Exception as e:
             print(f"[UI ERROR] Falló actualizar metadata: {e}")
             import sys
-            sys.stdout.flush()
+            sys.stdout.flush() 
 
     def copiar_ruta(self):
         """Copia la ruta de la carpeta seleccionada al portapapeles"""

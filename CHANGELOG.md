@@ -1,4 +1,20 @@
-# Changelog - BusquedaCarpetas V.6.1 (Empíreo Híbrido)
+# Changelog - BusquedaCarpetas V.6.2 (Empíreo Sincro)
+
+## [6.2.0] - 2026-04-14
+
+### 🚀 Sincronización y Refinamiento (Empíreo Sincro)
+
+#### Sincronización TreeView ↔ Explorador
+- **NEW:** Implementada sincronización automática de selección. Al elegir un resultado en el TreeView principal, el explorador lateral se expande y enfoca automáticamente en dicha ubicación.
+- **PERF:** Lógica de expansión jerárquica que asegura la visibilidad de archivos en subcarpetas cerradas.
+
+#### Corrección de Visualización
+- **FIXED:** Solucionado el problema de "sombreado" donde los archivos con el mismo nombre que una carpeta eran omitidos en los resultados.
+- **IMPROVED:** Unificación robusta de resultados de contenido (archivos) y caché (carpetas) en el motor de búsqueda central.
+
+#### Refactorización de Interfaz
+- **REFINED:** Menú contextual del buscador de contenido simplificado. La opción de indexación ahora se llama **"🔄 Actualizar índice de esta carpeta"** y reside exclusivamente en la pestaña de configuración.
+- **CLEANUP:** Eliminadas integraciones redundantes en los menús de clic derecho de la tabla principal y del explorador lateral para una UI más limpia y enfocada.
 
 ## [6.1.0] - 2026-04-14
 

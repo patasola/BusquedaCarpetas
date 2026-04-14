@@ -772,24 +772,24 @@ class FileExplorerManager:
             context_menu.grab_release()
     
     def _add_context_menu_items(self, menu, path):
-        """Agrega items espec├¡ficos al men├║ contextual"""
+        """Agrega items específicos al menú contextual"""
         if os.path.isdir(path):
             menu.add_command(
-                label="­ƒôé Expandir/Colapsar", 
+                label="📂 Expandir/Colapsar", 
                 command=lambda: self.on_double_click(None)
             )
             menu.add_command(
-                label="Ô£Å´©Å Renombrar carpeta", 
+                label="✍️ Renombrar carpeta", 
                 command=self.handle_f2,
                 accelerator="F2"
             )
         elif os.path.isfile(path):
             menu.add_command(
-                label="­ƒôä Abrir archivo", 
+                label="📄 Abrir archivo", 
                 command=lambda: self.on_double_click(None)
             )
             menu.add_command(
-                label="Ô£Å´©Å Renombrar archivo", 
+                label="✍️ Renombrar archivo", 
                 command=self.handle_f2,
                 accelerator="F2"
             )
@@ -797,15 +797,15 @@ class FileExplorerManager:
         menu.add_separator()
         # ELIMINAR sin espacios extra
         menu.add_command(
-            label="­ƒùæ Eliminar",  # Sin variante de emoji
+            label="🗑️ Eliminar",
             command=self.delete_selected_item,
             accelerator="Supr"
         )
         menu.add_command(
-            label="­ƒôï Copiar ruta", 
+            label="📋 Copiar ruta", 
             command=self.copy_selected_path
         )
-    
+
     def copy_selected_path(self):
         """Copia ruta del elemento seleccionado"""
         selection = self.ui.tree.selection()
@@ -1214,4 +1214,69 @@ class FileExplorerManager:
         """Oculta l├¡nea gu├¡a"""
         if self._drop_indicator:
             self._drop_indicator.place_forget()
+
+    def focus_path(self, target_path):
+        """
+        Sincroniza el explorador con una ruta específica:
+        Expande la jerarquía y resalta el elemento.
+        """
+        if not target_path or not os.path.exists(target_path):
+            return
+
+        print(f"[DEBUG] Sincronizando explorador con: {target_path}")
+        
+        # Asegurar que el explorador esté visible
+        if not self.is_visible():
+            self.show()
+
+        target_path = os.path.normpath(target_path)
+        
+        # 1. Verificar si la ruta está dentro de la raíz actual
+        if not target_path.lower().startswith(self.current_path.lower()):
+            # Si no está en la raíz actual, podríamos cargar su raíz (opcional)
+            # Por ahora, si no está en la raíz, no hacemos nada para no romper el contexto del usuario
+            # unless it's a very helpful feature.
+            return
+
+        # 2. Descomponer la ruta en partes relativas a la raíz
+        try:
+            rel_path = os.path.relpath(target_path, self.current_path)
+        except ValueError:
+            return
+
+        if rel_path == ".":
+            # Es la propia raíz
+            root_item = self.path_to_item.get(self.current_path)
+            if root_item:
+                self.tree.selection_set(root_item)
+                self.tree.see(root_item)
+            return
+
+        parts = rel_path.split(os.sep)
+        current_traversal = self.current_path
+        
+        # 3. Recorrer y expandir
+        for part in parts:
+            current_traversal = os.path.join(current_traversal, part)
+            
+            # Buscar el item en el árbol
+            item = self.path_to_item.get(current_traversal)
+            
+            if item:
+                # Si es un directorio y no es el último elemento, expandir
+                if os.path.isdir(current_traversal):
+                    self.tree.item(item, open=True)
+                    # Forzar carga de hijos si no están cargados
+                    if item not in self.loaded_items:
+                        self.handle_node_expansion_immediate(item)
+                
+                # Seleccionar y ver
+                self.tree.selection_set(item)
+                self.tree.see(item)
+                self.tree.focus(item)
+            else:
+                # Si un nodo intermedio no existe en el árbol, el usuario podría no haberlo cargado
+                # Podríamos intentar forzar la carga pero es arriesgado por performance.
+                # Intentamos expandir el padre para ver si aparece
+                pass
 

@@ -1,4 +1,4 @@
-# MANUAL DE USUARIO - BÚSQUEDA RÁPIDA DE CARPETAS V.5.0 (Luce Intellettual)
+# MANUAL DE USUARIO - BÚSQUEDA RÁPIDA DE CARPETAS V.6.2 (Empíreo Sincro)
 
 ## CÓMO USAR LA APLICACIÓN
 
@@ -74,7 +74,7 @@ Para copiar la ruta de una carpeta:
 3. Puedes navegar carpetas haciendo clic en las flechas
 4. Para cerrar el explorador, usa el mismo atajo
 
-> **NOVEDAD V.5.0:** Puedes tener AMBOS paneles abiertos al mismo tiempo.
+> **NOVEDAD V.6.2:** Al seleccionar un resultado en la tabla principal, el explorador se sincroniza automáticamente con esa carpeta o archivo.
 
 ---
 
@@ -98,17 +98,20 @@ Tienes 3 métodos para buscar:
 
 Para cambiar método: Selecciona el botón correspondiente antes de buscar.
 
----
+### PASO 8: BÚSQUEDA CRUZADA DE ARCHIVOS Y CARPETAS (V.6.2)
 
-### PASO 8: ACTUALIZAR EL ÍNDICE
+1. En la parte superior, marca la casilla **"📄 Incluir archivos"**.
+2. Al realizar una búsqueda, verás tanto carpetas (📂) como archivos indexados (📄).
+3. Si un archivo y una carpeta tienen el mismo nombre, el sistema mostrará ambos de forma independiente.
 
-Si has creado carpetas nuevas y no aparecen en las búsquedas:
+### PASO 9: ACTUALIZAR EL ÍNDICE DE CONTENIDO
 
-1. Ve a "Archivo" → "Construir cache"
-2. Espera a que termine la actualización en segundo plano
-3. Ahora las carpetas nuevas aparecerán en futuras búsquedas
+Si trabajas con archivos (.pdf, .docx, .xlsx, .txt) y quieres buscarlos por su contenido:
 
-> El índice se actualiza automáticamente cada 24 horas y busca carpetas nuevas en tiempo real.
+1. Ve a "Archivo" → "Búsqueda por Contenido".
+2. En la pestaña **Configuración e Índice**, agrega las carpetas que quieres indexar.
+3. Haz clic derecho sobre una carpeta en la lista y selecciona **"🔄 Actualizar índice de esta carpeta"**.
+4. Una vez terminado, podrás buscar palabras dentro de esos archivos.
 
 ---
 
@@ -212,5 +215,5 @@ Para funciones avanzadas, experimenta con los diferentes métodos de búsqueda y
 
 ---
 
-© 2025 - Búsqueda Rápida de Carpetas V.5.1 (Luce Intellettual)
-¡Encuentra tus carpetas más rápido que nunca!
+© 2026 - Búsqueda Rápida de Carpetas V.6.2 (Empíreo Sincro)
+¡Encuentra tus carpetas y archivos más rápido que nunca!

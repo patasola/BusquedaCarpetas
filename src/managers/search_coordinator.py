@@ -126,10 +126,17 @@ class SearchCoordinator:
                 
                 if self.search_cancelled or search_id != self.current_search_id: return
                 
-                # Convertir a formato UI
+                # Convertir a formato UI preservando los resultados de contenido encontrados previamente
                 # Formato disco: (nombre, ruta_rel, ruta_abs)
                 # Formato UI esperado: (nombre, ruta_rel, ruta_abs, tiene_hijos, loc_name, demandante, demandado)
                 resultados_ui = []
+                
+                # INTEGRAR RESULTADOS DE CONTENIDO (Archivos) encontrados en Paso 0
+                for r in resultados_contenido:
+                    # r: {'name', 'path', 'abs_path', 'has_children'}
+                    resultados_ui.append((r['name'], r['path'], r['abs_path'], False, "Contenido", "", ""))
+
+                # AGREGAR RESULTADOS DE DISCO (Carpetas)
                 for r in resultados_disco:
                     # r[0]=nombre, r[1]=ruta_rel, r[2]=ruta_abs
                     resultados_ui.append((r[0], r[1], r[2], True, "Disco", "", ""))
