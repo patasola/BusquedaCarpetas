@@ -248,6 +248,8 @@ class ContentSearchModal:
         self.config_tree.pack(fill='both', expand=True)
         
         self.context_menu = tk.Menu(self.modal, tearoff=0)
+        self.context_menu.add_command(label="➕ Agregar Carpeta", command=self._add_folder)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label="⚡ Indexar solo esta carpeta", command=self._index_single_selected)
         self.context_menu.add_command(label="📂 Abrir en explorador", command=self._open_folder_selected)
         self.context_menu.add_separator()
@@ -266,7 +268,19 @@ class ContentSearchModal:
         item = self.config_tree.identify_row(event.y)
         if item:
             self.config_tree.selection_set(item)
-            self.context_menu.post(event.x_root, event.y_root)
+            try:
+                self.context_menu.entryconfig("⚡ Indexar solo esta carpeta", state="normal")
+                self.context_menu.entryconfig("📂 Abrir en explorador", state="normal")
+                self.context_menu.entryconfig("❌ Quitar de la lista", state="normal")
+            except: pass
+        else:
+            try:
+                self.context_menu.entryconfig("⚡ Indexar solo esta carpeta", state="disabled")
+                self.context_menu.entryconfig("📂 Abrir en explorador", state="disabled")
+                self.context_menu.entryconfig("❌ Quitar de la lista", state="disabled")
+            except: pass
+            
+        self.context_menu.post(event.x_root, event.y_root)
 
     def _show_results_context_menu(self, event, tree):
         item_id = tree.identify_row(event.y)
