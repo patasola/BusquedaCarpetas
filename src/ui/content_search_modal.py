@@ -269,16 +269,19 @@ class ContentSearchModal:
         if item:
             self.config_tree.selection_set(item)
             try:
-                self.context_menu.entryconfig("⚡ Indexar solo esta carpeta", state="normal")
-                self.context_menu.entryconfig("📂 Abrir en explorador", state="normal")
-                self.context_menu.entryconfig("❌ Quitar de la lista", state="normal")
-            except: pass
+                # Usar índices numéricos es más robusto ante problemas de encoding con emojis
+                self.context_menu.entryconfig(2, state="normal") # Indexar solo esta carpeta
+                self.context_menu.entryconfig(3, state="normal") # Abrir en explorador
+                self.context_menu.entryconfig(5, state="normal") # Quitar de la lista
+            except Exception as e:
+                print(f"[DEBUG] Error config menu (con item): {e}")
         else:
             try:
-                self.context_menu.entryconfig("⚡ Indexar solo esta carpeta", state="disabled")
-                self.context_menu.entryconfig("📂 Abrir en explorador", state="disabled")
-                self.context_menu.entryconfig("❌ Quitar de la lista", state="disabled")
-            except: pass
+                self.context_menu.entryconfig(2, state="disabled")
+                self.context_menu.entryconfig(3, state="disabled")
+                self.context_menu.entryconfig(5, state="disabled")
+            except Exception as e:
+                print(f"[DEBUG] Error config menu (sin item): {e}")
             
         self.context_menu.post(event.x_root, event.y_root)
 
