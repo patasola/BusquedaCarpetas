@@ -1,4 +1,4 @@
-﻿# src/ui/ui_components.py - Componentes de Interfaz V.5.0 (Luce Intellettual)
+# src/ui/ui_components.py - Componentes de Interfaz V.5.0 (Luce Intellettual)
 import tkinter as tk
 from tkinter import ttk
 from .components.tree_tooltip import TreeViewTooltip
@@ -145,6 +145,17 @@ class UIComponents:
         )
         btn_cancelar.pack(side=tk.LEFT)
         
+        # Checkbox para incluir archivos indexados
+        chk_archivos = tk.Checkbutton(
+            button_frame,
+            text="📄 Incluir archivos",
+            font=("Segoe UI", 9),
+            bg=Colors.BACKGROUND,
+            fg=Colors.TITLE_FG,
+            cursor="hand2"
+        )
+        chk_archivos.pack(side=tk.LEFT, padx=(15, 0))
+        
         # Tabla de resultados
         table_container = tk.Frame(main_frame, bg=Colors.BACKGROUND, relief=tk.FLAT, borderwidth=0)
         table_container.pack(fill=tk.BOTH, expand=True, pady=(10, 15))
@@ -168,10 +179,41 @@ class UIComponents:
             style="Custom.Treeview"
         )
         
+        # Configurar estado de ordenamiento
+        tree._sort_reverse = {"#0": False, "Método": False, "Ruta": False}
+        
+        def _sort_main_tree(col):
+            reverse = tree._sort_reverse.get(col, False)
+            rows = []
+            for k in tree.get_children(""):
+                if col == "#0":
+                    val = tree.item(k, "text").replace("📁 ", "").replace("📂 ", "").replace("📄 ", "")
+                elif col == "Método":
+                    values = tree.item(k, "values")
+                    val = values[0] if values and len(values) > 0 else ""
+                else:
+                    values = tree.item(k, "values")
+                    val = values[1] if values and len(values) > 1 else ""
+                rows.append((str(val).lower(), k))
+                
+            rows.sort(key=lambda x: x[0], reverse=reverse)
+            for i, (_, k) in enumerate(rows):
+                tree.move(k, "", i)
+                
+            labels = {"#0": "Carpeta", "Método": "M", "Ruta": "Ruta Relativa"}
+            arrow = " ▼" if reverse else " ▲"
+            for c in labels:
+                if c == col:
+                    tree.heading(c, text=labels[c] + arrow, command=lambda c_val=c: _sort_main_tree(c_val))
+                else:
+                    tree.heading(c, text=labels[c], command=lambda c_val=c: _sort_main_tree(c_val))
+                    
+            tree._sort_reverse[col] = not reverse
+
         # Configurar encabezados y columnas
-        tree.heading("#0", text="Carpeta", anchor=tk.CENTER)
-        tree.heading("Método", text="M", anchor=tk.CENTER)
-        tree.heading("Ruta", text="Ruta Relativa", anchor=tk.W)
+        tree.heading("#0", text="Carpeta", anchor=tk.CENTER, command=lambda: _sort_main_tree("#0"))
+        tree.heading("Método", text="M", anchor=tk.CENTER, command=lambda: _sort_main_tree("Método"))
+        tree.heading("Ruta", text="Ruta Relativa", anchor=tk.W, command=lambda: _sort_main_tree("Ruta"))
         
         # Aplicar anchos (guardados o defaults) de forma robusta
         cw = col_widths if col_widths else {}
@@ -325,5 +367,6 @@ class UIComponents:
             'label_estado': label_estado,
             'label_carpeta_info': label_carpeta_info,
             'configurar_scrollbars': configurar_scrollbars,
-            'tooltip': self.tooltip
+            'tooltip': self.tooltip,
+            'chk_archivos': chk_archivos
         }

@@ -62,13 +62,18 @@ class SearchCoordinator:
             self.app.master.after(0, self.app.ui_manager.limpiar_resultados)
             start_time = time.time()
             
+            # FORZAR INCLUSIÓN SI EL CHECKBOX GLOBAL ESTÁ ENCENDIDO
+            if hasattr(self.app, 'incluir_archivos') and self.app.incluir_archivos.get():
+                incluir_contenido = True
+            
             # PASO 0: Búsqueda por CONTENIDO (FTS5) - SOLO SI SE SOLICITA EXPLICITAMENTE
             resultados_contenido = []
             if incluir_contenido:
                 if not hasattr(self.app, 'content_indexer'):
                     from ..core.content_indexer import ContentIndexer
                     self.app.content_indexer = ContentIndexer(self.app)
-                resultados_contenido = self.app.content_indexer.search(criterio)
+                # Búsqueda rápida por cruce de base de datos SQL
+                resultados_contenido = self.app.content_indexer.search(criterio, search_field="path")
             
             # PASO 1: Intentar caché (INSTANTÁNEO)
             resultados_cache = []

@@ -196,30 +196,29 @@ class EventManager:
         ruta_abs = os.path.normpath(ruta_abs)
         nombre = seleccion['nombre']
         
-        # Verificar que la carpeta existe ANTES de intentar abrir
+        # Verificar que la ruta existe ANTES de intentar abrir
         if not os.path.exists(ruta_abs):
-            self._actualizar_estado(f"La carpeta no existe: {nombre}")
+            self._actualizar_estado(f"La ruta no existe: {nombre}")
             return
         
-        if not os.path.isdir(ruta_abs):
-            self._actualizar_estado(f"La ruta no es un directorio: {nombre}")
-            return
+        es_archivo = os.path.isfile(ruta_abs)
+        tipo = "Archivo" if es_archivo else "Carpeta"
         
         try:
-            # USAR DIRECTAMENTE el método que sabemos que funciona
+            # USAR DIRECTAMENTE el método que sabemos que funciona (abre carpetas o archivos)
             exito = self._abrir_carpeta_directo(ruta_abs)
             
             if exito:
                 # También copiar la ruta al portapapeles
                 if self._copiar_ruta_portapapeles(ruta_abs):
-                    self._actualizar_estado(f"Carpeta abierta y ruta copiada: {nombre}")
+                    self._actualizar_estado(f"{tipo} abiert{'o' if es_archivo else 'a'} y ruta copiada: {nombre}")
                 else:
-                    self._actualizar_estado(f"Carpeta abierta: {nombre}")
+                    self._actualizar_estado(f"{tipo} abiert{'o' if es_archivo else 'a'}: {nombre}")
             else:
-                self._actualizar_estado(f"No se pudo abrir la carpeta: {nombre}")
+                self._actualizar_estado(f"No se pudo abrir: {nombre}")
                 
         except Exception as e:
-            self._actualizar_estado(f"Error abriendo carpeta {nombre}: {str(e)}")
+            self._actualizar_estado(f"Error abriendo {nombre}: {str(e)}")
     
     def _abrir_carpeta_directo(self, ruta):
         """Abre carpeta directamente usando subprocess - CORREGIDO DEFINITIVO"""

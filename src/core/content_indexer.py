@@ -86,50 +86,64 @@ class ContentIndexer:
         return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower()
 
     def _extract_text(self, file_path):
+        import warnings
         ext = os.path.splitext(file_path)[1].lower()
         text = ""
         try:
-            if ext in ('.txt', '.log'):
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    text = f.read()
-            elif ext == '.pdf':
-                from pypdf import PdfReader
-                reader = PdfReader(file_path)
-                pages = reader.pages
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
                 
-                # OPTIMIZACIÓN: muestrear primeras 3 páginas
-                # Si no tienen texto → PDF escaneado → descartar sin procesar el resto
-                sample = ""
-                for page in pages[:3]:
-                    t = page.extract_text()
-                    if t: sample += t
-                
-                if not sample.strip():
-                    return ""  # PDF escaneado → salida rápida
-                
-                # Tiene texto → extraer todo, respetando señal de stop
-                texts = [sample]
-                for page in pages[3:]:
-                    if self.stop_requested: break
-                    t = page.extract_text()
-                    if t: texts.append(t)
-                text = " ".join(texts)
-                
-            elif ext == '.docx':
-                import docx
-                doc = docx.Document(file_path)
-                text = " ".join([p.text for p in doc.paragraphs])
-            elif ext == '.xlsx':
-                import openpyxl
-                wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
-                texts = []
-                for sheet in wb:
-                    for row in sheet.iter_rows(values_only=True):
-                        texts.extend([str(c) for c in row if c is not None])
-                text = " ".join(texts)
+                if ext in ('.txt', '.log'):
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        text = f.read()
+                elif ext == '.pdf':
+                    from pypdf import PdfReader
+                    import logging
+                    # Silenciar TODOS los loggers relacionados con pypdf
+                    logging.getLogger("pypdf").setLevel(logging.CRITICAL)
+                    for log_name in logging.root.manager.loggerDict:
+                        if 'pypdf' in log_name:
+                            logging.getLogger(log_name).setLevel(logging.CRITICAL)
+                            
+                    reader = PdfReader(file_path, strict=False)
+                    pages = reader.pages
+                    
+                    sample = ""
+                    for page in pages[:3]:
+                        try:
+                            t = page.extract_text()
+                            if t: sample += t
+                        except: pass
+                    
+                    if not sample.strip():
+                        return ""  # PDF escaneado
+                    
+                    texts = [sample]
+                    max_pages = 50  # Limitar a máximo 50 páginas indexadas para evitar bloqueos
+                    for page in pages[3:max_pages]:
+                        if self.stop_requested: break
+                        try:
+                            t = page.extract_text()
+                            if t: texts.append(t)
+                        except: pass
+                    text = " ".join(texts)
+                    
+                elif ext == '.docx':
+                    import docx
+                    doc = docx.Document(file_path)
+                    text = " ".join([p.text for p in doc.paragraphs])
+                elif ext == '.xlsx':
+                    import openpyxl
+                    wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
+                    texts = []
+                    for sheet in wb:
+                        for row in sheet.iter_rows(values_only=True):
+                            texts.extend([str(c) for c in row if c is not None])
+                    text = " ".join(texts)
         except Exception as e:
-            print(f"[CONTENT] Error extrayendo texto de {file_path}: {e}")
+            pass # Silenciar errores de extracción individuales para no saturar consola
         return self.normalize_text(text)
+
 
     def index_folder(self, folder_path, progress_callback=None):
         self.stop_requested = False
@@ -166,7 +180,8 @@ class ContentIndexer:
                 return True
 
             import logging
-            logging.getLogger("pypdf").setLevel(logging.ERROR)
+            logging.getLogger("pypdf").setLevel(logging.CRITICAL)
+            logging.getLogger("pypdf").propagate = False
             
             max_workers = 6
             processed_count = 0

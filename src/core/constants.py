@@ -1,7 +1,7 @@
 # src/core/constants.py - Constantes V.6.0 (Empíreo)
 
 # Información de la aplicación
-APP_VERSION = "V. 6.0 - Empíreo"
+APP_VERSION = "V. 6.1 - Empíreo Híbrido"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana

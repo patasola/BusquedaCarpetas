@@ -91,6 +91,7 @@ class BusquedaCarpetaApp:
         self.version = APP_VERSION
         self.mostrar_explorador = tk.BooleanVar(value=False)
         self.mostrar_historial = tk.BooleanVar(value=False)
+        self.incluir_archivos = tk.BooleanVar(value=False)
         self._selection_timer = None
         self.mostrar_barra_cache = tk.BooleanVar(value=True)
         self.mostrar_barra_estado = tk.BooleanVar(value=True)
@@ -364,8 +365,10 @@ class BusquedaCarpetaApp:
         
         # Asignar referencias
         for ref in ['entry', 'modo_label', 'btn_buscar', 'btn_cancelar', 'tree', 
-                    'btn_copiar', 'btn_abrir', 'label_estado', 'label_carpeta_info', 'configurar_scrollbars']:
+                    'btn_copiar', 'btn_abrir', 'label_estado', 'label_carpeta_info', 'configurar_scrollbars', 'chk_archivos']:
             setattr(self, ref, ui[ref])
+            
+        self.chk_archivos.config(variable=self.incluir_archivos)
         
         # Configurar barra clickeable
         self.label_carpeta_info.bind("<Button-1>", lambda e: self.menu_manager._show_locations_config())

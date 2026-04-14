@@ -242,6 +242,14 @@ class ThemeManager:
                     selectbackground=self.colores["tree_selected_bg"],
                     selectforeground=self.colores["tree_selected_fg"]
                 )
+            elif widget_class == "Checkbutton":
+                widget.configure(
+                    bg=self.colores["frame_bg"], # Mejor coherencia con el fondo de su contenedor
+                    fg=self.colores["fg"],
+                    selectcolor=self.colores["entry_bg"], # Dentro del recuadro
+                    activebackground=self.colores["frame_bg"],
+                    activeforeground=self.colores["fg"]
+                )
             elif widget_class == "Menu":
                 widget.configure(
                     bg=self.colores["menu_bg"],

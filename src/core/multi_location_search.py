@@ -83,6 +83,20 @@ class MultiLocationSearch:
                 print(f"Error buscando en {location['name']}: {e}")
                 continue
         
+        # BÚSQUEDA CRUZADA DE ARCHIVOS
+        if hasattr(self.app, 'incluir_archivos') and self.app.incluir_archivos.get():
+            try:
+                if hasattr(self.app, 'content_indexer'):
+                    archivos = self.app.content_indexer.search(criterio, "path")
+                    import os
+                    for arch in archivos:
+                        # arch: (id, path, mtime, ext, content, match_snippet)
+                        ruta_abs = arch[1]
+                        nombre = os.path.basename(ruta_abs)
+                        all_results.append((nombre, ruta_abs, ruta_abs, "📄 Archivo Indexado"))
+            except Exception as e:
+                print(f"[MULTI-SEARCH] Error buscando en archivos indexados: {e}")
+                
         return all_results
     
     def _search_in_location(self, location, criterio):
