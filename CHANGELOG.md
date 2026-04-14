@@ -1,4 +1,27 @@
-# Changelog - BusquedaCarpetas V.5.0 (Luce Intellettual)
+# Changelog - BusquedaCarpetas V.6.1 (Empíreo Híbrido)
+
+## [6.1.0] - 2026-04-14
+
+### 🚀 Búsqueda Híbrida y Mejoras de UI (Empíreo Híbrido)
+
+#### Búsqueda Cruzada (Híbrida)
+- **NEW:** Implementado checkbox "📄 Incluir archivos" en la interfaz principal.
+- **INTEGRATED:** Fusión instantánea de resultados de carpetas (Caché/Disco) con resultados de archivos indexados (FTS5).
+- **PERF:** Búsqueda combinada asíncrona que mantiene la fluidez de la UI.
+
+#### Interfaz de Usuario (UI/UX)
+- **NEW:** Ordenamiento interactivo de columnas (Carpeta, M, Ruta) mediante clic en encabezados (A-Z / Z-A).
+- **FIXED:** Restaurado y mejorado el menú contextual (clic derecho) en la pestaña de Generación de Índice.
+- **NEW:** Opción "➕ Agregar Carpeta" añadida directamente al menú contextual de configuración.
+- **STABILITY:** Uso de índices numéricos en menús para evitar fallos por codificación de emojis.
+- **THEME:** Mejorado el soporte de modo oscuro para Checkbuttons y diálogos secundarios.
+
+#### Robustez y Dependencias
+- **SILENCE:** Implementado silenciador agresivo para `pypdf` (CRITICAL) eliminando advertencias de codificación en consola.
+- **FIXED:** Corregido "Ghost search" donde el checkbox de archivos era ignorado por el coordinador central.
+
+## [6.0.0] - Versión anterior "Empíreo"
+(Buscador de contenido FTS5 inicial)
 
 ## [5.1.0] - 2026-02-06
 

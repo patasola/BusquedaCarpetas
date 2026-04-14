@@ -15,7 +15,7 @@ class ManualViewer:
 
         # Crear ventana simple
         self.manual_window = tk.Toplevel(self.parent)
-        self.manual_window.title("Manual de Usuario - Búsqueda Rápida de Carpetas V.4.5")
+        self.manual_window.title("Manual de Usuario - Búsqueda Rápida de Carpetas V.6.1")
         self.manual_window.geometry("900x600")
         self.manual_window.configure(bg=Colors.BACKGROUND)
         
@@ -102,12 +102,11 @@ PASO 2: REALIZAR TU PRIMERA BÚSQUEDA
 3. Los resultados aparecerán en la tabla principal
 
 
-PASO 3: ABRIR UNA CARPETA
+PASO 4: ORDENAR RESULTADOS
 =========================
 
-- DOBLE CLIC sobre el resultado
-- ENTER sobre el resultado
-- Botón "Abrir" del menú principal
+- Haz clic en los TÍTULOS de las columnas (Carpeta, M, Ruta) para ordenar alfabéticamente de A-Z.
+- Haz clic de nuevo en la misma columna para invertir el orden (Z-A).
 
 
 PASO 13: BÚSQUEDA POR CONTENIDO (¡NUEVO EN V.6.0!)
@@ -123,16 +122,27 @@ Esta es la funcionalidad estrella de la versión EMPÍREO:
 6. DOBLE CLIC o ENTER para abrir el archivo directamente.
 
 
-NUEVOS ATAJOS V.6.0:
+PASO 14: BÚSQUEDA HÍBRIDA (¡NUEVO EN V.6.1!)
+===================================================
+
+¡Ya no necesitas dos ventanas diferentes!
+
+1. En la pantalla principal, activa el checkbox "📄 Incluir archivos".
+2. Realiza tu búsqueda normal.
+3. La aplicación combinará instantáneamente las CARPETAS encontradas con los ARCHIVOS que contengan ese texto.
+
+
+NUEVOS ATAJOS V.6.1:
 ====================
 • Ctrl + I : Abrir Buscador de Contenido
 • Ctrl + U : Configurar Ubicaciones de Contenido
 • Ctrl + O : Abrir archivo/carpeta seleccionado
 • ESC      : Cerrar ventana actual (Buscador/Ubicaciones)
+• Clic Cabecera : Ordenar resultados
 
 
 ===============================================================================
-© 2026 - Búsqueda Rápida de Carpetas V.6.0 - EMPÍREO
+© 2026 - Búsqueda Rápida de Carpetas V.6.1 - EMPÍREO HÍBRIDO
 ¡El paraíso de la búsqueda de archivos!"""
 
     def _cerrar_manual(self):

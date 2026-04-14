@@ -133,20 +133,20 @@ class AboutDialog:
         right_column = tk.Frame(tech_frame, bg=Colors.BACKGROUND)
         right_column.pack(side='right')
         
-        # Características V.6.0 (Empíreo)
+        # Características V.6.1 (Empíreo Híbrido) ✨
         features_label = tk.Label(left_column,
-                                text="✨ Nuevas características V.6.0 (Empíreo):",
+                                text="✨ Nuevas características V.6.1:",
                                 font=("Segoe UI", 11, "bold"),
                                 fg=Colors.BLUE_BAR,
                                 bg=Colors.BACKGROUND,
                                 anchor='w')
         features_label.pack(anchor='w')
         
-        features_text = ("• Buscador de contenido FTS5 (Ctrl+I)\n"
-                        "• Snippets de contexto inteligentes\n"
-                        "• Atajos globales blindados (O, U, Esc)\n"
-                        "• Carga de inicio invisible (Zero-Flicker)\n"
-                        "• Caché asíncrono y protección de foco")
+        features_text = ("• Búsqueda Híbrida (Carpetas + Archivos)\n"
+                        "• Ordenamiento interactivo de columnas\n"
+                        "• Menú contextual mejorado de indexación\n"
+                        "• Silenciado absoluto de logs de PDF\n"
+                        "• Temas adaptativos en componentes extra")
         
         features_detail = tk.Label(left_column,
                                  text=features_text,
@@ -162,10 +162,9 @@ class AboutDialog:
         # Sección adicional - Evolución
         # ...
         
-        evolution_text = ("V.4.5 → Paneles duales con redimensión dinámica\n"
-                         "V.5.0 → Luce Intellettual: Nueva estética consolidada\n"
-                         "V.5.1 → Luce Ultima: Startup instantáneo y correcciones finales\n"
-                         "V.6.0 → Empíreo: Búsqueda de contenido FTS5 y snippets nativos")
+        evolution_text = ("V.5.1 → Luce Ultima: Startup instantáneo y correcciones finales\n"
+                         "V.6.0 → Empíreo: Búsqueda de contenido FTS5 y snippets nativos\n"
+                         "V.6.1 → Empíreo Híbrido: Búsqueda cruzada y ordenamiento UI")
         
         evolution_detail = tk.Label(self.content_frame,
                                    text=evolution_text,
