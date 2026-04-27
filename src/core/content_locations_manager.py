@@ -13,7 +13,14 @@ class ContentLocationsManager:
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    locs = json.load(f)
+                # Normalizar valores None para que se muestren correctamente en UI
+                for loc in locs:
+                    if not loc.get('last_indexed'):
+                        loc['last_indexed'] = 'Nunca'
+                    if not loc.get('last_duration'):
+                        loc['last_duration'] = '-'
+                return locs
             except:
                 return []
         return []
@@ -34,7 +41,9 @@ class ContentLocationsManager:
             'path': path,
             'name': name,
             'enabled': True,
-            'last_indexed': None
+            'index_content': True,  # V.6.6 - Permite saltar extracción de texto
+            'last_indexed': 'Nunca',
+            'last_duration': '-'
         })
         self.save()
         return True

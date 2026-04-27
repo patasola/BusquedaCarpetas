@@ -67,83 +67,75 @@ class DatabaseManager:
 
     def obtener_info_proceso(self, radicado):
         """
-        Busca información de partes para un radicado.
+        Busca información de partes para un radicado con bloqueo de hilo para seguridad.
         Retorna: (demandante, demandado)
         """
-        # Verificar cache primero
+        # Verificar cache primero (fuera del lock para velocidad)
         if radicado in self._cache:
             self.last_query_time = time.time()
             return self._cache[radicado]
-        if not self.connection:
-            if not self.conectar():
-                return None, None
-                
-        try:
-            cursor = self.connection.cursor()
-            
-            # Limpiar radicado para asegurar que tenga 23 dígitos
-            # Eliminamos guiones y espacios
-            radicado_limpio = ''.join(filter(str.isdigit, str(radicado)))
-            
-            # Si tiene más de 23 dígitos (ej: tiene sufijos), cortamos a 23
-            if len(radicado_limpio) > 23:
-                radicado_limpio = radicado_limpio[:23]
-            
-            # Si tiene menos de 23, intentamos buscar con LIKE
-            # pero idealmente debe ser exacto para T112DRSUJEPROC
-            
-            query = """
-                SELECT A112CODISUJE, A112NOMBSUJE 
-                FROM T112DRSUJEPROC 
-                WHERE A112LLAVPROC = ?
-            """
-            
-            cursor.execute(query, (radicado_limpio,))
-            rows = cursor.fetchall()
-            
-            demandantes = []
-            demandados = []
-            
-            for row in rows:
-                codigo = row[0]
-                nombre = row[1].strip() if row[1] else ""
-                
-                if codigo == '0001': # Demandante
-                    demandantes.append(nombre)
-                elif codigo == '0002': # Demandado
-                    demandados.append(nombre)
-            
-            # Unir múltiples partes con " | "
-            str_demandante = " | ".join(demandantes) if demandantes else "Desconocido"
-            str_demandado = " | ".join(demandados) if demandados else "Desconocido"
 
-            # Si no se encontró nada, retornar None para no llenar con "Desconocido"
-            if not demandantes and not demandados:
-                self._cache[radicado] = (None, None)
-                return None, None
-
-            # Guardar en cache
-            result = (str_demandante, str_demandado)
-            self._cache[radicado] = result
-
-            # Limpiar cache si excede tamaño máximo (FIFO simple)
-            if len(self._cache) > self._cache_max_size:
-                for _ in range(100):
-                    self._cache.pop(next(iter(self._cache)))
-            self.last_query_time = time.time()
-            return result
-            
-        except pyodbc.Error as e:
-            print(f"[DB Query Error] {e}")
-            # Si hay error de conexión, intentamos reconectar una vez
-            if "08S01" in str(e) or "08001" in str(e):
-                self.connection = None
-            return None, None
-        finally:
+        with self._lock:
+            if not self.connection:
+                if not self.conectar():
+                    return None, None
+                    
             try:
-                cursor.close()
-            except:
-                pass
+                cursor = self.connection.cursor()
+                
+                # Limpiar radicado para asegurar que tenga 23 dígitos
+                radicado_limpio = ''.join(filter(str.isdigit, str(radicado)))
+                
+                if len(radicado_limpio) > 23:
+                    radicado_limpio = radicado_limpio[:23]
+                
+                query = """
+                    SELECT A112CODISUJE, A112NOMBSUJE 
+                    FROM T112DRSUJEPROC 
+                    WHERE A112LLAVPROC = ?
+                """
+                
+                cursor.execute(query, (radicado_limpio,))
+                rows = cursor.fetchall()
+                
+                demandantes = []
+                demandados = []
+                
+                for row in rows:
+                    codigo = row[0]
+                    nombre = row[1].strip() if row[1] else ""
+                    
+                    if codigo == '0001': # Demandante
+                        demandantes.append(nombre)
+                    elif codigo == '0002': # Demandado
+                        demandados.append(nombre)
+                
+                str_demandante = " | ".join(demandantes) if demandantes else "Desconocido"
+                str_demandado = " | ".join(demandados) if demandados else "Desconocido"
+    
+                if not demandantes and not demandados:
+                    self._cache[radicado] = (None, None)
+                    return None, None
+    
+                result = (str_demandante, str_demandado)
+                self._cache[radicado] = result
+    
+                if len(self._cache) > self._cache_max_size:
+                    for _ in range(100):
+                        self._cache.pop(next(iter(self._cache)))
+                self.last_query_time = time.time()
+                return result
+                
+            except pyodbc.Error as e:
+                print(f"[DB Query Error] {e}")
+                if "08S01" in str(e) or "08001" in str(e):
+                    self.connection = None
+                return None, None
+            finally:
+                try:
+                    cursor.close()
+                except:
+                    pass
 
     def test_connection(self, dsn, user="", password=""):
         """Prueba una configuración de conexión"""

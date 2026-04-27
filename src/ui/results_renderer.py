@@ -111,11 +111,22 @@ class ResultsRenderer:
                     # Determinar icono: Carpeta si tiene_hijos es True, si no, Archivo
                     icon = "📂" if tiene_hijos else "📄"
                     
-                    item_id = app.tree.insert("", "end",
-                                   text=f"{icon} {nombre}",
-                                   values=tuple(tree_values),
-                                   tags=(tag,),
-                                   open=False)
+                    # NORMALIZAR RUTA PARA DEDUPLICACIÓN (V.9.4)
+                    import os as _os
+                    ruta_abs_norm = _os.path.normpath(ruta_abs)
+                    
+                    # Insertar en TreeView usando la ruta absoluta normalizada como IID único
+                    if not app.tree.exists(ruta_abs_norm):
+                        item_id = app.tree.insert("", "end",
+                                       iid=ruta_abs_norm,
+                                       text=f"{icon} {nombre}",
+                                       values=tuple(tree_values),
+                                       tags=(tag,),
+                                       open=False)
+                    else:
+                        # Si ya existe (ej: lo encontró el indexador y el disco), 
+                        # ignoramos la inserción duplicada exacta
+                        continue
                     
                     # RECUPERAR INFO DE HIJOS (Triángulo)
                     if tiene_hijos:

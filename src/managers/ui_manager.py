@@ -212,12 +212,38 @@ class UIManager:
             self.app.btn_cancelar.config(state='disabled')
         self.app.entry.config(state='normal')
 
+    def actualizar_metadata_especifica(self, radicado, demandante, demandado):
+        """Actualiza metadata SOLO en las filas que coincidan con el radicado buscado"""
+        try:
+            if not hasattr(self, 'app') or not hasattr(self.app, 'tree'): return
+            tree = self.app.tree
+            
+            # Extraer el año y número del radicado para comparar con el nombre de la carpeta
+            # Radicado: 110013105017 YYYY NNNNN 00
+            if len(radicado) >= 23:
+                anio = radicado[12:16]
+                num = radicado[16:21].lstrip('0')
+                tag_busqueda = f"{anio}-{num}" # Ej: 2014-710
+            else:
+                tag_busqueda = radicado
+                
+            items = tree.get_children()
+            for item_id in items:
+                values = list(tree.item(item_id, 'values'))
+                folder_name = str(tree.item(item_id, 'text')).lower()
+                
+                # SOLO actualizar si el nombre de la carpeta contiene el radicado corto
+                if tag_busqueda.lower() in folder_name and len(values) >= 5:
+                    values[2] = demandante or ""
+                    values[3] = demandado or ""
+                    tree.item(item_id, values=tuple(values))
+                    
+            print(f"[UI] Metadata específica aplicada para {tag_busqueda}")
+        except Exception as e:
+            print(f"[UI ERROR] Falló actualizar metadata específica: {e}")
+
     def actualizar_metadata_resultados(self, demandante, demandado):
-        """Actualiza los resultados visibles con info de BD (Lazy Loading)
-        
-        CRÍTICO: Esta función NO debe tocar el foco en absoluto.
-        Solo actualiza valores silenciosamente en el background.
-        """
+        """Actualiza los resultados visibles con info de BD (Lazy Loading)"""
         try:
             if not hasattr(self.app, 'tree'): return
             tree = self.app.tree

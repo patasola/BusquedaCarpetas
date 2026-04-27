@@ -40,6 +40,7 @@ class ContentSearchModal:
         
         self.start_time = 0
         self.is_indexing = False
+        self.common_base_var = tk.StringVar(value="")
         self._update_status_from_locs()
     
     def _update_status_from_locs(self):
@@ -82,7 +83,7 @@ class ContentSearchModal:
     
     def _create_modal_window(self):
         self.modal = tk.Toplevel(self.parent)
-        self.modal.title("Búsqueda Avanzada por Contenido (FTS5)")
+        self.modal.title("Búsqueda Avanzada por Contenido V.6.3 - PARADISO")
         self.modal.geometry("900x780")
         self.modal.update_idletasks()
         x = (self.modal.winfo_screenwidth() - 900) // 2
@@ -229,38 +230,58 @@ class ContentSearchModal:
         main = tk.Frame(self.tab_config, padx=20, pady=20)
         main.pack(fill='both', expand=True)
         btn_f = tk.Frame(main)
-        btn_f.pack(fill='x', pady=(0, 15))
+        btn_f.pack(fill='x', pady=(0, 8))
         self.btn_add_folder = tk.Button(btn_f, text="➕ Agregar Carpeta", command=self._add_folder, font=("Segoe UI", 9), relief='flat', padx=12, pady=6)
-        self.btn_add_folder.pack(side='left', padx=(0, 10))
-        self.btn_remove_folder = tk.Button(btn_f, text="❌ Quitar", command=self._remove_folder, font=("Segoe UI", 9), relief='flat', padx=12, pady=6)
-        self.btn_remove_folder.pack(side='left', padx=(0, 10))
+        self.btn_add_folder.pack(side='left', padx=(0, 5))
         
-        self.btn_clear_index = tk.Button(btn_f, text="🗑️ Borrar Todo el Índice", command=self._handle_clear_all_index, font=("Segoe UI", 9), relief='flat', padx=12, pady=6)
-        self.btn_clear_index.pack(side='left', padx=(0, 10))
+        self.btn_import_txt = tk.Button(btn_f, text="📄 Importar TXT", command=self._import_locations_from_txt, font=("Segoe UI", 9), relief='flat', padx=12, pady=6)
+        self.btn_import_txt.pack(side='left', padx=(0, 5))
+
+        self.btn_remove_folder = tk.Button(btn_f, text="❌ Quitar", command=self._remove_folder, font=("Segoe UI", 9), relief='flat', padx=12, pady=6)
+        self.btn_remove_folder.pack(side='left', padx=(0, 5))
+        
+        self.btn_clear_index = tk.Button(btn_f, text="🗑️ Borrar Índice", command=self._handle_clear_all_index, font=("Segoe UI", 9), relief='flat', padx=12, pady=6)
+        self.btn_clear_index.pack(side='left', padx=(0, 5))
         
         self.btn_index = tk.Button(btn_f, text="⚡ Iniciar Indexación", command=self._handle_indexing_click, font=("Segoe UI", 9, "bold"), relief='flat', padx=15, pady=6)
         self.btn_index.pack(side='right')
 
+        # --- Etiqueta de ruta base común ---
+        base_f = tk.Frame(main)
+        base_f.pack(fill='x', pady=(0, 4))
+        tk.Label(base_f, text="📂 Base:", font=("Segoe UI", 8, "bold"), fg="#555").pack(side='left')
+        self.lbl_base_path = tk.Label(
+            base_f, textvariable=self.common_base_var,
+            font=("Segoe UI", 8), fg="#1565c0",
+            anchor='w', wraplength=750, justify='left'
+        )
+        self.lbl_base_path.pack(side='left', fill='x', expand=True, padx=(4, 0))
+
         tree_cnt = tk.Frame(main)
         tree_cnt.pack(fill='both', expand=True)
-        self.config_tree = ttk.Treeview(tree_cnt, columns=("path", "status", "last", "duration"), show="headings", style="Treeview")
-        self.config_tree.heading("path", text="Carpeta", anchor='w')
+        self.config_tree = ttk.Treeview(tree_cnt, columns=("name", "mode", "status", "last", "duration", "full_path"), show="headings", style="Treeview")
+        self.config_tree.heading("name", text="Carpeta", anchor='w')
+        self.config_tree.heading("mode", text="Modo", anchor='center')
         self.config_tree.heading("status", text="Estado", anchor='center')
         self.config_tree.heading("last", text="Última Indexación", anchor='center')
         self.config_tree.heading("duration", text="⏳ Duración", anchor='center')
-        self.config_tree.column("path", width=350, stretch=False)
-        self.config_tree.column("status", width=100, stretch=False)
-        self.config_tree.column("last", width=150, stretch=False)
-        self.config_tree.column("duration", width=100, stretch=False)
+        self.config_tree.heading("full_path", text="Ruta Completa", anchor='w')
+        
+        self.config_tree.column("name",      width=180, stretch=True)
+        self.config_tree.column("mode",      width=100, stretch=False)
+        self.config_tree.column("status",    width=110, stretch=False)
+        self.config_tree.column("last",      width=140, stretch=False)
+        self.config_tree.column("duration",  width=80,  stretch=False)
+        self.config_tree.column("full_path", width=400, stretch=True)
+        
+        # Ocultar la columna de ruta completa por defecto
+        self.config_tree["displaycolumns"] = ("name", "mode", "status", "last", "duration")
         self.config_tree.pack(fill='both', expand=True)
         
-        self.context_menu = tk.Menu(self.modal, tearoff=0)
-        self.context_menu.add_command(label="➕ Agregar Carpeta", command=self._add_folder)
-        self.context_menu.add_separator()
-        self.context_menu.add_command(label="🔄 Actualizar índice de esta carpeta", command=self._index_single_selected)
-        self.context_menu.add_command(label="📂 Abrir en explorador", command=self._open_folder_selected)
-        self.context_menu.add_separator()
-        self.context_menu.add_command(label="❌ Quitar de la lista", command=self._remove_folder)
+        # Tooltip: mostrar ruta completa en la barra de estado al seleccionar
+        self.config_tree.bind("<<TreeviewSelect>>", self._on_config_tree_select)
+        
+        # El menú se creará dinámicamente en _show_context_menu para mayor robustez
         self.config_tree.bind("<Button-3>", self._show_context_menu, add="+")
         self.config_tree.bind("<Button-2>", self._show_context_menu, add="+")
 
@@ -272,28 +293,57 @@ class ContentSearchModal:
         self.lbl_progress.pack()
 
     def _show_context_menu(self, event):
+        """Muestra el menú contextual de configuración de forma ultra-robusta"""
+        # Confirmar que recibimos el evento (Depuración visual para el usuario)
+        self.status_var.set("📂 Configuración: Menú de opciones...")
+        
         item = self.config_tree.identify_row(event.y)
+        # Crear el menú vinculado directamente al árbol
+        context_menu = tk.Menu(self.config_tree, tearoff=0)
+        
+        context_menu.add_command(label="➕ Agregar Carpeta", command=self._add_folder)
+        context_menu.add_separator()
+        
+        state = "normal" if item else "disabled"
         if item:
             self.config_tree.selection_set(item)
-            try:
-                # Usar Etiquetas de texto para entryconfig es más seguro que índices numéricos
-                self.context_menu.entryconfig("🔄 Actualizar índice de esta carpeta", state="normal")
-                self.context_menu.entryconfig("📂 Abrir en explorador", state="normal")
-                self.context_menu.entryconfig("❌ Quitar de la lista", state="normal")
-            except Exception as e:
-                print(f"[DEBUG] Error config menu (con item): {e}")
-        else:
-            try:
-                self.context_menu.entryconfig("🔄 Actualizar índice de esta carpeta", state="disabled")
-                self.context_menu.entryconfig("📂 Abrir en explorador", state="disabled")
-                self.context_menu.entryconfig("❌ Quitar de la lista", state="disabled")
-            except Exception as e:
-                print(f"[DEBUG] Error config menu (sin item): {e}")
             
-        try:
-            self.context_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self.context_menu.grab_release()
+        context_menu.add_command(
+            label="🔄 Actualizar índice de esta carpeta", 
+            command=self._index_single_selected,
+            state=state
+        )
+        
+        if item:
+            loc = next((l for l in self.loc_manager.locations if l['path'] == self._get_selected_full_path()), None)
+            if loc:
+                label_toggle = "📑 Cambiar a: Indexar Todo" if not loc.get('index_content', True) else "🖼️ Cambiar a: Solo Nombres (Escaneado)"
+                context_menu.add_command(label=label_toggle, command=self._toggle_content_indexing)
+        
+        context_menu.add_separator()
+        
+        # Opción para mostrar/ocultar rutas
+        is_showing_paths = "full_path" in list(self.config_tree["displaycolumns"])
+        label_paths = "🙈 Ocultar Rutas Completas" if is_showing_paths else "👁️ Mostrar Rutas Completas"
+        context_menu.add_command(label=label_paths, command=self._toggle_path_column)
+        
+        context_menu.add_separator()
+        context_menu.add_command(label="📂 Abrir en explorador", command=self._open_folder_selected, state=state)
+        context_menu.add_command(
+            label="❌ Quitar de la lista", 
+            command=self._remove_folder,
+            state=state
+        )
+        
+        # Pequeño retraso para asegurar que el evento de clic se procese antes que el popup
+        def do_popup():
+            try:
+                context_menu.post(event.x_root, event.y_root)
+            except:
+                pass
+                
+        self.modal.after(10, do_popup)
+        return "break"
 
     def _show_results_context_menu(self, event, tree):
         item_id = tree.identify_row(event.y)
@@ -373,8 +423,13 @@ class ContentSearchModal:
         self.search_entry.focus_set()
 
     def _handle_clear_all_index(self):
+        if self.is_indexing:
+            messagebox.showwarning("Acción bloqueada", "No puedes borrar el índice mientras hay una indexación en curso. Detenla primero.", parent=self.modal)
+            return
+
         if messagebox.askyesno("Confirmar Borrado Total", "¿Estás seguro de que deseas borrar ABSOLUTAMENTE TODO el índice de contenido?\n\nEsta acción no se puede deshacer y también limpiará todos los tiempos registrados.", parent=self.modal):
             self.btn_clear_index.config(text="🗑️ Borrando...", state='disabled')
+            self.btn_index.config(state='disabled') # Evitar iniciar mientras se borra
             self.modal.update()
             
             def run():
@@ -386,6 +441,7 @@ class ContentSearchModal:
 
     def _post_clear(self, success):
         self.btn_clear_index.config(text="🗑️ Borrar Todo el Índice", state='normal')
+        self.btn_index.config(state='normal')
         if success:
             # RESETEAR TIEMPOS
             for loc in self.loc_manager.locations:
@@ -414,21 +470,104 @@ class ContentSearchModal:
         if not results:
             tree.insert("", "end", values=("Sin resultados", "Intenta con otra palabra"))
             return
+            
+        # Ocultamos el árbol temporalmente para acelerar el renderizado (hack de Tkinter)
+        
+        max_limit = 10000
+        count = 0
+        
         for r in results:
+            if count >= max_limit:
+                item = tree.insert("", "end", values=("⚠️ Demasiados resultados", f"Mostrando los primeros {max_limit}. Por favor, sé más específico o añade más palabras."))
+                # Aplicamos un color distinto si fuera posible o simplemente lo insertamos
+                self.app.theme_manager.apply_theme_to_item(tree, item)
+                break
+                
             item = tree.insert("", "end", values=(r['name'], r['path']), tags=(r['abs_path'], r['snippet']))
             self.app.theme_manager.apply_theme_to_item(tree, item)
+            count += 1
+
+    def _on_config_tree_select(self, event):
+        """Muestra la ruta completa en la barra de estado al seleccionar una fila"""
+        full_path = self._get_selected_full_path()
+        if full_path:
+            self.status_var.set(f"📂 {full_path}")
+
+    def _get_selected_full_path(self):
+        """Obtiene la ruta COMPLETA del item seleccionado (guardada en tags[1])"""
+        sel = self.config_tree.selection()
+        if not sel:
+            return None
+        tags = self.config_tree.item(sel[0]).get('tags', [])
+        # tags = (color_tag, full_path)
+        return tags[1] if len(tags) >= 2 else None
 
     def _populate_config_tree(self):
         self.config_tree.delete(*self.config_tree.get_children())
+        
+        # --- Calcular ruta base común (normalizando separadores primero) ---
+        norm_paths = [os.path.normpath(loc['path']) for loc in self.loc_manager.locations]
+        common_base = ""
+        if len(norm_paths) > 1:
+            try:
+                cb = os.path.commonpath(norm_paths)
+                # Solo usar la base si es útil (incluso si es solo la unidad "D:\")
+                if len(cb) >= 3:
+                    common_base = cb
+            except ValueError:
+                common_base = ""   # paths en unidades distintas
+        elif len(norm_paths) == 1:
+            common_base = os.path.dirname(norm_paths[0])
+        
+        # Mostrar la base en la etiqueta
+        if hasattr(self, 'common_base_var'):
+            self.common_base_var.set(common_base if common_base else "(rutas en distintas unidades)")
+        
+        # Configurar tags de colores
+        self.config_tree.tag_configure('indexed',     background='#e8f5e9', foreground='#1b5e20')
+        self.config_tree.tag_configure('not_indexed', background='#fff8e1', foreground='#e65100')
+        self.config_tree.tag_configure('disabled',    background='#f5f5f5', foreground='#9e9e9e')
+        
         for loc in self.loc_manager.locations:
-            status = "Habilitado" if loc.get('enabled', True) else "Deshabilitado"
-            item = self.config_tree.insert("", "end", values=(loc['path'], status, loc.get('last_indexed', "Nunca"), loc.get('last_duration', "-")))
-            self.app.theme_manager.apply_theme_to_item(self.config_tree, item)
+            full_path = loc['path']
+            norm_full = os.path.normpath(full_path)
+            enabled   = loc.get('enabled', True)
+            idx_cont  = loc.get('index_content', True)
+            last_idx  = loc.get('last_indexed') or 'Nunca'
+            last_dur  = loc.get('last_duration') or '-'
+            
+            mode_text = "Completo" if idx_cont else "🖼️ Escaneado"
+            
+            # Mostrar SOLO el nombre de la carpeta
+            display_name = os.path.basename(norm_full) or norm_full
+            
+            has_index = last_idx not in ('Nunca', None, '')
+            
+            if not enabled:
+                status = "⛔ Deshabilitado"
+                tag    = 'disabled'
+            elif has_index:
+                status = "✅ Indexado"
+                tag    = 'indexed'
+            else:
+                status = "⚠️ Sin índice"
+                tag    = 'not_indexed'
+            
+            # tags = (color_tag, ruta_completa) — la ruta completa se usa en operaciones
+            self.config_tree.insert(
+                "", "end",
+                values=(display_name, mode_text, status, last_idx, last_dur, full_path),
+                tags=(tag, full_path)
+            )
 
     def _handle_indexing_click(self):
         if self.is_indexing:
             self.indexer.stop_indexing()
             self.btn_index.config(text="🛑 Deteniendo...")
+            # Limpiar progreso visual inmediatamente
+            self.progress_var.set("Indexación detenida")
+            self.percent_var.set(0)
+            self.modal.update()
         else: self._start_indexing()
 
     def _update_timer(self):
@@ -443,8 +582,9 @@ class ContentSearchModal:
         else: locations = self.loc_manager.get_enabled_locations()
         if not locations: return
         self.is_indexing = True
+        self.indexer.stop_requested = False # ¡RESETEO CRUCIAL! Para que pueda volver a arrancar
         self.start_time = time.time()
-        self.btn_index.config(text="🛑 Detener Indexación", bg="#ef4444")
+        self.btn_index.config(text="🛑 Detener Indexación", bg="#ef4444", state='normal')
         self._update_timer()
         def upd(msg, val):
             if self.modal and self.modal.winfo_exists(): self.modal.after(0, lambda: [self.progress_var.set(msg), self.percent_var.set(val)])
@@ -453,7 +593,8 @@ class ContentSearchModal:
                 for loc in locations:
                     if self.indexer.stop_requested: break
                     t0 = time.time()
-                    self.indexer.index_folder(loc['path'], progress_callback=upd)
+                    skip_content = not loc.get('index_content', True)
+                    self.indexer.index_folder(loc['path'], progress_callback=upd, skip_content=skip_content)
                     dur = time.time() - t0
                     loc['last_duration'] = f"{int(dur)}s" if dur < 60 else f"{int(dur//60)}m {int(dur%60)}s"
                     loc['last_indexed'] = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -489,8 +630,10 @@ class ContentSearchModal:
     def _remove_folder(self):
         sel = self.config_tree.selection()
         if not sel: return
-        it = self.config_tree.item(sel[0])
-        path = it['values'][0]
+        path = self._get_selected_full_path()
+        if not path:
+            # fallback por si los tags cambiaron
+            path = self.config_tree.item(sel[0])['values'][0]
         if messagebox.askyesno("Confirmar", f"¿Quitar y limpiar índice?\n{path}", parent=self.modal):
             self.indexer.purge_location(path)
             self.loc_manager.remove_location(path)
@@ -498,14 +641,57 @@ class ContentSearchModal:
 
     def _index_single_selected(self):
         """Indexa únicamente la carpeta seleccionada en la tabla de configuración"""
-        sel = self.config_tree.selection()
-        if not sel: return
-        path = self.config_tree.item(sel[0])['values'][0]
+        path = self._get_selected_full_path()
+        if not path: return
         self._start_indexing(single_path=path)
+
+    def _toggle_content_indexing(self):
+        """Cambia el modo entre indexación completa e indexación de solo nombres"""
+        path = self._get_selected_full_path()
+        if not path: return
+        for loc in self.loc_manager.locations:
+            if loc['path'] == path:
+                loc['index_content'] = not loc.get('index_content', True)
+                break
+        self.loc_manager.save()
+        self._populate_config_tree()
+
+    def _toggle_path_column(self):
+        """Muestra u oculta la columna de ruta completa"""
+        cols = list(self.config_tree["displaycolumns"])
+        if "full_path" in cols:
+            cols.remove("full_path")
+        else:
+            cols.append("full_path")
+        self.config_tree["displaycolumns"] = tuple(cols)
 
     def _open_folder_selected(self):
         """Abre la carpeta seleccionada en el explorador de Windows"""
-        sel = self.config_tree.selection()
-        if not sel: return
-        path = self.config_tree.item(sel[0])['values'][0]
+        path = self._get_selected_full_path()
+        if not path: return
         if os.path.exists(path): os.startfile(path)
+
+    def _import_locations_from_txt(self):
+        """Importa múltiples rutas desde un archivo TXT (una ruta por línea)"""
+        p = filedialog.askopenfilename(parent=self.modal, title="Seleccionar archivo TXT con rutas", filetypes=[("Archivos de Texto", "*.txt")])
+        if not p: return
+        
+        try:
+            with open(p, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+            
+            added = 0
+            for line in lines:
+                # Limpiar comillas y espacios (Windows suele poner comillas al 'Copiar como ruta')
+                path = line.strip().replace('"', '').replace("'", "")
+                if path and os.path.isdir(path):
+                    if self.loc_manager.add_location(path, os.path.basename(path)):
+                        added += 1
+            
+            if added > 0:
+                self._populate_config_tree()
+                messagebox.showinfo("Éxito", f"Se han importado {added} ubicaciones correctamente.", parent=self.modal)
+            else:
+                messagebox.showwarning("Aviso", "No se encontraron rutas válidas en el archivo.", parent=self.modal)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer el archivo: {e}", parent=self.modal)

@@ -6,11 +6,16 @@ class ConfigManager:
     """Gestor de configuración de la aplicación"""
     
     def __init__(self):
-        self.config_file = "config.json"
+        # Guardar configuración en AppData para persistencia entre versiones del EXE
+        app_data = os.environ.get('LOCALAPPDATA', os.environ.get('APPDATA', os.path.expanduser("~")))
+        config_dir = os.path.join(app_data, "BusquedaCarpetas")
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+            
+        self.config_file = os.path.join(config_dir, "config.json")
         self.default_config = {
             "ruta_carpeta": os.path.expanduser("~"),
-            "version": "4.5",
-            # UI Settings
+            "version": "7.3",
             "theme": "claro",
             "window_geometry": "990x700+100+100",
             "show_history": False,

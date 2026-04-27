@@ -186,9 +186,13 @@ class MenuManager:
     def _show_content_search_config(self, initial_path=None):
         """Muestra modal de configuración de búsqueda por contenido"""
         try:
-            from ..ui.content_search_modal import ContentSearchModal
-            modal = ContentSearchModal(self.app.master, self.app)
-            modal.show_modal(initial_path=initial_path)
+            # Reutilizar la instancia persistente si ya existe en la app
+            if hasattr(self.app, 'content_search_modal') and self.app.content_search_modal:
+                self.app.content_search_modal.show_modal(initial_path=initial_path)
+            else:
+                from ..ui.content_search_modal import ContentSearchModal
+                self.app.content_search_modal = ContentSearchModal(self.app.master, self.app)
+                self.app.content_search_modal.show_modal(initial_path=initial_path)
         except Exception as e:
             print(f"Error abriendo configuración de contenido: {e}")
             import traceback

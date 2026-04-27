@@ -87,16 +87,24 @@ from ..core.constants import APP_VERSION
 class BusquedaCarpetaApp:
     def __init__(self, master):
         self.master = master
+        self.config = ConfigManager() # Cargar configuración global
+        
         start_time = time.time()
         self.version = APP_VERSION
-        self.mostrar_explorador = tk.BooleanVar(value=False)
-        self.mostrar_historial = tk.BooleanVar(value=False)
+        
+        # Cargar estados desde configuración
+        self.mostrar_explorador = tk.BooleanVar(value=self.config.get("show_explorer", False))
+        self.mostrar_historial = tk.BooleanVar(value=self.config.get("show_history", False))
         self.incluir_archivos = tk.BooleanVar(value=False)
         self._selection_timer = None
-        self.mostrar_barra_cache = tk.BooleanVar(value=True)
-        self.mostrar_barra_estado = tk.BooleanVar(value=True)
+        self.mostrar_barra_cache = tk.BooleanVar(value=self.config.get("show_cache_bar", True))
+        self.mostrar_barra_estado = tk.BooleanVar(value=self.config.get("show_status_bar", True))
         self.modo_numerico = True
-        self._is_initializing = True  # Bloquear redimensionamientos automáticos en el arranque
+        self._is_initializing = True 
+        
+        # Sincronizar cambios de UI con configuración
+        self.mostrar_explorador.trace_add("write", lambda *a: self.config.set("show_explorer", self.mostrar_explorador.get()))
+        self.mostrar_historial.trace_add("write", lambda *a: self.config.set("show_history", self.mostrar_historial.get()))
         
         # 1. Configuración y Estilo (Crítico)
         self.config = ConfigManager()
@@ -159,7 +167,12 @@ class BusquedaCarpetaApp:
     def _deferred_step_background_loads(self):
         """Paso 4: Cargas pesadas en hilos separados"""
         import threading
+        # 1. Carga de carpeta principal
         threading.Thread(target=self._cargar_cache_inteligente, daemon=True).start()
+        
+        # 2. Precarga paralela de ubicaciones adicionales
+        if hasattr(self, 'search_coordinator'):
+            self.search_coordinator.pre_cargar_ubicaciones_adicionales()
         
         # 5. Restaurar visibilidad de paneles (último paso)
         self.master.after(200, self._restore_panel_visibility_safe)
@@ -236,13 +249,6 @@ class BusquedaCarpetaApp:
         except Exception as e:
             print(f"[ERROR] Falló carga de caché en background: {e}")
             return False
-    def on_close(self):
-        """Se ejecuta al cerrar la aplicación"""
-        try:
-            self.save_ui_settings()
-        except:
-            pass
-        self.master.destroy()
 
     def save_ui_settings(self):
         """Guarda las preferencias actuales de la interfaz"""
@@ -328,25 +334,6 @@ class BusquedaCarpetaApp:
             print(f"[DEBUG] Preferencias de UI (Geometría: {geometry}) y columnas guardadas")
         except Exception as e:
             print(f"[ERROR] Error guardando preferencias: {e}")
-
-    def _cargar_cache_inteligente(self):
-        """Carga cache solo si no existe"""
-        try:
-            cache_cargado = self.cache_manager.cargar_cache()
-            
-            if cache_cargado and self.cache_manager.cache.valido:
-                stats = self.cache_manager.get_cache_stats()
-                if stats.get('carpetas', 0) > 0:
-                    return True
-            
-            if self.ruta_carpeta and os.path.exists(self.ruta_carpeta):
-                import threading
-                threading.Thread(target=self.cache_manager.construir_cache, daemon=True).start()
-                return True
-            
-            return False
-        except:
-            return False
 
     def _init_ui(self):
         """Inicializa interfaz"""
@@ -493,6 +480,7 @@ class BusquedaCarpetaApp:
         # Sincronizar con explorador (con retraso de 300ms)
         if hay_seleccion and hasattr(self, 'file_explorer_manager') and self.file_explorer_manager:
             if self.file_explorer_manager.is_visible():
+                # Sincronización rápida (300ms) sin robar foco del teclado
                 self._selection_timer = self.master.after(300, self._sync_explorer_delayed)
         
         if callable(self.configurar_scrollbars):
@@ -502,9 +490,14 @@ class BusquedaCarpetaApp:
         """Ejecuta la sincronización después del debounce"""
         try:
             ruta = self._obtener_ruta_absoluta_seleccionada()
-            if ruta and os.path.exists(ruta) and os.path.isdir(ruta):
+            if ruta and os.path.exists(ruta):
                 if self.file_explorer_manager.is_visible():
-                    self.file_explorer_manager.load_directory(ruta)
+                    if os.path.isdir(ruta):
+                        # Para carpetas: mostrar su contenido (nueva raíz)
+                        self.file_explorer_manager.load_directory(ruta)
+                    else:
+                        # Para archivos: resaltar su ubicación
+                        self.file_explorer_manager.focus_path(ruta)
         except Exception as e:
             print(f"Error en sync delayed: {e}")
         finally:
@@ -702,6 +695,7 @@ class BusquedaCarpetaApp:
             self.content_locations_manager = ContentLocationsManager()
             from ..ui.content_search_modal import ContentSearchModal
             self.content_search_modal = ContentSearchModal(self.master, self)
+            self.content_search_modal.modal.title("Búsqueda Avanzada por Contenido V.7.6 - TOTAL CONTROL")
             # ATAJOS DE EMERGENCIA
             self.master.bind_all("<Control-i>", lambda e: self.content_search_modal.show_modal())
             self.master.bind_all("<Control-I>", lambda e: self.content_search_modal.show_modal())
@@ -727,5 +721,33 @@ class BusquedaCarpetaApp:
             return
         
         # 3. Por defecto, usar la lógica estándar del EventManager
-        if hasattr(self, 'event_manager'):
-            self.event_manager.abrir_carpeta_seleccionada()
+        
+    def on_close(self):
+        """Cierre ordenado de la aplicación guardando preferencias"""
+        print("[App] Cerrando y guardando configuración...")
+        try:
+            self.save_ui_settings()
+            if hasattr(self, 'config'):
+                self.config.save_config()
+            if hasattr(self, 'content_indexer'):
+                self.content_indexer.stop_indexing()
+        except Exception as e:
+            print(f"[ERROR] Error al cerrar: {e}")
+        self.master.destroy()
+
+    def save_ui_settings(self):
+        """Guarda la geometría (Tamaño + Posición) y preferencias de la ventana principal"""
+        if hasattr(self, 'master') and hasattr(self, 'config'):
+            geom = self.master.geometry()
+            self.config.set("window_geometry", geom)
+            print(f"[UI] Geometría guardada (X,Y incluido): {geom}")
+
+    def _update_global_status(self):
+        """Actualiza la barra azul con el resumen global del índice"""
+        if hasattr(self, 'content_indexer') and hasattr(self, 'ui_manager'):
+            stats = self.content_indexer.get_index_stats()
+            total = stats.get('total_files', 0)
+            if hasattr(self.ui_manager, 'status_label_index'):
+                self.ui_manager.status_label_index.config(
+                    text=f" 🗃️ Total Archivos en Índice: {total:,} | V.6.3 - PARADISO"
+                )

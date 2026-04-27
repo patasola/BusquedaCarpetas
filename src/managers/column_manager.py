@@ -77,7 +77,7 @@ class ColumnManager:
             if w < 10: w = col_def.get("width", 100) # Evitar 1px bug
             
             self.tree.heading(col_id, text=col_def.get("title", col_id))
-            self.tree.column(col_id, width=w, anchor=col_def.get("anchor", "w"), 
+            self.tree.column(col_id, width=w, minwidth=50, anchor=col_def.get("anchor", "w"), 
                             stretch=(col_id == "Ruta"))
         
         # Cargar visibilidad de columnas si está guardada
@@ -94,9 +94,10 @@ class ColumnManager:
         self.all_columns = all_columns_ordered
 
     def bind_events(self):
-        """Vincula clics y drag&drop"""
-        self.tree.bind("<Button-3>", self._on_right_click)
-        self.tree.bind("<Double-Button-1>", self._handle_doubleclick_autofit)
+        """Vincula clics y drag&drop de forma aditiva"""
+        self.tree.bind("<Button-3>", self._on_right_click, add="+")
+        self.tree.bind("<Button-2>", self._on_right_click, add="+")
+        self.tree.bind("<Double-Button-1>", self._handle_doubleclick_autofit, add="+")
         self._setup_drag_drop()
 
     def load_config(self):

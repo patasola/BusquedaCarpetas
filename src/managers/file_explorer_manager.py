@@ -55,6 +55,9 @@ class FileExplorerManager:
     
         # Callback para notificar cambios al TreeView principal
         self.on_file_change_callback = None
+        
+        # Objetivo de enfoque pendiente (para sincronización tras carga asíncrona)
+        self.pending_focus_path = None
 
     @property
     def frame(self):
@@ -420,6 +423,11 @@ class FileExplorerManager:
         self.current_path = os.path.normpath(path)
         self.path_label.configure(text=f"Raíz: {self.current_path}")
         
+        # Si no hay un enfoque pendiente específico, limpiar cualquier rastro anterior
+        # Pero NO limpiar si venimos de un focus_path que acaba de establecer un pending
+        if not self.pending_focus_path:
+             pass 
+             
         from datetime import datetime as _datetime
         current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
         print(f"[{current_time}] [DEBUG] Cargando directorio: {self.current_path}")
@@ -492,6 +500,14 @@ class FileExplorerManager:
                 return
             self._add_directory_items(parent_item, items)
             self.loaded_items.add(parent_item)
+            
+            # REVISAR ENFOQUE PENDIENTE
+            if self.pending_focus_path:
+                target = self.pending_focus_path
+                # Si el enfoque pendiente es este directorio o está dentro de él
+                if target.lower().startswith(self.current_path.lower()):
+                    self.app.master.after(10, lambda: self._apply_pending_focus())
+
             if hasattr(self.ui, 'update_scrollbars'):
                 self.ui.update_scrollbars()
         except Exception as e:
@@ -854,7 +870,7 @@ class FileExplorerManager:
         selection = self.ui.tree.selection()
         if not selection:
             messagebox.showinfo(
-                "Sin selecci├│n",
+                "Sin selección",
                 "Por favor selecciona un archivo o carpeta para eliminar"
             )
             return
@@ -862,37 +878,37 @@ class FileExplorerManager:
         item = selection[0]
         path = self.item_to_path.get(item)
         
-        # No permitir eliminar la ra├¡z
+        # No permitir eliminar la raíz
         if not path or path == self.current_path:
             messagebox.showwarning(
-                "Operaci├│n no permitida",
-                "No se puede eliminar el directorio ra├¡z"
+                "Operación no permitida",
+                "No se puede eliminar el directorio raíz"
             )
             return
         
-        # Obtener informaci├│n del elemento
+        # Obtener información del elemento
         item_name = os.path.basename(path)
         is_dir = os.path.isdir(path)
         item_type = "carpeta" if is_dir else "archivo"
         
-        # Confirmar eliminaci├│n
+        # Confirmar eliminación
         if is_dir:
             # Contar elementos dentro
             try:
                 contents_count = len(os.listdir(path))
-                warning_msg = f"┬┐Est├ís seguro de eliminar la carpeta '{item_name}'?\n\n"
+                warning_msg = f"¿Estás seguro de eliminar la carpeta '{item_name}'?\n\n"
                 if contents_count > 0:
-                    warning_msg += f"ÔÜá´©Å Contiene {contents_count} elemento(s)\n"
-                    warning_msg += "Todo su contenido ser├í eliminado."
+                    warning_msg += f"⚠️ Contiene {contents_count} elemento(s)\n"
+                    warning_msg += "Todo su contenido será eliminado."
                 else:
-                    warning_msg += "La carpeta est├í vac├¡a."
+                    warning_msg += "La carpeta está vacía."
             except:
-                warning_msg = f"┬┐Est├ís seguro de eliminar la carpeta '{item_name}'?"
+                warning_msg = f"¿Estás seguro de eliminar la carpeta '{item_name}'?"
         else:
-            warning_msg = f"┬┐Est├ís seguro de eliminar el archivo '{item_name}'?"
+            warning_msg = f"¿Estás seguro de eliminar el archivo '{item_name}'?"
         
         response = messagebox.askyesno(
-            f"Confirmar eliminaci├│n de {item_type}",
+            f"Confirmar eliminación de {item_type}",
             warning_msg,
             icon='warning'
         )
@@ -904,7 +920,7 @@ class FileExplorerManager:
         success = self.file_ops.delete_item(path)
         
         if success:
-            # Eliminar del ├írbol
+            # Eliminar del árbol
             self.tree.delete(item)
             
             # Limpiar mapeos
@@ -929,7 +945,7 @@ class FileExplorerManager:
             pass
     
     def update_shortcuts_context(self):
-        """Actualiza la barra de atajos seg├║n la selecci├│n actual"""
+        """Actualiza la barra de atajos según la selección actual"""
         if not self.ui or not hasattr(self.ui, 'update_shortcuts_bar'):
             return
         
@@ -1233,10 +1249,18 @@ class FileExplorerManager:
         
         # 1. Verificar si la ruta está dentro de la raíz actual
         if not target_path.lower().startswith(self.current_path.lower()):
-            # Si no está en la raíz actual, podríamos cargar su raíz (opcional)
-            # Por ahora, si no está en la raíz, no hacemos nada para no romper el contexto del usuario
-            # unless it's a very helpful feature.
+            # Si no está en la raíz actual, cargamos la carpeta contenedora como nueva raíz
+            # y establecemos un "enfoque pendiente"
+            parent_dir = os.path.dirname(target_path)
+            if os.path.exists(parent_dir):
+                print(f"[DEBUG] Cambiando raíz y estableciendo enfoque pendiente: {target_path}")
+                self.pending_focus_path = target_path
+                self.load_directory(parent_dir)
             return
+
+        # Limpiar enfoque pendiente si ya estamos en la raíz correcta
+        if self.pending_focus_path == target_path:
+            self.pending_focus_path = None
 
         # 2. Descomponer la ruta en partes relativas a la raíz
         try:
@@ -1269,14 +1293,22 @@ class FileExplorerManager:
                     # Forzar carga de hijos si no están cargados
                     if item not in self.loaded_items:
                         self.handle_node_expansion_immediate(item)
+                        # CRÍTICO: Permitir que la UI procese la inserción de hijos antes de seleccionar
+                        self.tree.update_idletasks()
                 
-                # Seleccionar y ver
+                # Seleccionar y desplazar a la vista (sin robar foco de teclado)
                 self.tree.selection_set(item)
                 self.tree.see(item)
-                self.tree.focus(item)
             else:
-                # Si un nodo intermedio no existe en el árbol, el usuario podría no haberlo cargado
-                # Podríamos intentar forzar la carga pero es arriesgado por performance.
-                # Intentamos expandir el padre para ver si aparece
+                # Intento desesperado: si el item no está en el mapa, quizá se está cargando
                 pass
+
+    def _apply_pending_focus(self):
+        """Aplica el enfoque que quedó pendiente tras una carga asíncrona"""
+        if not self.pending_focus_path:
+            return
+            
+        target = self.pending_focus_path
+        self.pending_focus_path = None # Limpiar para evitar bucles
+        self.focus_path(target)
 

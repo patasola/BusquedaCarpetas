@@ -105,8 +105,16 @@ class ThemeManager:
         }
     }
     
-    def __init__(self, app, tema_inicial="claro"):
+    def __init__(self, app, tema_inicial=None):
         self.app = app
+        
+        # Cargar tema desde configuración si no se especifica uno
+        if tema_inicial is None:
+            if hasattr(app, 'config'):
+                tema_inicial = app.config.get("theme", "claro")
+            else:
+                tema_inicial = "claro"
+                
         self.tema_actual = tema_inicial
         self.colores = self.TEMAS[tema_inicial].copy()
         self.theme_callbacks = []
@@ -150,6 +158,11 @@ class ThemeManager:
         
         self.tema_actual = nombre_tema
         self.colores = self.TEMAS[nombre_tema].copy()
+        
+        # Guardar preferencia
+        if hasattr(self.app, 'config'):
+            self.app.config.set("theme", nombre_tema)
+            
         self.aplicar_tema()
         self._notify_callbacks()
     

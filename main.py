@@ -17,19 +17,9 @@ def main():
     root = tk.Tk()
     root.withdraw() # OCULTAR VENTANA INICIALMENTE (Evitar "baile")
     
-    root.title("Búsqueda Rápida de Carpetas V.6.0 - Empíreo")
+    root.title("Búsqueda Avanzada por Contenido V.7.8 - ULTIMATE FIX")
     
-    # Configurar tamaño y posición inicial
-    root.geometry("900x600")
-    
-    # Centrar la ventana
-    root.update_idletasks()
-    width = root.winfo_width()
-    height = root.winfo_height()
-    x = (root.winfo_screenwidth() // 2) - (width // 2)
-    y = (root.winfo_screenheight() // 2) - (height // 2)
-    root.geometry(f"{width}x{height}+{x}+{y}")
-    
+    # El tamaño y posición se manejan dentro de BusquedaCarpetaApp -> WindowManager
     app = BusquedaCarpetaApp(root)
     
     # MOSTRAR VENTANA FINALMENTE (Todo cargado)

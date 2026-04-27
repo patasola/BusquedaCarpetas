@@ -54,122 +54,147 @@ class SearchCoordinator:
         self.current_search_thread.start()
     
     def _perform_search_async(self, criterio, silenciosa, search_id, incluir_contenido=False):
-        """Búsqueda optimizada por niveles: Nombres (Caché/Disco) y opcionalmente Contenido"""
+        """Búsqueda por STREAMING: Muestra resultados instantáneos y sigue buscando en el fondo"""
         try:
             if search_id != self.current_search_id: return
             
-            # Limpiar UI
+            # 1. PREPARACIÓN E INICIO
             self.app.master.after(0, self.app.ui_manager.limpiar_resultados)
             start_time = time.time()
             
-            # FORZAR INCLUSIÓN SI EL CHECKBOX GLOBAL ESTÁ ENCENDIDO
+            # Forzar inclusión si el checkbox global está encendido
             if hasattr(self.app, 'incluir_archivos') and self.app.incluir_archivos.get():
                 incluir_contenido = True
-            
-            # PASO 0: Búsqueda por CONTENIDO (FTS5) - SOLO SI SE SOLICITA EXPLICITAMENTE
-            resultados_contenido = []
-            if incluir_contenido:
-                if not hasattr(self.app, 'content_indexer'):
-                    from ..core.content_indexer import ContentIndexer
-                    self.app.content_indexer = ContentIndexer(self.app)
-                # Búsqueda rápida por cruce de base de datos SQL
-                resultados_contenido = self.app.content_indexer.search(criterio, search_field="path")
-            
-            # PASO 1: Intentar caché (INSTANTÁNEO)
-            resultados_cache = []
-            if hasattr(self.app, 'cache_manager') and self.app.cache_manager:
-                if self.app.cache_manager.cache.valido:
-                    resultados_cache = self.app.cache_manager.buscar_en_cache(criterio)
-            
-            # Si hay resultados en caché o contenido, mostrarlos
-            if resultados_cache or resultados_contenido:
-                print(f"[SEARCH] Resultados: {len(resultados_cache)} cache, {len(resultados_contenido)} contenido")
-                
-                # Unificar para UI
-                resultados_ui = []
-                
-                # Agregar archivos encontrados por contenido primero
-                for r in resultados_contenido:
-                    # r: {'name', 'path', 'abs_path', 'has_children'}
-                    resultados_ui.append((r['name'], r['path'], r['abs_path'], False, "Contenido", "", ""))
 
-                # Agregar carpetas de caché
-                for r in resultados_cache:
-                    # r[0]=nombre, r[1]=ruta_rel, r[2]=ruta_abs, r[3]=timestamp
-                    resultados_ui.append((r[0], r[1], r[2], True, "Caché", "", ""))
-                
-                # Mostrar inmediatamente
-                tiempo_cache = time.time() - start_time
-                self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados(
-                    resultados_ui, "C", tiempo_cache
-                ))
-                self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
-                
-                # Registrar en historial
-                if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
-                    self.app.master.after(100, lambda: self.app.historial_manager.agregar_busqueda(
-                        criterio, "Caché", len(resultados_ui), tiempo_cache
-                    ))
-                
-                # LAZY LOADING: Enriquecer en segundo plano
-                self._trigger_background_enrichment(resultados_ui, criterio)
-                return
-            
-            # PASO 2: No hay caché, buscar en disco (SIMPLE)
-            print(f"[SEARCH] Caché miss, buscando en disco...")
+            # --- FASE 1: CACHÉ (INSTANTÁNEO) ---
             if not silenciosa:
-                self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado("Buscando en disco..."))
+                self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado("Consultando memoria rápida..."))
             
-            # Usar SearchEngine directamente (sin threading complejo)
-            if hasattr(self.app, 'search_engine') and self.app.search_engine:
-                resultados_disco = self.app.search_engine.buscar_tradicional(criterio)
-                
-                if self.search_cancelled or search_id != self.current_search_id: return
-                
-                # Convertir a formato UI preservando los resultados de contenido encontrados previamente
-                # Formato disco: (nombre, ruta_rel, ruta_abs)
-                # Formato UI esperado: (nombre, ruta_rel, ruta_abs, tiene_hijos, loc_name, demandante, demandado)
-                resultados_ui = []
-                
-                # INTEGRAR RESULTADOS DE CONTENIDO (Archivos) encontrados en Paso 0
-                for r in resultados_contenido:
-                    # r: {'name', 'path', 'abs_path', 'has_children'}
-                    resultados_ui.append((r['name'], r['path'], r['abs_path'], False, "Contenido", "", ""))
+            resultados_cache_totales = []
+            
+            # A. Caché Principal
+            if hasattr(self.app, 'cache_manager') and self.app.cache_manager.cache.valido:
+                res_p = self.app.cache_manager.buscar_en_cache(criterio)
+                for r in res_p:
+                    # (nombre, rel, abs, hijos, origin, d1, d2)
+                    resultados_cache_totales.append((r[0], r[1], r[2], r[3], "Caché-Principal", "", ""))
 
-                # AGREGAR RESULTADOS DE DISCO (Carpetas)
-                for r in resultados_disco:
-                    # r[0]=nombre, r[1]=ruta_rel, r[2]=ruta_abs
-                    resultados_ui.append((r[0], r[1], r[2], True, "Disco", "", ""))
-                
-                # Mostrar resultados
-                tiempo_total = time.time() - start_time
-                self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados(
-                    resultados_ui, "D", tiempo_total
+            # B. Cachés Adicionales
+            if hasattr(self.app, 'multi_location_search'):
+                for loc in self.app.multi_location_search.get_enabled_locations():
+                    path = loc['path']
+                    if path not in self._multi_cache_managers:
+                        from ..core.cache_manager import CacheManager
+                        self._multi_cache_managers[path] = CacheManager(path, self._get_cache_filename(path))
+                    
+                    mgr = self._multi_cache_managers[path]
+                    if mgr.cache.valido:
+                        for r in mgr.buscar_en_cache(criterio):
+                            resultados_cache_totales.append((r[0], r[1], r[2], r[3], loc['name'], "", ""))
+
+            # MOSTRAR CACHÉ INMEDIATAMENTE
+            if resultados_cache_totales:
+                self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
+                    resultados_cache_totales, "C", time.time() - start_time
                 ))
-                self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
-                
-                # Registrar en historial
-                if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
-                    self.app.master.after(100, lambda: self.app.historial_manager.agregar_busqueda(
-                        criterio, "Disco", len(resultados_ui), tiempo_total
+            
+            if self.search_cancelled or search_id != self.current_search_id: return
+
+            # --- FASE 2: BÚSQUEDA NITRO (Siempre activa para nombres/rutas) ---
+            if not hasattr(self.app, 'content_indexer'):
+                from ..core.content_indexer import ContentIndexer
+                self.app.content_indexer = ContentIndexer(self.app)
+            try:
+                # Buscamos siempre en el índice por nombres de carpeta y archivo
+                res_nitro = self.app.content_indexer.search(criterio, search_field="path")
+                if res_nitro:
+                    res_ui_nitro = []
+                    for r in res_nitro:
+                        # Identificar si es una carpeta (icono expandible)
+                        es_carpeta = r.get('is_folder', False)
+                        res_ui_nitro.append((r['name'], r['path'], r['abs_path'], es_carpeta, "Nitro", "", ""))
+                    
+                    self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
+                        res_ui_nitro, "N", time.time() - start_time
                     ))
-                
-                # LAZY LOADING: Enriquecer en segundo plano
-                self._trigger_background_enrichment(resultados_ui, criterio)
-            else:
-                self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado("Error: Motor de búsqueda no disponible"))
-                self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
-                
+            except Exception as e:
+                print(f"[SEARCH COORDINATOR] Error en Fase Nitro: {e}")
+
+            # --- FASE 3: BÚSQUEDA DE CONTENIDO (Solo si se marca la casilla) ---
+            if incluir_contenido:
+                try:
+                    res_cont = self.app.content_indexer.search(criterio, search_field="content")
+                    if res_cont:
+                        res_ui_cont = []
+                        for r in res_cont:
+                            # Los resultados de contenido puro no suelen ser carpetas
+                            res_ui_cont.append((r['name'], r['path'], r['abs_path'], False, "Contenido", "", ""))
+                        
+                        self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
+                            res_ui_cont, "C", time.time() - start_time
+                        ))
+                except Exception as e:
+                    print(f"[SEARCH COORDINATOR] Error en Fase Contenido: {e}")
+
+            if self.search_cancelled or search_id != self.current_search_id: return
+
+            # --- FASE 3: DISCO (COMPLEMENTARIO) ---
+            # Si después de caché y contenido no hay mucho, o si el usuario quiere profundidad, buscamos en disco
+            # Pero sobre todo, buscamos en disco las ubicaciones ADICIONALES para asegurar que no falte nada.
+            
+            if not silenciosa:
+                self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado("Buscando duplicados en fondo..."))
+            
+            # A. Disco Principal
+            if hasattr(self.app, 'search_engine') and self.app.search_engine:
+                res_disco_p = self.app.search_engine.buscar_tradicional(criterio)
+                if res_disco_p:
+                    res_ui_p = [(r[0], r[1], r[2], True, "Principal", "", "") for r in res_disco_p]
+                    self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
+                        res_ui_p, "D", time.time() - start_time
+                    ))
+
+            # B. Disco Adicionales (donde no hay caché o es necesaria búsqueda profunda)
+            if hasattr(self.app, 'multi_location_search'):
+                for loc in self.app.multi_location_search.get_enabled_locations():
+                    if self.search_cancelled or search_id != self.current_search_id: break
+                    
+                    # Para ubicaciones adicionales, siempre hacemos un barrido de disco si se solicita
+                    # o si no hay caché cargada para esa ubicación
+                    mgr = self._multi_cache_managers.get(loc['path'])
+                    if not mgr or not mgr.cache.valido:
+                        res_disco_m = self.app.multi_location_search._search_in_location(loc, criterio)
+                        if res_disco_m:
+                            res_ui_m = [(r[0], r[1], r[2], True, loc['name'], "", "") for r in res_disco_m]
+                            self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
+                                res_ui_m, "D", time.time() - start_time
+                            ))
+
+            # --- FINALIZACIÓN ---
+            tiempo_total = time.time() - start_time
+            self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
+            
+            # Enriquecimiento final de metadatos (el que ya teníamos funcionando)
+            # Como usamos mostrar_resultados_incrementales, los items ya están en el árbol con iid=ruta_abs
+            # No necesitamos pasar todos los resultados, el worker buscará radicado del criterio
+            self._trigger_background_enrichment([], criterio, search_id)
+            
+            if not silenciosa:
+                self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado(
+                    f"✅ Búsqueda completa ({tiempo_total:.2f}s)"
+                ))
+
+            self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
+            
         except Exception as e:
             print(f"[ERROR] Búsqueda falló: {e}")
-            import traceback
-            traceback.print_exc()
             self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado(f"Error: {str(e)}"))
             self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
 
-    def _trigger_background_enrichment(self, resultados, criterio):
-        """Lanza un hilo para enriquecer resultados con info de BD sin bloquear UI"""
-        threading.Thread(target=self._enrich_worker, args=(resultados, criterio), daemon=True).start()
+    def _trigger_background_enrichment(self, resultados, criterio, search_id):
+        """Inicia el enriquecimiento de metadatos en segundo plano asociado a un ID de búsqueda"""
+        import threading
+        threading.Thread(target=self._enrich_worker, args=(resultados, criterio, search_id), daemon=True).start()
 
     def _enrich_worker(self, resultados, criterio, search_id):
         """Worker que consulta BD y actualiza UI"""
@@ -202,15 +227,6 @@ class SearchCoordinator:
         except Exception as e:
             print(f"[BG ENRICH] Error: {e}")
 
-    def _trigger_background_enrichment(self, resultados, criterio):
-        """Inicia el enriquecimiento en background"""
-        if not hasattr(self, 'current_search_id'): return
-        
-        # Usar el ID actual
-        search_id = self.current_search_id
-        
-        import threading
-        threading.Thread(target=self._enrich_worker, args=(resultados, criterio, search_id), daemon=True).start()
     
     def _append_results_batch(self, resultados, criterio, loc_name, start_time, silenciosa, search_id):
         """Añade un lote de resultados a la UI sin limpiar los anteriores"""
@@ -594,3 +610,46 @@ class SearchCoordinator:
         except Exception as e:
             from tkinter import messagebox
             messagebox.showerror("Error", f"Error en verificación: {e}")
+
+    def pre_cargar_ubicaciones_adicionales(self):
+        """Inicia carga paralela de caches para ubicaciones externas durante el arranque"""
+        if not hasattr(self.app, 'multi_location_search'):
+            return
+            
+        enabled_locations = self.app.multi_location_search.get_enabled_locations()
+        if not enabled_locations:
+            return
+            
+        print(f"[INIT] Lanzando precarga paralela para {len(enabled_locations)} ubicaciones...")
+        import threading
+        for loc in enabled_locations:
+            path = loc['path']
+            # Evitar recargar la principal si ya se está cargando por otro hilo
+            if hasattr(self.app, 'ruta_carpeta') and path == self.app.ruta_carpeta:
+                continue
+                
+            thread = threading.Thread(
+                target=self._solo_cargar_una_ubicacion,
+                args=(loc,),
+                daemon=True,
+                name=f"Loader-{loc['name']}"
+            )
+            thread.start()
+
+    def _solo_cargar_una_ubicacion(self, loc):
+        """Worker individual para cargar caché de una ubicación sin bloquear"""
+        try:
+            path = loc['path']
+            if path not in self._multi_cache_managers:
+                from ..core.cache_manager import CacheManager
+                cache_file = self._get_cache_filename(path)
+                mgr = CacheManager(path, cache_file)
+                self._multi_cache_managers[path] = mgr
+                
+                # Cargar el archivo .pkl en memoria
+                mgr.cargar_cache()
+                if mgr.cache.valido:
+                    stats = mgr.get_cache_stats()
+                    print(f"[MULTI-CACHE] '{loc['name']}' cargado: {stats.get('carpetas', 0)} registros.")
+        except Exception as e:
+            print(f"[ERROR] Falló precarga de {loc.get('name')}: {e}")
