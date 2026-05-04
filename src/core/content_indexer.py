@@ -64,6 +64,60 @@ class ContentIndexer:
                     text = f.read(10000)
             return text.strip()
         except: return ""
+    def _parse_advanced_query(self, query):
+        """Traduce sintaxis estilo Google a sintaxis FTS5 válida"""
+        import re
+        if not query: return ""
+        
+        # 1. Tokenizar respetando comillas y prefijos (+, -)
+        # Este regex captura: "frases exactas", términos con +/- o términos normales con wildcard
+        tokens = re.findall(r'\"[^\"]+\"|[-+]\S+|\S+', query)
+        
+        parsed_parts = []
+        for token in tokens:
+            # Caso NOT literal
+            if token.upper() == "NOT":
+                parsed_parts.append("NOT")
+                continue
+                
+            # Caso Exclusión (-)
+            if token.startswith("-"):
+                term = token[1:]
+                if term:
+                    # En FTS5, el operador NOT requiere un término a la izquierda.
+                    # Si es el primer token, lo manejaremos al final.
+                    parsed_parts.append(f"NOT {term}")
+                continue
+                
+            # Caso Obligatoriedad (+)
+            if token.startswith("+"):
+                term = token[1:]
+                if term:
+                    parsed_parts.append(term)
+                continue
+                
+            # Término normal o frase
+            parsed_parts.append(token)
+            
+        # 2. Correcciones finales para FTS5
+        if not parsed_parts: return ""
+        
+        # FTS5 no permite que NOT sea el primer término.
+        # Si la consulta empieza con NOT, intentamos encontrar el primer término positivo y moverlo al inicio.
+        if parsed_parts[0].startswith("NOT"):
+            # Buscar el primer término que no sea un NOT
+            first_pos = next((i for i, t in enumerate(parsed_parts) if not t.startswith("NOT")), None)
+            if first_pos is not None:
+                # Mover el término positivo al inicio
+                pos_term = parsed_parts.pop(first_pos)
+                parsed_parts.insert(0, pos_term)
+            else:
+                # Si TODO es negativo, FTS5 no puede procesarlo solo. 
+                # Podríamos ignorar el primer NOT o dejarlo fallar.
+                # Aquí simplemente quitamos el prefijo NOT para que busque algo.
+                parsed_parts[0] = parsed_parts[0].replace("NOT ", "")
+
+        return " ".join(parsed_parts)
 
     def search(self, query, search_field=None):
         """Busca texto/nombres y devuelve resultados en el formato esperado por la UI"""
@@ -72,11 +126,8 @@ class ContentIndexer:
             with self.db_lock:
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
-                search_query = f"{query}*"
-                
                 if search_field == "path":
                     # Búsqueda LITERAL en la columna de ruta/nombre (Evita problemas con guiones)
-                    # Usamos LIKE en lugar de MATCH para que '2014-710' sea tratado como texto exacto
                     cursor.execute("""
                         SELECT path, content
                         FROM content_fts 
@@ -85,14 +136,33 @@ class ContentIndexer:
                         LIMIT 10000
                     """, (f"%{query}%",))
                 else:
-                    # Búsqueda por CONTENIDO (aquí sí usamos MATCH para velocidad de texto)
-                    cursor.execute("""
-                        SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) 
-                        FROM content_fts 
-                        WHERE content_fts MATCH ? 
-                        ORDER BY rank
-                        LIMIT 10000
-                    """, (f"content:{search_query}",))
+                    # Búsqueda AVANZADA por CONTENIDO
+                    advanced_query = self._parse_advanced_query(query)
+                    
+                    # Usamos el formato content:(query) para que FTS5 aplique los operadores al campo content
+                    # Si el parser falló o devolvió vacío, usamos la query original escapada mínimamente
+                    final_match = f"content:({advanced_query})"
+                    
+                    try:
+                        cursor.execute("""
+                            SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) 
+                            FROM content_fts 
+                            WHERE content_fts MATCH ? 
+                            ORDER BY rank
+                            LIMIT 10000
+                        """, (final_match,))
+                    except sqlite3.OperationalError:
+                        # Fallback a búsqueda simple si la sintaxis avanzada dio error
+                        # (e.g. comillas sin cerrar)
+                        simple_query = query.replace('"', '').replace('*', '')
+                        cursor.execute("""
+                            SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) 
+                            FROM content_fts 
+                            WHERE content_fts MATCH ? 
+                            ORDER BY rank
+                            LIMIT 10000
+                        """, (f"content:{simple_query}*",))
+
                 
                 rows = cursor.fetchall()
                 conn.close()

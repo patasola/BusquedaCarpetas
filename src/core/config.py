@@ -23,10 +23,19 @@ class ConfigManager:
             "manual_app_width": None,
             "explorer_width": 350,
             "history_width": 300,
-            # Column Widths
-            "main_column_widths": {"#0": 200, "Método": 35, "Ruta": 300},
-            "explorer_column_widths": {"#0": 250, "Fecha": 120},
-            "history_column_widths": {"Criterio": 120, "Metodo": 40, "Resultados": 60, "Tiempo": 60, "Fecha": 60}
+            # Column Widths (Estructura unificada V.5.0)
+            "main_column_widths": {
+                "visible_columns": ["#0", "Método", "Ruta"],
+                "widths": {"#0": 200, "Método": 35, "Ruta": 300}
+            },
+            "explorer_column_widths": {
+                "visible_columns": ["#0", "Fecha"],
+                "widths": {"#0": 250, "Fecha": 120}
+            },
+            "history_column_widths": {
+                "visible_columns": ["Criterio", "Metodo", "Resultados", "Tiempo", "Fecha"],
+                "widths": {"Criterio": 120, "Metodo": 40, "Resultados": 60, "Tiempo": 60, "Fecha": 60}
+            }
         }
         self.config = self._load_config()
     

@@ -216,7 +216,10 @@ class UIComponents:
         tree.heading("Ruta", text="Ruta Relativa", anchor=tk.W, command=lambda: _sort_main_tree("Ruta"))
         
         # Aplicar anchos (guardados o defaults) de forma robusta
-        cw = col_widths if col_widths else {}
+        # Soportar tanto formato simple como anidado (V.5.0)
+        saved_widths = {}
+        if isinstance(col_widths, dict):
+            saved_widths = col_widths.get("widths", col_widths)
         
         # Diccionario de defaults para asegurar que siempre haya valores válidos
         defaults = {"#0": 200, "Método": 35, "Ruta": 300}
@@ -224,9 +227,11 @@ class UIComponents:
         # Aplicar a cada columna
         for col in ["#0", "Método", "Ruta"]:
             # Intentar obtener de guardados, si no de defaults
-            w = cw.get(col, defaults.get(col, 200))
+            w = saved_widths.get(col, defaults.get(col, 200))
+            if not isinstance(w, int): w = defaults.get(col, 200)
+            
             anchor = tk.W if col != "Método" else tk.CENTER
-            stretch = True if col == "Ruta" else False
+            stretch = False # Desactivar stretch para evitar efectos de rebote
             minw = 120 if col == "#0" else (30 if col == "Método" else 150)
             
             tree.column(col, width=w, anchor=anchor, minwidth=minw, stretch=stretch)

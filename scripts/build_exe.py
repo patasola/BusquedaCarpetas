@@ -16,9 +16,11 @@ def build(with_console=False):
         print(f"Error: No se encontró {main_script}")
         return
 
-    # Comando de PyInstaller
+    # Comando de PyInstaller (usando el ejecutable actual de python para evitar problemas de PATH)
     command = [
-        "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--onefile",
         f"--name={app_name}",
         "--add-data=src;src",

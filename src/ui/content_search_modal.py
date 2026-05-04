@@ -41,6 +41,8 @@ class ContentSearchModal:
         self.start_time = 0
         self.is_indexing = False
         self.common_base_var = tk.StringVar(value="")
+        self.preview_window = None  # Ventana para Quick Look
+        self.preview_text_widget = None # Referencia al widget de texto
         self._update_status_from_locs()
     
     def _update_status_from_locs(self):
@@ -156,7 +158,12 @@ class ContentSearchModal:
         
         if search_type == "content":
             self.lbl_ocr_warning = tk.Label(header, text="⚠ PDFs escaneados (imágenes) son invisibles sin OCR.", font=("Segoe UI", 8, "italic"))
-            self.lbl_ocr_warning.pack(anchor='w', pady=(0, 5))
+            self.lbl_ocr_warning.pack(anchor='w', pady=(0, 2))
+            
+            # Guía de sintaxis avanzada (V.9.1)
+            self.lbl_syntax_help = tk.Label(header, text='💡 "frase exacta"  +incluir  -excluir  *wildcard (Ej: "recurso reposicion"+extraordinario*)', 
+                                         font=("Segoe UI", 8, "italic"))
+            self.lbl_syntax_help.pack(anchor='w', pady=(0, 5))
         
         entry_cnt = tk.Frame(header)
         entry_cnt.pack(fill='x')
@@ -198,6 +205,17 @@ class ContentSearchModal:
         tree.bind("<Button-3>", lambda e: self._show_results_context_menu(e, tree))
         tree.bind("<Button-2>", lambda e: self._show_results_context_menu(e, tree))
         tree.bind("<Double-1>", lambda e: self._open_selected_result(tree))
+        
+        # --- NUEVAS BINDINGS (V.9.3 - Interactive Preview) ---
+        tree.bind("<KeyPress-space>", lambda e: self._show_preview(tree))
+        tree.bind("<KeyRelease-space>", lambda e: self._hide_preview())
+        tree.bind("<F7>", lambda e: self._open_folder_selected_result(tree))
+        
+        # Redirigir flechas a la vista previa si está activa
+        tree.bind("<Up>", lambda e: self._handle_nav_keys(e, tree, -1, "units"))
+        tree.bind("<Down>", lambda e: self._handle_nav_keys(e, tree, 1, "units"))
+        tree.bind("<Prior>", lambda e: self._handle_nav_keys(e, tree, -1, "pages"))
+        tree.bind("<Next>", lambda e: self._handle_nav_keys(e, tree, 1, "pages"))
         
         # Ordenamiento por columna al hacer clic en el encabezado
         tree._sort_reverse = {"file": False, "path": False}
@@ -374,6 +392,124 @@ class ContentSearchModal:
         path = tree.item(sel[0]).get('tags', [None])[0]
         if path and os.path.exists(path): os.startfile(path)
 
+    def _open_folder_selected_result(self, tree):
+        """Abre la carpeta contenedora del archivo seleccionado (F7)"""
+        sel = tree.selection()
+        if not sel: return
+        path = tree.item(sel[0]).get('tags', [None])[0]
+        if path and os.path.exists(path):
+            folder = os.path.dirname(path)
+            if os.path.exists(folder):
+                os.startfile(folder)
+                
+    def _show_preview(self, tree):
+        """Muestra una ventana flotante de vista previa (Quick Look)"""
+        if self.preview_window: return
+        sel = tree.selection()
+        if not sel: return
+        
+        path = tree.item(sel[0]).get('tags', [None])[0]
+        if not path or not os.path.exists(path): return
+        
+        # Crear ventana minimalista
+        self.preview_window = tk.Toplevel(self.modal)
+        self.preview_window.overrideredirect(True)
+        self.preview_window.attributes("-topmost", True)
+        
+        # Forzar un tamaño inicial para el cálculo de posición
+        self.preview_window.geometry("700x500")
+        
+        c = self.app.theme_manager.colores
+        bg_color = c.get("bg", "#ffffff")
+        accent = c.get("accent_primary", "#007acc")
+        
+        self.preview_window.configure(bg=accent, padx=2, pady=2) # Borde de color acento
+        
+        # Contenedor interno para el contenido
+        f_main = tk.Frame(self.preview_window, bg=bg_color)
+        f_main.pack(fill='both', expand=True)
+        
+        # Header con info del archivo
+        f_header = tk.Frame(f_main, bg=c.get("button_active_bg", "#f0f0f0"), padx=12, pady=8)
+        f_header.pack(fill='x')
+        tk.Label(f_header, text=f"📄 {os.path.basename(path)}", font=("Segoe UI", 10, "bold"), 
+                 bg=c.get("button_active_bg", "#f0f0f0"), fg=accent).pack(side='left')
+        
+        # Cuerpo con texto
+        f_body = tk.Frame(f_main, bg=bg_color, padx=15, pady=15)
+        f_body.pack(fill='both', expand=True)
+        
+        text_preview = tk.Text(f_body, font=("Consolas", 10), bg=c.get("entry_bg", "#ffffff"), 
+                               fg=c.get("entry_fg", "#000000"), relief='flat', wrap='word')
+        text_preview.pack(fill='both', expand=True)
+        self.preview_text_widget = text_preview
+        
+        # Footer con instrucciones de navegación
+        f_footer = tk.Frame(f_main, bg=bg_color, padx=10, pady=2)
+        f_footer.pack(fill='x')
+        tk.Label(f_footer, text="🖱️ Mantén Espacio  |  ⌨️ Navegar: ↑ ↓  RePág AvPág", 
+                 font=("Segoe UI", 8, "italic"), bg=bg_color, fg=c.get("fg_alt", "#888888")).pack(side='right')
+        
+        # Cargar contenido: snippet o lectura directa (LÍMITE AUMENTADO V.9.3)
+        tags = tree.item(sel[0]).get('tags', [])
+        snippet = tags[1] if len(tags) > 1 else None
+        
+        has_content = False
+        if snippet and snippet != "Contexto no disponible":
+            # Limpiar etiquetas HTML del snippet para el widget Text
+            clean_text = snippet.replace('<b>', '').replace('</b>', '').strip()
+            if clean_text:
+                text_preview.insert('1.0', clean_text + "\n" + "-"*50 + "\n\n")
+                # Intentar cargar más texto después del snippet
+                has_content = False # Forzamos carga adicional
+        
+        # Intento de lectura rápida de los primeros 10000 chars
+        try:
+            ext = os.path.splitext(path)[1].lower()
+            if ext in ('.pdf', '.docx', '.xlsx'):
+                if not has_content: text_preview.insert('end', "[Cargando extracto extendido...]\n\n")
+                text_preview.insert('end', self.indexer._extract_text(path))
+            else:
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    text_preview.insert('end', f.read(10000))
+        except Exception as e:
+            if not text_preview.get('1.0', 'end').strip():
+                text_preview.insert('1.0', f"[Vista previa no disponible: {str(e)}]")
+        
+        text_preview.configure(state='disabled')
+        
+        # Posicionar centrada usando rootx/y para evitar desfases de monitores
+        self.preview_window.update_idletasks()
+        w = self.preview_window.winfo_reqwidth()
+        h = self.preview_window.winfo_reqheight()
+        
+        # Centrar respecto a la ventana modal
+        mx = self.modal.winfo_rootx() + (self.modal.winfo_width() - w) // 2
+        my = self.modal.winfo_rooty() + (self.modal.winfo_height() - h) // 2
+        
+        # Asegurarse de que no se salga de la pantalla
+        mx = max(0, mx)
+        my = max(0, my)
+        
+        self.preview_window.geometry(f"{w}x{h}+{mx}+{my}")
+
+    def _handle_nav_keys(self, event, tree, amount, unit):
+        """Maneja las teclas de navegación: desplaza la vista previa si está activa, o la lista si no."""
+        if self.preview_window and self.preview_text_widget:
+            self.preview_text_widget.yview_scroll(amount, unit)
+            return "break"
+        return None # Dejar que el evento siga su curso normal en la lista
+
+    def _hide_preview(self):
+        """Cierra la ventana de vista previa"""
+        if self.preview_window:
+            try:
+                self.preview_window.destroy()
+            except:
+                pass
+            self.preview_window = None
+            self.preview_text_widget = None
+
     def aplicar_tema(self):
         if not self.modal or not self.modal.winfo_exists(): return
         tm = self.app.theme_manager
@@ -412,6 +548,7 @@ class ContentSearchModal:
                 else: 
                     widget.configure(bg=c["bg"], fg=c["fg"])
                     if hasattr(self, 'lbl_ocr_warning') and widget == self.lbl_ocr_warning: widget.configure(fg=c.get("fg_alt", "#888888"))
+                    if hasattr(self, 'lbl_syntax_help') and widget == self.lbl_syntax_help: widget.configure(fg=c.get("fg_alt", "#888888"))
             elif wclass == "Entry": widget.configure(bg=c["entry_bg"], fg=c["entry_fg"], insertbackground=c["entry_fg"])
             elif wclass == "Button": widget.configure(bg=c["button_bg"], fg=c["button_fg"], activebackground=c["button_active_bg"])
             for child in widget.winfo_children(): self._colorear_recursivo(child, c)

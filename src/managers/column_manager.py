@@ -78,7 +78,7 @@ class ColumnManager:
             
             self.tree.heading(col_id, text=col_def.get("title", col_id))
             self.tree.column(col_id, width=w, minwidth=50, anchor=col_def.get("anchor", "w"), 
-                            stretch=(col_id == "Ruta"))
+                            stretch=False) # Forzar stretch=False para persistencia exacta
         
         # Cargar visibilidad de columnas si está guardada
         if self.app and hasattr(self.app, 'config'):
@@ -98,21 +98,45 @@ class ColumnManager:
         self.tree.bind("<Button-3>", self._on_right_click, add="+")
         self.tree.bind("<Button-2>", self._on_right_click, add="+")
         self.tree.bind("<Double-Button-1>", self._handle_doubleclick_autofit, add="+")
+        self.tree.bind("<ButtonRelease-1>", self._on_button_release, add="+")
         self._setup_drag_drop()
+
+    def _on_button_release(self, event):
+        """Al soltar el click, guardamos el estado si algo cambió"""
+        # Siempre intentamos guardar después de una interacción de ratón en cabeceras/separadores
+        # o simplemente en cualquier release para ser robustos.
+        self.save_config()
 
     def load_config(self):
         """Carga visibilidad y anchos desde el ConfigManager central"""
         if self.app and hasattr(self.app, 'config'):
             key = self.config_keys.get(self.config_id)
-            if key:
-                config = self.app.config.get(key, {})
-                visible = config.get('visible_columns')
-                if visible:
-                    self.tree.configure(displaycolumns=tuple([c for c in visible if c in self.all_columns]))
+            config = self.app.config.get(key, {})
+            
+            if config and isinstance(config, dict):
+                # Cargar anchos de forma robusta
                 widths = config.get('widths', {})
-                for cid, w in widths.items():
-                    try: self.tree.column(cid, width=w)
-                    except: pass
+                if widths:
+                    for cid, w in widths.items():
+                        try:
+                            # Asegurarse de que el ancho sea un entero válido
+                            if isinstance(w, (int, float)) and w > 0:
+                                self.tree.column(cid, width=int(w))
+                        except Exception as e:
+                            print(f"[ColumnManager] Error cargando ancho para {cid}: {e}")
+                
+                # Cargar visibilidad
+                display = config.get('visible_columns', [])
+                if display:
+                    self._apply_visibility(display)
+                
+                # Forzar actualización visual
+                self.tree.update_idletasks()
+                
+                # Notificar éxito
+                if self.app and hasattr(self.app, 'actualizar_estado'):
+                    self.app.actualizar_estado("✓ Columnas cargadas")
+                    self.app.master.after(2000, lambda: self.app.actualizar_estado("Listo"))
 
     def save_config(self):
         """Envía el estado actual al ConfigManager central"""
@@ -136,10 +160,16 @@ class ColumnManager:
              
         widths = {str(c): self.tree.column(c, 'width') for c in ["#0"] + list(self.tree["columns"])}
         
+        # Guardar en configuración
         self.app.config.set(self.config_keys.get(self.config_id), {
             'visible_columns': display,
             'widths': widths
         })
+        
+        # Opcional: Notificar al usuario de forma sutil
+        if hasattr(self.app, 'actualizar_estado'):
+            # Solo si no está en medio de una búsqueda
+            pass
 
     def _on_right_click(self, event):
         """Muestra menú de columnas"""
@@ -229,6 +259,22 @@ class ColumnManager:
         self.tree.configure(displaycolumns=tuple(visible))
         self.save_config()
 
+    def _apply_visibility(self, visible_cols):
+        """Aplica la lista de columnas visibles de forma segura"""
+        if not visible_cols: return
+        
+        # Las columnas disponibles reales en el widget
+        all_available = list(self.tree["columns"])
+        
+        # Filtrar solo las que existen
+        to_show = [c for c in visible_cols if c in all_available]
+        
+        if to_show:
+            try:
+                self.tree.configure(displaycolumns=tuple(to_show))
+            except Exception as e:
+                print(f"[ColumnManager] Error aplicando visibilidad: {e}")
+
     def _handle_doubleclick_autofit(self, event):
         if self.tree.identify_region(event.x, event.y) == 'separator':
             cid = self.tree.identify_column(event.x)
@@ -252,7 +298,12 @@ class ColumnManager:
         key = self.config_keys.get(self.config_id)
         if not key: return {}
         conf = self.app.config.get(key, {})
-        return conf.get('widths', {}) if isinstance(conf, dict) else {}
+        if not isinstance(conf, dict): return {}
+        # Si la config es del formato nuevo {visible_columns: [], widths: {}}
+        if 'widths' in conf:
+            return conf.get('widths', {})
+        # Si la config es del formato viejo {col: width}
+        return conf
 
     def _reconfigure_all_headings(self):
         for cid in list(self.tree["columns"]):

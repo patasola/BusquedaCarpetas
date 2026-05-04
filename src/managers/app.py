@@ -735,12 +735,6 @@ class BusquedaCarpetaApp:
             print(f"[ERROR] Error al cerrar: {e}")
         self.master.destroy()
 
-    def save_ui_settings(self):
-        """Guarda la geometría (Tamaño + Posición) y preferencias de la ventana principal"""
-        if hasattr(self, 'master') and hasattr(self, 'config'):
-            geom = self.master.geometry()
-            self.config.set("window_geometry", geom)
-            print(f"[UI] Geometría guardada (X,Y incluido): {geom}")
 
     def _update_global_status(self):
         """Actualiza la barra azul con el resumen global del índice"""
