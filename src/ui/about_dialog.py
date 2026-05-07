@@ -132,74 +132,24 @@ class AboutDialog:
         
         right_column = tk.Frame(tech_frame, bg=Colors.BACKGROUND)
         right_column.pack(side='right')
-        
-        # Características V.6.2 (Empíreo Sincro) ✨
-        features_label = tk.Label(left_column,
-                                text="✨ Nuevas características V.6.2:",
-                                font=("Segoe UI", 11, "bold"),
-                                fg=Colors.BLUE_BAR,
-                                bg=Colors.BACKGROUND,
-                                anchor='w')
-        features_label.pack(anchor='w')
-        
-        features_text = ("• Sincronización automática de Explorador\n"
-                        "• Corrección de sombreado de archivos/carpetas\n"
-                        "• Menú contextual 100% focalizado\n"
-                        "• Mejoras en la unificación de resultados\n"
-                        "• Optimización de navegación TreeView")
-        
-        features_detail = tk.Label(left_column,
-                                 text=features_text,
-                                 font=("Segoe UI", 9),
-                                 fg=Colors.DARK_GRAY,
-                                 bg=Colors.BACKGROUND,
-                                 justify='left',
-                                 anchor='w')
-        features_detail.pack(anchor='w', pady=(5, 0))
-        
-        # ... (Tech info column stays same) ...
-
-        # Sección adicional - Evolución
-        # ...
-        
-        evolution_text = ("V.5.1 → Luce Ultima: Startup instantáneo y correcciones finales\n"
-                         "V.6.1 → Empíreo Híbrido: Búsqueda cruzada y ordenamiento UI\n"
-                         "V.6.2 → Empíreo Sincro: Sincronización total de navegación")
-        
-        evolution_detail = tk.Label(self.content_frame,
-                                   text=evolution_text,
-                                   font=("Segoe UI", 9),
-                                   fg=Colors.DARK_GRAY,
-                                   bg=Colors.BACKGROUND,
-                                   justify='left')
-        evolution_detail.pack(pady=(5, 20))
-        
-        self._add_space(40)
-        
-        # Cita de Dante
+              
+        # Cita de Dante (Purgatorio)
         dante_label1 = tk.Label(self.content_frame,
-                              text="\"Nel mezzo del cammin di nostra vita",
-                              font=("Segoe UI", 11, "italic"),
-                              fg=Colors.DARK_GRAY,
+                              text="\"Per correr miglior acque",
+                              font=("Segoe UI", 13, "italic", "bold"),
+                              fg=Colors.BLUE_BAR,
                               bg=Colors.BACKGROUND)
         dante_label1.pack(pady=2)
         
         dante_label2 = tk.Label(self.content_frame,
-                              text="mi ritrovai per una selva oscura,",
-                              font=("Segoe UI", 11, "italic"),
-                              fg=Colors.DARK_GRAY,
+                              text="alza le vele.\"",
+                              font=("Segoe UI", 13, "italic", "bold"),
+                              fg=Colors.BLUE_BAR,
                               bg=Colors.BACKGROUND)
         dante_label2.pack(pady=2)
         
-        dante_label3 = tk.Label(self.content_frame,
-                              text="ché la diritta via era smarrita.\"",
-                              font=("Segoe UI", 11, "italic"),
-                              fg=Colors.DARK_GRAY,
-                              bg=Colors.BACKGROUND)
-        dante_label3.pack(pady=2)
-        
         dante_author = tk.Label(self.content_frame,
-                              text="— Dante Alighieri, Divina Comedia",
+                              text="— Dante Alighieri, Purgatorio (Canto I)",
                               font=("Segoe UI", 9),
                               fg=Colors.MEDIUM_GRAY,
                               bg=Colors.BACKGROUND)
@@ -207,7 +157,7 @@ class AboutDialog:
         
         # Créditos finales
         credits_title = tk.Label(self.content_frame,
-                               text="CO-CREADO POR",
+                               text="CREADO POR",
                                font=("Segoe UI", 12, "bold"),
                                fg=Colors.BLUE_BAR,
                                bg=Colors.BACKGROUND)
@@ -220,37 +170,7 @@ class AboutDialog:
                           bg=Colors.BACKGROUND)
         creator1.pack(pady=2)
         
-        and_label = tk.Label(self.content_frame,
-                           text="&",
-                           font=("Segoe UI", 11),
-                           fg=Colors.DARK_GRAY,
-                           bg=Colors.BACKGROUND)
-        and_label.pack(pady=2)
-        
-        creator2 = tk.Label(self.content_frame,
-                          text="Claude Sonnet 4",
-                          font=("Segoe UI", 11),
-                          fg=Colors.DARK_GRAY,
-                          bg=Colors.BACKGROUND)
-        creator2.pack(pady=2)
-        
-        collab_label1 = tk.Label(self.content_frame,
-                               text="Desarrollado con colaboración humano-IA",
-                               font=("Segoe UI", 9),
-                               fg=Colors.MEDIUM_GRAY,
-                               bg=Colors.BACKGROUND)
-        collab_label1.pack(pady=(10, 2))
-        
-        collab_label2 = tk.Label(self.content_frame,
-                               text="para optimizar la gestión de archivos",
-                               font=("Segoe UI", 9),
-                               fg=Colors.MEDIUM_GRAY,
-                               bg=Colors.BACKGROUND)
-        collab_label2.pack(pady=2)
-        
-        self._add_space(30)
-        
-        # Copyright
+      # Copyright
         copyright_label = tk.Label(self.content_frame,
                                  text=f"© 2026 - {APP_TITLE}\n"
                                       "Desarrollado con ❤️ para mejorar tu productividad",

@@ -75,6 +75,10 @@ class ContentIndexer:
         
         parsed_parts = []
         for token in tokens:
+            # Limpiar caracteres que rompen FTS5 si están al final
+            token = token.rstrip('*+- ')
+            if not token: continue
+
             # Caso NOT literal
             if token.upper() == "NOT":
                 parsed_parts.append("NOT")
@@ -119,7 +123,7 @@ class ContentIndexer:
 
         return " ".join(parsed_parts)
 
-    def search(self, query, search_field=None):
+    def search(self, query, search_field=None, extension=None):
         """Busca texto/nombres y devuelve resultados en el formato esperado por la UI"""
         if not query: return []
         try:
@@ -127,41 +131,40 @@ class ContentIndexer:
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
                 if search_field == "path":
-                    # Búsqueda LITERAL en la columna de ruta/nombre (Evita problemas con guiones)
-                    cursor.execute("""
-                        SELECT path, content
-                        FROM content_fts 
-                        WHERE path LIKE ? 
-                        ORDER BY path ASC
-                        LIMIT 10000
-                    """, (f"%{query}%",))
+                    # Búsqueda LITERAL en la columna de ruta/nombre
+                    sql = "SELECT path, content FROM content_fts WHERE path LIKE ? "
+                    params = [f"%{query}%"]
+                    if extension and extension != "all":
+                        sql += " AND path LIKE ?"
+                        params.append(f"%{extension}")
+                    sql += " ORDER BY path ASC LIMIT 10000"
+                    cursor.execute(sql, params)
                 else:
                     # Búsqueda AVANZADA por CONTENIDO
                     advanced_query = self._parse_advanced_query(query)
-                    
-                    # Usamos el formato content:(query) para que FTS5 aplique los operadores al campo content
-                    # Si el parser falló o devolvió vacío, usamos la query original escapada mínimamente
                     final_match = f"content:({advanced_query})"
                     
+                    sql = "SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) FROM content_fts WHERE content_fts MATCH ?"
+                    params = [final_match]
+                    
+                    if extension and extension != "all":
+                        sql += " AND path LIKE ?"
+                        params.append(f"%{extension}")
+                    
+                    sql += " ORDER BY rank LIMIT 10000"
+                    
                     try:
-                        cursor.execute("""
-                            SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) 
-                            FROM content_fts 
-                            WHERE content_fts MATCH ? 
-                            ORDER BY rank
-                            LIMIT 10000
-                        """, (final_match,))
+                        cursor.execute(sql, params)
                     except sqlite3.OperationalError:
-                        # Fallback a búsqueda simple si la sintaxis avanzada dio error
-                        # (e.g. comillas sin cerrar)
+                        # Fallback a búsqueda simple
                         simple_query = query.replace('"', '').replace('*', '')
-                        cursor.execute("""
-                            SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) 
-                            FROM content_fts 
-                            WHERE content_fts MATCH ? 
-                            ORDER BY rank
-                            LIMIT 10000
-                        """, (f"content:{simple_query}*",))
+                        sql_fallback = "SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) FROM content_fts WHERE content_fts MATCH ?"
+                        params_fallback = [f"content:{simple_query}*"]
+                        if extension and extension != "all":
+                            sql_fallback += " AND path LIKE ?"
+                            params_fallback.append(f"%{extension}")
+                        sql_fallback += " ORDER BY rank LIMIT 10000"
+                        cursor.execute(sql_fallback, params_fallback)
 
                 
                 rows = cursor.fetchall()

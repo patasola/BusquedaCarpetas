@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BusquedaCarpetas V7 – Búsqueda de Documentos</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--border:#30363d;
+  --accent:#3b82f6;--accent2:#8b5cf6;--text:#e6edf3;--text2:#8b949e;
+  --red:#f85149;--green:#3fb950;--yellow:#d29922;--orange:#f0883e;
+  --card-bg:rgba(22,27,34,0.85);--glass:rgba(255,255,255,0.05);
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+/* Header */
+.header{background:linear-gradient(135deg,#1a1f2e 0%,#0d1117 100%);border-bottom:1px solid var(--border);padding:0 1.25rem;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px)}
+.header-inner{margin:0 auto;display:flex;align-items:center;gap:1.25rem;height:64px}
+.logo{display:flex;align-items:center;gap:.65rem;text-decoration:none;flex-shrink:0}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.logo-text{font-size:1.05rem;font-weight:700;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+.search-wrap{flex:1;position:relative}
+.search-box{width:100%;padding:.75rem 3.5rem .75rem 1.25rem;background:var(--bg3);border:1.5px solid var(--border);border-radius:12px;color:var(--text);font-size:1rem;font-family:'Inter',sans-serif;outline:none;transition:all .2s}
+.search-box:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+.search-box::placeholder{color:var(--text2)}
+.search-icon{position:absolute;right:1rem;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none;font-size:1.1rem}
+.search-spinner{display:none;position:absolute;right:1rem;top:50%;transform:translateY(-50%);width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+.search-spinner.active{display:block}
+@keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
+.stats-badge{display:flex;align-items:center;gap:.5rem;padding:.4rem 1rem;background:var(--glass);border:1px solid var(--border);border-radius:20px;font-size:.8rem;color:var(--text2);white-space:nowrap;cursor:default}
+.stats-badge span{color:var(--accent);font-weight:600}
+/* Filters */
+.filters{background:var(--bg2);border-bottom:1px solid var(--border);padding:.6rem 1.25rem;position:sticky;top:64px;z-index:99}
+.filters-inner{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.filter-group{display:flex;gap:.4rem}
+.filter-label{font-size:.75rem;color:var(--text2);font-weight:500;align-self:center;margin-right:.2rem}
+.chip{padding:.35rem .85rem;border-radius:20px;font-size:.78rem;font-weight:500;border:1.5px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.ext-pdf.active{background:#f85149;border-color:#f85149}
+.chip.ext-docx.active{background:#3b82f6;border-color:#3b82f6}
+.chip.ext-xlsx.active{background:#3fb950;border-color:#3fb950}
+.chip.ext-txt.active{background:#8b949e;border-color:#8b949e}
+.result-count{margin-left:auto;font-size:.8rem;color:var(--text2)}
+.result-count strong{color:var(--text)}
+/* Main layout */
+.main{padding:1rem 1.25rem}
+/* Welcome */
+.welcome{text-align:center;padding:5rem 2rem;animation:fadeIn .5s ease}
+.welcome h2{font-size:2rem;font-weight:700;margin-bottom:.75rem;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.welcome p{color:var(--text2);font-size:1rem;max-width:500px;margin:0 auto 2rem}
+.welcome-tips{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.tip{padding:.6rem 1.2rem;background:var(--glass);border:1px solid var(--border);border-radius:10px;font-size:.8rem;color:var(--text2)}
+.tip code{color:var(--accent);font-family:monospace}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+/* Results */
+.results-list{display:flex;flex-direction:column;gap:.6rem;animation:fadeIn .3s ease}
+.result-card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1rem 1.25rem;cursor:pointer;transition:all .2s;backdrop-filter:blur(10px);display:flex;gap:1rem;align-items:flex-start}
+.result-card:hover{border-color:var(--accent);background:rgba(59,130,246,.05);transform:translateX(3px)}
+.result-card.active{border-color:var(--accent);background:rgba(59,130,246,.08)}
+.file-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;font-weight:700;font-size:.7rem;letter-spacing:.02em}
+.icon-pdf{background:rgba(248,81,73,.15);color:#f85149}
+.icon-docx{background:rgba(59,130,246,.15);color:#3b82f6}
+.icon-xlsx{background:rgba(63,185,80,.15);color:#3fb950}
+.icon-txt{background:rgba(139,148,158,.15);color:#8b949e}
+.icon-folder{background:rgba(210,153,34,.15);color:#d29922}
+.icon-other{background:rgba(139,92,246,.15);color:#8b5cf6}
+.result-body{flex:1;min-width:0}
+.result-name{font-size:.95rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.2rem}
+.result-path{font-size:.72rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.4rem;font-family:monospace}
+.result-snippet{font-size:.8rem;color:var(--text2);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.result-snippet b{color:var(--yellow);font-weight:600;background:rgba(210,153,34,.1);padding:0 2px;border-radius:2px}
+.result-actions{display:flex;gap:.4rem;flex-shrink:0;opacity:0;transition:opacity .2s}
+.result-card:hover .result-actions{opacity:1}
+.btn-sm{padding:.35rem .7rem;border-radius:8px;font-size:.72rem;font-weight:500;border:1px solid var(--border);background:var(--glass);color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-sm:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+/* Detail Panel - Drawer desde la derecha */
+.detail-panel{
+  position:fixed;top:0;right:-480px;width:460px;height:100vh;
+  background:var(--bg2);border-left:1px solid var(--border);
+  z-index:200;overflow-y:auto;overflow-x:hidden;
+  transition:right .3s cubic-bezier(.4,0,.2,1);
+  box-shadow:-8px 0 40px rgba(0,0,0,.5);
+  display:flex;flex-direction:column;
+}
+.detail-panel.open{right:0}
+/* Overlay */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199;backdrop-filter:blur(2px)}
+.overlay.visible{display:block}
+.detail-header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.detail-title{font-size:.95rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:.5rem}
+.detail-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:1.2rem;padding:.25rem;border-radius:6px;transition:all .15s;line-height:1}
+.detail-close:hover{background:var(--red);color:#fff}
+.detail-body{padding:1.25rem 1.5rem;flex:1}
+.detail-icon-big{width:60px;height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:700;margin:0 auto 1.25rem}
+.detail-path{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;font-size:.75rem;color:var(--text2);font-family:monospace;word-break:break-all;margin-bottom:1rem;line-height:1.5}
+.detail-actions{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.25rem}
+.btn-action{padding:.65rem 1rem;border-radius:10px;font-size:.82rem;font-weight:500;border:1.5px solid var(--border);background:var(--glass);color:var(--text);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.5rem;width:100%}
+.btn-action:hover{background:var(--accent);border-color:var(--accent);transform:translateY(-1px)}
+.btn-action.secondary:hover{background:var(--accent2);border-color:var(--accent2)}
+.btn-action.success:hover{background:var(--green);border-color:var(--green)}
+.detail-snippet{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:.8rem;color:var(--text2);line-height:1.8}
+.detail-snippet b{color:var(--yellow);font-weight:600}
+.detail-section-label{font-size:.72rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem}
+/* Toast */
+.toast{position:fixed;bottom:2rem;right:5rem;background:var(--bg3);border:1px solid var(--green);border-radius:12px;padding:.75rem 1.25rem;color:var(--text);font-size:.85rem;font-weight:500;display:flex;align-items:center;gap:.5rem;z-index:9999;transform:translateY(100px);transition:transform .3s;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.toast.show{transform:translateY(0)}
+/* Install Banner */
+.install-banner{background:linear-gradient(90deg,rgba(139,92,246,.15),rgba(59,130,246,.15));border:1px solid var(--accent2);border-radius:12px;padding:.9rem 1.25rem;display:flex;align-items:center;gap:1rem;margin-bottom:1rem;animation:fadeIn .4s ease}
+.install-banner-icon{font-size:1.5rem;flex-shrink:0}
+.install-banner-text{flex:1}
+.install-banner-text strong{color:var(--text);font-size:.88rem;display:block;margin-bottom:.2rem}
+.install-banner-text span{color:var(--text2);font-size:.78rem}
+.install-banner-actions{display:flex;gap:.5rem;flex-shrink:0}
+.btn-install{padding:.5rem 1rem;border-radius:8px;font-size:.8rem;font-weight:600;border:none;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;cursor:pointer;text-decoration:none;transition:all .2s}
+.btn-install:hover{opacity:.85;transform:translateY(-1px)}
+.btn-dismiss{padding:.5rem .75rem;border-radius:8px;font-size:.8rem;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer}
+.btn-dismiss:hover{background:var(--glass)}
+/* Protocol indicator */
+.proto-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;padding:.2rem .5rem;border-radius:6px;font-weight:500}
+.proto-ok{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+.proto-no{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+/* Responsive */
+@media(max-width:700px){
+  .detail-panel{width:100vw;right:-100vw}
+  .stats-badge{display:none}
+  .logo-text{display:none}
+}
+</style>
+</head>
+<body><div class="overlay" id="overlay"></div>
+
+<div class="header">
+  <div class="header-inner">
+    <a class="logo" href="/">
+      <div class="logo-icon">🔍</div>
+      <span class="logo-text">BusquedaCarpetas</span>
+    </a>
+    <div class="search-wrap">
+      <input class="search-box" id="searchInput" type="text"
+        placeholder='Busca documentos... Ej: "contrato 2024" o -excluir +obligatorio'
+        autocomplete="off" spellcheck="false">
+      <span class="search-icon" id="searchIcon">⎕</span>
+      <div class="search-spinner" id="spinner"></div>
+    </div>
+    <div class="stats-badge" id="statsBadge" title="Documentos indexados">
+      📦 <span id="totalDocs">–</span> docs · <span id="lastUpdate">–</span>
+    </div>
+    <a href="/download/instalar_cliente.bat" class="btn-sm" style="text-decoration:none; display:flex; align-items:center; gap:5px; background:var(--glass)" title="Instalar acceso directo para abrir archivos">
+      🔌 Configurar
+    </a>
+  </div>
+</div>
+
+<div class="filters">
+  <div class="filters-inner">
+    <span class="filter-label">Campo:</span>
+    <div class="filter-group" id="fieldGroup">
+      <button class="chip active" data-field="content">Contenido</button>
+      <button class="chip" data-field="path">Nombre</button>
+    </div>
+    <span class="filter-label" style="margin-left:.5rem">Tipo:</span>
+    <div class="filter-group" id="extGroup">
+      <button class="chip active" data-ext="all">Todos</button>
+      <button class="chip ext-pdf" data-ext="pdf">PDF</button>
+      <button class="chip ext-docx" data-ext="docx">DOCX</button>
+      <button class="chip ext-xlsx" data-ext="xlsx">XLSX</button>
+      <button class="chip ext-txt" data-ext="txt">TXT</button>
+    </div>
+    <span class="result-count" id="resultCount"></span>
+  </div>
+</div>
+
+<div class="main" id="mainLayout">
+  <div id="installBanner" style="display:none">
+    <div class="install-banner">
+      <div class="install-banner-icon">🔌</div>
+      <div class="install-banner-text">
+        <strong>Instala el acceso directo para abrir archivos con un clic</strong>
+        <span>Descarga e instala el manejador de protocolo. Solo necesitas hacerlo una vez en este equipo.</span>
+      </div>
+      <div class="install-banner-actions">
+        <a class="btn-install" href="/download/instalar_cliente.bat" download>⬇️ Instalar (5 seg)</a>
+        <button class="btn-dismiss" id="btnDismiss">✕</button>
+      </div>
+    </div>
+  </div>
+  <div id="contentArea">
+    <div class="welcome" id="welcomeMsg">
+      <h2>Busca en tus documentos</h2>
+      <p>Accede al contenido de miles de archivos PDF, Word, Excel y más desde cualquier equipo de la red.</p>
+      <div class="welcome-tips">
+        <div class="tip"><code>"frase exacta"</code> búsqueda exacta</div>
+        <div class="tip"><code>+obligatorio</code> debe incluir</div>
+        <div class="tip"><code>-excluir</code> debe excluir</div>
+        <div class="tip"><code>término*</code> prefijo</div>
+      </div>
+    </div>
+    <div class="results-list" id="resultsList" style="display:none"></div>
+    <div style="text-align:center; padding: 2rem; color: var(--text2); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 2rem;">
+      BusquedaCarpetas V7 'Purgatorio' • <a href="/download/instalar_cliente.bat" style="color:var(--accent); text-decoration:none;">Descargar instalador de acceso directo</a>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Drawer -->
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-header">
+    <div class="detail-title" id="detailTitle">–</div>
+    <button class="detail-close" id="detailClose">✕</button>
+  </div>
+  <div class="detail-body">
+    <div class="detail-icon-big" id="detailIcon"></div>
+    <div class="detail-section-label">Ruta del archivo</div>
+    <div class="detail-path" id="detailPath"></div>
+    <div class="detail-actions">
+      <button class="btn-action" id="btnOpenFile">📄 Abrir archivo</button>
+      <button class="btn-action secondary" id="btnOpenFolder">📂 Abrir carpeta contenedora</button>
+      <button class="btn-action" id="btnCopyPath">📋 Copiar ruta completa</button>
+      <button class="btn-action success" id="btnDownload">⬇️ Descargar archivo</button>
+    </div>
+    <div id="snippetSection" style="display:none">
+      <div class="detail-section-label">Fragmento encontrado</div>
+      <div class="detail-snippet" id="detailSnippet"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let debounceTimer, activeExt = 'all', activeField = 'content', activeCard = null;
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const protocolInstalled = localStorage.getItem('busqueda_protocol') === 'ok';
+
+// ─── Install Banner ───────────────────────────────────────────────────────────
+if (!isLocalhost && !protocolInstalled) {
+  $('installBanner').style.display = '';
+}
+$('btnDismiss') && ($('btnDismiss').onclick = () => {
+  $('installBanner').style.display = 'none';
+  // No lo guardamos para que vuelva a aparecer si recargan
+});
+
+// ─── Stats ───────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    $('totalDocs').textContent = (d.total_files || 0).toLocaleString('es-CO');
+    $('lastUpdate').textContent = d.last_update || '–';
+  } catch(e) {}
+}
+loadStats();
+
+// ─── Filters ─────────────────────────────────────────────────────────────────
+$('fieldGroup').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  $('fieldGroup').querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  activeField = chip.dataset.field;
+  doSearch();
+});
+
+$('extGroup').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  $('extGroup').querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  activeExt = chip.dataset.ext;
+  doSearch();
+});
+
+// ─── Search ──────────────────────────────────────────────────────────────────
+$('searchInput').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(doSearch, 320);
+});
+
+$('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { $('searchInput').value = ''; doSearch(); }
+});
+
+async function doSearch() {
+  const q = $('searchInput').value.trim();
+  if (!q || q.length < 2) {
+    $('welcomeMsg').style.display = '';
+    $('resultsList').style.display = 'none';
+    $('resultCount').textContent = '';
+    hideDetail();
+    return;
+  }
+
+  $('spinner').classList.add('active');
+  $('searchIcon').style.display = 'none';
+
+  try {
+    const url = `/api/search?q=${encodeURIComponent(q)}&ext=${activeExt}&field=${activeField}&limit=200`;
+    const r = await fetch(url);
+    const data = await r.json();
+    renderResults(data);
+  } catch(e) {
+    $('resultCount').textContent = 'Error de conexión';
+  } finally {
+    $('spinner').classList.remove('active');
+    $('searchIcon').style.display = '';
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function getIcon(ext, isFolder) {
+  if (isFolder) return { cls:'icon-folder', label:'📁' };
+  const map = { pdf:{cls:'icon-pdf',label:'PDF'}, docx:{cls:'icon-docx',label:'DOC'},
+    doc:{cls:'icon-docx',label:'DOC'}, xlsx:{cls:'icon-xlsx',label:'XLS'},
+    xls:{cls:'icon-xlsx',label:'XLS'}, txt:{cls:'icon-txt',label:'TXT'},
+    csv:{cls:'icon-txt',label:'CSV'}, py:{cls:'icon-other',label:'PY'},
+    sql:{cls:'icon-other',label:'SQL'} };
+  return map[ext] || {cls:'icon-other', label:(ext||'?').toUpperCase().slice(0,3)};
+}
+
+function renderResults(data) {
+  const list = $('resultsList');
+  $('welcomeMsg').style.display = 'none';
+  list.innerHTML = '';
+
+  const total = data.count || 0;
+  const showing = data.showing || 0;
+  $('resultCount').innerHTML = total > showing
+    ? `Mostrando <strong>${showing}</strong> de <strong>${total.toLocaleString('es-CO')}</strong> resultados`
+    : `<strong>${total.toLocaleString('es-CO')}</strong> resultado${total !== 1 ? 's' : ''}`;
+
+  if (!data.results || data.results.length === 0) {
+    list.innerHTML = `<div class="welcome"><h2 style="font-size:1.3rem">Sin resultados</h2>
+      <p>No se encontraron documentos para "<em>${data.query || ''}</em>"</p></div>`;
+    list.style.display = 'flex';
+    return;
+  }
+
+  data.results.forEach(item => {
+    const icon = getIcon(item.ext, item.is_folder);
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.innerHTML = `
+      <div class="file-icon ${icon.cls}">${icon.label}</div>
+      <div class="result-body">
+        <div class="result-name">${escHtml(item.name)}</div>
+        <div class="result-path">${escHtml(item.path)}</div>
+        ${item.snippet ? `<div class="result-snippet">${item.snippet}</div>` : ''}
+      </div>
+      <div class="result-actions">
+        <button class="btn-sm" data-action="copy" title="Copiar ruta">📋</button>
+        <button class="btn-sm" data-action="folder" title="Abrir carpeta">📂</button>
+      </div>`;
+
+    card.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (btn) {
+        e.stopPropagation();
+        if (btn.dataset.action === 'copy') copyToClipboard(item.path);
+        if (btn.dataset.action === 'folder') openFolder(item.path);
+        return;
+      }
+      showDetail(item, card);
+    });
+    list.appendChild(card);
+  });
+
+  list.style.display = 'flex';
+}
+
+// ─── Detail Panel ────────────────────────────────────────────────────────────
+function showDetail(item, cardEl) {
+  if (activeCard) activeCard.classList.remove('active');
+  activeCard = cardEl;
+  cardEl.classList.add('active');
+
+  const icon = getIcon(item.ext, item.is_folder);
+  $('detailIcon').className = `detail-icon-big ${icon.cls}`;
+  $('detailIcon').textContent = icon.label;
+  $('detailTitle').textContent = item.name;
+  $('detailPath').textContent = item.path;
+
+  if (item.snippet) {
+    $('snippetSection').style.display = '';
+    $('detailSnippet').innerHTML = item.snippet;
+  } else {
+    $('snippetSection').style.display = 'none';
+  }
+
+  $('btnCopyPath').onclick = () => copyToClipboard(item.path);
+  $('btnOpenFolder').onclick = () => openWithProtocol('folder', item.path);
+  $('btnOpenFile').style.display = item.is_folder ? 'none' : '';
+  $('btnOpenFile').onclick = () => openWithProtocol('open', item.path);
+  $('btnDownload').style.display = item.is_folder ? 'none' : '';
+  $('btnDownload').onclick = () => window.open(`/api/download?path=${encodeURIComponent(item.path)}`);
+
+  $('detailPanel').classList.add('open');
+  $('overlay').classList.add('visible');
+}
+
+function hideDetail() {
+  $('detailPanel').classList.remove('open');
+  $('overlay').classList.remove('visible');
+  if (activeCard) { activeCard.classList.remove('active'); activeCard = null; }
+}
+
+$('detailClose').onclick = hideDetail;
+$('overlay').onclick = hideDetail;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideDetail(); });
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('✅ Ruta copiada al portapapeles'));
+}
+
+function openWithProtocol(mode, path) {
+  if (isLocalhost) {
+    // En el servidor: usar API directa
+    fetch('/api/open-folder', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path})
+    }).then(r => r.json()).then(d => {
+      if (d.ok) showToast('📂 Abierto en el servidor');
+      else showToast('⚠️ No se pudo abrir: ' + (d.error || ''));
+    });
+  } else {
+    // En clientes remotos: usar protocolo busqueda://
+    const encoded = encodeURIComponent(path);
+    const protoUrl = `busqueda://${mode}?path=${encoded}`;
+    try {
+      window.location.href = protoUrl;
+      // Marcar protocolo como instalado si funciona
+      setTimeout(() => localStorage.setItem('busqueda_protocol', 'ok'), 500);
+      $('installBanner') && ($('installBanner').style.display = 'none');
+    } catch(e) {
+      showToast('⚠️ Instala el acceso directo primero');
+    }
+  }
+}
+
+async function openFolder(path) {
+  openWithProtocol('folder', path);
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── Utils ───────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Focus search on load
+$('searchInput').focus();
+</script>
+</body>
+</html>

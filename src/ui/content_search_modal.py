@@ -43,6 +43,15 @@ class ContentSearchModal:
         self.common_base_var = tk.StringVar(value="")
         self.preview_window = None  # Ventana para Quick Look
         self.preview_text_widget = None # Referencia al widget de texto
+        
+        # Filtros por extensión (V.10.0)
+        self.search_filter_ext = tk.StringVar(value="all")
+        self.filter_buttons = {} # Guardar referencias para cambiar estilos
+        
+        # Referencias a entries para foco global
+        self.search_entry_content = None
+        self.search_entry_files = None
+        
         self._update_status_from_locs()
     
     def _update_status_from_locs(self):
@@ -129,17 +138,29 @@ class ContentSearchModal:
         self.notebook = ttk.Notebook(self.modal)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=(10, 0))
         
-        self.tab_search = tk.Frame(self.notebook)
-        self.notebook.add(self.tab_search, text="  🔍 Buscar Texto  ")
-        self.results_tree = self._setup_search_view(self.tab_search, "content")
+        # TAB 1: Buscar Texto
+        try:
+            self.tab_search = tk.Frame(self.notebook)
+            self.notebook.add(self.tab_search, text="  🔍 Buscar Texto  ")
+            self.results_tree = self._setup_search_view(self.tab_search, "content")
+        except Exception as e:
+            print(f"Error creando pestaña búsqueda texto: {e}")
+            
+        # TAB 2: Buscar Archivos
+        try:
+            self.tab_files = tk.Frame(self.notebook)
+            self.notebook.add(self.tab_files, text="  📂 Buscar Archivos  ")
+            self.files_results_tree = self._setup_search_view(self.tab_files, "path")
+        except Exception as e:
+            print(f"Error creando pestaña búsqueda archivos: {e}")
         
-        self.tab_files = tk.Frame(self.notebook)
-        self.notebook.add(self.tab_files, text="  📂 Buscar Archivos  ")
-        self.files_results_tree = self._setup_search_view(self.tab_files, "path")
-        
-        self.tab_config = tk.Frame(self.notebook)
-        self.notebook.add(self.tab_config, text="  ⚙️ Configuración e Índice  ")
-        self._create_config_tab()
+        # TAB 3: Configuración
+        try:
+            self.tab_config = tk.Frame(self.notebook)
+            self.notebook.add(self.tab_config, text="  ⚙️ Configuración e Índice  ")
+            self._create_config_tab()
+        except Exception as e:
+            print(f"Error creando pestaña config: {e}")
 
         self.status_bar_frame = tk.Frame(self.modal, height=35, relief='flat')
         self.status_bar_frame.pack(side='bottom', fill='x')
@@ -150,8 +171,27 @@ class ContentSearchModal:
 
     def _setup_search_view(self, container, search_type):
         """Crea una vista de búsqueda reutilizable para cualquier tipo de campo"""
+        # --- 1. Crear el contenedor de resultados PRIMERO ---
+        res_cnt = tk.Frame(container, padx=20)
+        res_cnt.pack(side='bottom', fill='both', expand=True, pady=(0, 20))
+        
+        tree = ttk.Treeview(res_cnt, columns=("file", "path"), show="headings", style="Treeview")
+        tree.heading("file", text="Archivo", anchor='w')
+        tree.heading("path", text="Ubicación Relativa", anchor='w')
+        tree.column("file", width=250, stretch=False)
+        tree.column("path", width=500, stretch=False)
+        
+        v_scroll = ttk.Scrollbar(res_cnt, orient="vertical", command=tree.yview)
+        h_scroll = ttk.Scrollbar(container, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+        
+        tree.pack(side='left', fill='both', expand=True)
+        v_scroll.pack(side='right', fill='y')
+        h_scroll.pack(side='bottom', fill='x', padx=20)
+
+        # --- 2. Crear el encabezado ---
         header = tk.Frame(container, padx=20, pady=20)
-        header.pack(fill='x')
+        header.pack(side='top', fill='x')
         
         label_text = "Buscar texto en los archivos:" if search_type == "content" else "Buscar entre los nombres de archivos:"
         tk.Label(header, text=label_text, font=("Segoe UI", 10)).pack(anchor='w')
@@ -173,6 +213,12 @@ class ContentSearchModal:
         entry = tk.Entry(entry_cnt, textvariable=query_var, font=("Segoe UI", 11), relief='solid', bd=1)
         entry.pack(side='left', fill='x', expand=True, ipady=8, padx=(0, 10))
         
+        # Guardar referencia para foco global (V.10.0)
+        if search_type == "content":
+            self.search_entry_content = entry
+        else:
+            self.search_entry_files = entry
+        
         # Helper para disparar la búsqueda
         def trigger_search(): self._do_search(query_var.get(), search_type, tree)
 
@@ -185,22 +231,30 @@ class ContentSearchModal:
         btn_clear = tk.Button(entry_cnt, text="🧹 Limpiar", command=lambda: [query_var.set(""), tree.delete(*tree.get_children())], font=("Segoe UI", 9), relief='flat', padx=12, pady=8, cursor="hand2")
         btn_clear.pack(side='left')
 
-        res_cnt = tk.Frame(container, padx=20)
-        res_cnt.pack(fill='both', expand=True)
-        
-        tree = ttk.Treeview(res_cnt, columns=("file", "path"), show="headings", style="Treeview")
-        tree.heading("file", text="Archivo", anchor='w')
-        tree.heading("path", text="Ubicación Relativa", anchor='w')
-        tree.column("file", width=250, stretch=False)
-        tree.column("path", width=500, stretch=False)
-        
-        v_scroll = ttk.Scrollbar(res_cnt, orient="vertical", command=tree.yview)
-        h_scroll = ttk.Scrollbar(container, orient="horizontal", command=tree.xview)
-        tree.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
-        
-        tree.pack(side='left', fill='both', expand=True)
-        v_scroll.pack(side='right', fill='y')
-        h_scroll.pack(fill='x', padx=20)
+        # --- FILTROS POR EXTENSIÓN (Chips V.10.0) ---
+        if search_type == "content":
+            filter_frame = tk.Frame(header)
+            filter_frame.pack(fill='x', pady=(10, 0))
+            
+            tk.Label(filter_frame, text="Filtrar por:", font=("Segoe UI", 8, "bold"), fg="#888888").pack(side='left', padx=(0, 10))
+            
+            extensions = [
+                ("Todos", "all"),
+                ("PDF", ".pdf"),
+                ("Word", ".docx"),
+                ("Excel", ".xlsx")
+            ]
+            
+            for label, ext in extensions:
+                btn = tk.Button(filter_frame, text=label, 
+                              command=lambda e=ext, t=tree, v=query_var, s=search_type: self._set_filter(e, t, v, s),
+                              font=("Segoe UI", 8), relief='flat', padx=10, pady=2, cursor="hand2")
+                btn.pack(side='left', padx=2)
+                self.filter_buttons[ext] = btn
+            
+            self._update_filter_ui_styles()
+
+        # (TreeView ya creado arriba)
         
         tree.bind("<Button-3>", lambda e: self._show_results_context_menu(e, tree))
         tree.bind("<Button-2>", lambda e: self._show_results_context_menu(e, tree))
@@ -517,7 +571,20 @@ class ContentSearchModal:
         self.modal.configure(bg=c["bg"])
         style = ttk.Style()
         style.configure("TNotebook", background=c["bg"], borderwidth=0)
+        style.configure("TNotebook.Tab", 
+                        background=c.get("bg_alt", "#252526"), 
+                        foreground=c.get("fg", "#ffffff"),
+                        padding=[15, 5],
+                        font=("Segoe UI", 9))
+        style.map("TNotebook.Tab",
+                  background=[("selected", c.get("accent_primary", "#3498db"))],
+                  foreground=[("selected", "#ffffff")])
+        
         self._colorear_recursivo(self.modal, c)
+        
+        # Actualizar estilos de los filtros (V.10.0)
+        self._update_filter_ui_styles()
+        
         if hasattr(self, 'status_bar_frame'):
             self.status_bar_frame.configure(bg=c.get("status_bg", "#007acc"))
             self.lbl_status_bar.configure(bg=c.get("status_bg", "#007acc"), fg=c.get("status_fg", "#ffffff"))
@@ -529,9 +596,11 @@ class ContentSearchModal:
                 btn_go.configure(bg=c.get("accent_primary", "#3498db"), fg="white")
                 btn_clear.configure(bg=c.get("button_bg", "#e0e0e0"), fg=c.get("button_fg", "#000000"))
         
-        self.btn_clear_index.configure(bg="#e74c3c", fg="white")
+        if hasattr(self, 'btn_clear_index'):
+            self.btn_clear_index.configure(bg="#e74c3c", fg="white")
         
-        if not self.is_indexing: self.btn_index.configure(bg=c.get("success", "#10b981"), fg="white")
+        if hasattr(self, 'btn_index') and not self.is_indexing: 
+            self.btn_index.configure(bg=c.get("success", "#10b981"), fg="white")
         
         if self.results_tree: tm._apply_theme_to_tree(self.results_tree, "ResultsContent", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
         if self.files_results_tree: tm._apply_theme_to_tree(self.files_results_tree, "ResultsFiles", {'fg': c["tree_fg"], 'bg': c["tree_bg"]})
@@ -591,17 +660,55 @@ class ContentSearchModal:
             self._populate_config_tree()
             self._update_status_from_locs()
 
-
-    def _do_search(self, query, search_field, tree):
-        query = query.strip()
+    def _do_search(self, query, search_type, tree):
         if not query: return
+        
+        # Limpiar resultados anteriores
         tree.delete(*tree.get_children())
+        
         def run():
             try:
-                results = self.indexer.search(query, search_field=search_field)
+                start = time.time()
+                # Pasar el filtro de extensión (V.10.0)
+                ext_filter = self.search_filter_ext.get()
+                results = self.indexer.search(query, search_field=search_type, extension=ext_filter)
+                
+                # Usar after para actualizar UI (Corregido: _display_results V.10.2)
                 self.modal.after(0, lambda: self._display_results(results, tree))
-            except Exception as e: print(e)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self.modal.after(0, lambda: messagebox.showerror("Error", f"Error en búsqueda: {e}"))
+                
         threading.Thread(target=run, daemon=True).start()
+
+    def _set_filter(self, ext, tree, query_var, search_type):
+        """Establece el filtro y dispara la búsqueda si hay algo escrito"""
+        self.search_filter_ext.set(ext)
+        self._update_filter_ui_styles()
+        
+        query = query_var.get()
+        if query:
+            self._do_search(query, search_type, tree)
+
+    def _update_filter_ui_styles(self):
+        """Actualiza el estilo visual de los botones de filtro"""
+        if not hasattr(self.app, 'theme_manager'): return
+        tm = self.app.theme_manager
+        # Usar .colores que es el atributo real en ThemeManager
+        c = tm.colores if hasattr(tm, 'colores') else tm.TEMAS.get(tm.tema_actual, tm.TEMAS["claro"])
+        
+        active_ext = self.search_filter_ext.get()
+        
+        for ext, btn in self.filter_buttons.items():
+            try:
+                if ext == active_ext:
+                    # Usar accent o accent_primary según disponibilidad
+                    bg_color = c.get("accent", c.get("accent_primary", "#0078d7"))
+                    btn.configure(bg=bg_color, fg="#ffffff")
+                else:
+                    btn.configure(bg=c.get("button_bg", "#f0f0f0"), fg=c.get("button_fg", "#000000"))
+            except: pass
 
     def _display_results(self, results, tree):
         if not results:

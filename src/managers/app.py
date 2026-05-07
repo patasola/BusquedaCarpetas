@@ -160,6 +160,7 @@ class BusquedaCarpetaApp:
         """Paso 3: Configuración de managers y atajos"""
         self._configure_app()
         self.create_global_shortcuts_bar()
+        self.keyboard_manager.setup_global_hotkey() # NUEVO Atajo Global V.10.0
         self._start_location_rotation()
         # 4. Siguiente paso: Cargas pesadas de cache en background
         self.master.after(100, self._deferred_step_background_loads)

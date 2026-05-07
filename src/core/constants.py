@@ -1,7 +1,7 @@
-# src/core/constants.py - Constantes V.6.0 (Empíreo)
+# src/core/constants.py - Constantes V7 (Purgatorio)
 
 # Información de la aplicación
-APP_VERSION = "V. 6.2 - Empíreo Sincro"
+APP_VERSION = "V7 - Purgatorio"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana
@@ -28,6 +28,8 @@ RESULT_UPDATE_INTERVAL = 5      # Cada 5%
 
 # NOTA: Colores ahora se obtienen desde theme_manager.py
 # La clase Colors fue eliminada para evitar duplicación
+# Cita de Dante (Purgatorio)
+# "Per correr miglior acque alza le vele." — Dante Alighieri, Purgatorio (Canto I)
 
 class Fonts:
     BUTTONS = ("Segoe UI", 9)

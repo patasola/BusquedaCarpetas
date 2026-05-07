@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Usuario - BusquedaCarpetas V7 'Purgatorio'</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #3b82f6;
+    --secondary: #8b5cf6;
+    --bg: #ffffff;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+    color: var(--text);
+    background: #f3f4f6;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 850px;
+    margin: 0 auto;
+    background: var(--bg);
+    padding: 60px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    border-radius: 12px;
+  }
+  header {
+    text-align: center;
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 30px;
+    margin-bottom: 40px;
+  }
+  h1 { font-size: 2.5rem; color: var(--primary); margin-bottom: 10px; }
+  .subtitle { font-size: 1.2rem; color: var(--text-light); }
+  
+  h2 { font-size: 1.5rem; margin-top: 40px; margin-bottom: 20px; color: var(--text); border-left: 5px solid var(--secondary); padding-left: 15px; }
+  p { margin-bottom: 15px; text-align: justify; }
+  
+  .step { margin-bottom: 40px; }
+  .step-img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin: 20px 0;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+  }
+  
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: var(--primary);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  
+  .tip {
+    background: #eff6ff;
+    border-left: 4px solid var(--primary);
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  
+  .key {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .container { box-shadow: none; width: 100%; max-width: 100%; padding: 40px; }
+    .no-print { display: none; }
+  }
+  
+  .footer {
+    margin-top: 60px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-light);
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>BusquedaCarpetas V7</h1>
+    <p class="subtitle">Guía de acceso y uso (Edición Purgatorio)</p>
+  </header>
+
+  <div class="no-print" style="background: #fffbeb; border: 1px solid #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
+    <strong>💡 Consejo:</strong> Para convertir esta guía en PDF, presiona <span class="key">Ctrl + P</span> y selecciona "Guardar como PDF".
+  </div>
+
+  <section class="step">
+    <span class="badge">Paso 1</span>
+    <h2>Acceso al Sistema</h2>
+    <p>Abre tu navegador (Chrome, Edge o Firefox) e ingresa la siguiente dirección en la barra de búsqueda:</p>
+    <div style="background: #1f2937; color: #fff; padding: 15px; border-radius: 8px; text-align: center; font-size: 1.2rem; font-family: monospace; margin: 15px 0;">
+      http://172.30.213.219:8080
+    </div>
+    <p>Verás una interfaz moderna con un buscador central. El sistema ya ha indexado miles de documentos para que encuentres lo que necesitas en segundos.</p>
+    <img src="step1.png" class="step-img" alt="Pantalla de inicio">
+  </section>
+
+  <section class="step">
+    <span class="badge">Paso 2</span>
+    <h2>Configuración de un solo clic</h2>
+    <p>Para poder abrir carpetas y archivos directamente desde la web (sin tener que buscarlos manualmente en tu PC), debes instalar un pequeño acceso directo.</p>
+    <ol style="margin-left: 20px; margin-bottom: 15px;">
+      <li>Busca el banner azul que dice <strong>"Instala el acceso directo"</strong> o haz clic en el botón 🔌 <strong>Configurar</strong> arriba a la derecha.</li>
+      <li>Se descargará un archivo llamado <span class="key">instalar_cliente.bat</span>.</li>
+      <li>Haz doble clic en él y presiona cualquier tecla cuando te lo pida.</li>
+    </ol>
+    <img src="step2.png" class="step-img" alt="Instalación del cliente">
+    <div class="tip">
+      <strong>Nota importante:</strong> Solo necesitas hacer esto una vez por computadora. Este paso permite que el navegador se comunique con tu explorador de archivos local.
+    </div>
+  </section>
+
+  <section class="step">
+    <span class="badge">Paso 3</span>
+    <h2>Búsqueda Inteligente</h2>
+    <p>Escribe cualquier palabra o frase en el buscador. El sistema es "insensible a acentos", por lo que buscar <span class="key">anotación</span> o <span class="key">anotacion</span> dará los mismos resultados.</p>
+    <ul style="margin-left: 20px; margin-bottom: 15px;">
+      <li><strong>Filtros:</strong> Puedes filtrar por tipo de archivo (PDF, Word, Excel) usando los botones debajo del buscador.</li>
+      <li><strong>Fragmentos:</strong> Verás un pequeño texto debajo de cada resultado indicando dónde se encontró la palabra buscada.</li>
+    </ul>
+  </section>
+
+  <section class="step">
+    <span class="badge">Paso 4</span>
+    <h2>Interacción con Resultados</h2>
+    <p>Al hacer clic en un resultado, se abrirá un panel lateral derecho con toda la información y acciones disponibles:</p>
+    <img src="step3.png" class="step-img" alt="Panel de detalle">
+    <ul style="margin-left: 20px;">
+      <li><strong>📄 Abrir archivo:</strong> Abre el documento directamente con el programa que tengas instalado (Word, PDF Reader, etc.).</li>
+      <li><strong>📂 Abrir carpeta:</strong> Abre el Explorador de Windows justo en la ubicación donde está el archivo.</li>
+      <li><strong>📋 Copiar ruta:</strong> Copia la dirección completa para pegarla en correos o chats.</li>
+      <li><strong>⬇️ Descargar:</strong> Si estás trabajando fuera de la red local, puedes descargar el archivo vía web.</li>
+    </ul>
+  </section>
+
+  <div class="footer">
+    Sistema de Búsqueda de Carpetas V7 'Purgatorio' • Servidor: Elkin PC • 2026
+  </div>
+</div>
+
+</body>
+</html>

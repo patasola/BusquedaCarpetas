@@ -24,6 +24,8 @@ def build(with_console=False):
         "--onefile",
         f"--name={app_name}",
         "--add-data=src;src",
+        "--add-data=README.md;.",
+        "--add-data=CHANGELOG.md;.",
         "--clean",
         main_script
     ]
