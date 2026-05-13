@@ -1,7 +1,7 @@
 # src/core/constants.py - Constantes V7 (Purgatorio)
 
 # Información de la aplicación
-APP_VERSION = "V7 - Purgatorio"
+APP_VERSION = "V7.6 - Total Control (Web Integrated)"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana

@@ -311,8 +311,6 @@ class UIComponents:
         )
         btn_abrir.pack(side=tk.LEFT)
         
-        btn_abrir.pack(side=tk.LEFT)
-        
         # --- MEJORA VISUAL DE NAVEGACIÓN (TAB) ---
         # Usamos highlightthickness=1 para que se vea el foco nativo (anillo punteado o borde)
         # sin cambiar colores, respetando la preferencia "normal" del usuario.
@@ -361,6 +359,20 @@ class UIComponents:
         )
         label_version.pack(side=tk.RIGHT)
         
+        label_web_status = tk.Label(
+            status_frame,
+            text="🌐 Off",
+            font=Fonts.NORMAL,
+            bg=Colors.STATUS_BAR_BG,
+            fg="#999999",
+            padx=10,
+            cursor="hand2"
+        )
+        label_web_status.pack(side=tk.RIGHT)
+        
+        # Guardar referencia para binding posterior
+        self.label_web_status = label_web_status
+        
         return {
             'entry': entry,
             'modo_label': modo_label,
@@ -370,6 +382,7 @@ class UIComponents:
             'btn_copiar': btn_copiar,
             'btn_abrir': btn_abrir,
             'label_estado': label_estado,
+            'label_web_status': label_web_status,
             'label_carpeta_info': label_carpeta_info,
             'configurar_scrollbars': configurar_scrollbars,
             'tooltip': self.tooltip,

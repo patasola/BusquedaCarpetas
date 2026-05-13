@@ -1,3 +1,4 @@
+import tkinter as tk
 from tkinter import Menu, messagebox
 import os
 import sys
@@ -9,6 +10,7 @@ class MenuManager:
         self.app = app
         self.menubar = None
         self.menu_visible = False  # Estado inicial: oculto
+        self.web_active_var = tk.BooleanVar(value=True) # Valor inicial para el checkbutton
 
     def _resource_path(self, relative_path):
         """Obtiene la ruta absoluta de los recursos, compatible con PyInstaller"""
@@ -23,10 +25,11 @@ class MenuManager:
         return os.path.join(base_path, relative_path)
     
     def create_menu_bar(self):
-        """Crea la barra de menú completa - OPTIMIZADA"""
+        """Crea la barra de menú completa - OCULTA POR DEFECTO"""
         self.menubar = Menu(self.app.master)
         # NO configurar menu al inicio para que arranque oculto
         # self.app.master.config(menu=self.menubar)
+        self.menu_visible = False
         
         self._create_archivo_menu(self.menubar)
         self._create_ver_menu(self.menubar)
@@ -61,6 +64,20 @@ class MenuManager:
             underline=13 # Búsqueda por -C-ontenido
         )
         
+        archivo.add_separator()
+        
+        # SUBMENU: Servidor Web
+        self.web_menu = Menu(archivo, tearoff=0)
+        archivo.add_cascade(label="Servidor Web (LAN)", menu=self.web_menu)
+        self.web_menu.add_checkbutton(
+            label="🌐 Servidor Activo", 
+            variable=self.web_active_var,
+            command=self._toggle_web_server
+        )
+        self.web_menu.add_command(label="📝 Ver Log / Consola", command=self._show_web_log)
+        self.web_menu.add_separator()
+        self.web_menu.add_command(label="🌐 Abrir Interfaz Web", command=self._open_web_ui)
+
         archivo.add_separator()
         archivo.add_command(label="Verificar problemas", command=self.app.search_coordinator.verificar_problemas_cache, underline=0)
         archivo.add_separator()
@@ -402,3 +419,69 @@ class MenuManager:
         # Para ocultar, pasamos un menú vacío o None (en Tkinter config(menu='') funciona)
         self.app.master.config(menu='')
         self.menu_visible = False
+
+    def _toggle_web_server(self, event=None):
+        """Alterna el servidor web. Soporta click directo (event) o desde menú"""
+        # Si viene de un evento (click en Label), el checkbutton no se ha enterado, 
+        # así que invertimos manualmente la variable de estado.
+        if event is not None:
+            self.web_active_var.set(not self.web_active_var.get())
+            
+        if self.web_active_var.get():
+            self._start_web_server()
+        else:
+            self._stop_web_server()
+
+    def _start_web_server(self):
+        """Inicia el servidor web en segundo plano"""
+        success, message = self.app.web_server_manager.start_server()
+        if success:
+            self.app.ui_manager.actualizar_estado("🌐 " + message)
+            if hasattr(self.app, 'label_web_status'):
+                self.app.label_web_status.config(text="🌐 On", fg="#2e7d32")
+            self.web_active_var.set(True) # Sincronizar por si se llamó externamente
+        else:
+            self.web_active_var.set(False)
+            messagebox.showerror("Error", message)
+
+    def _stop_web_server(self):
+        """Detiene el servidor web"""
+        success, message = self.app.web_server_manager.stop_server()
+        if success:
+            self.app.ui_manager.actualizar_estado("🛑 " + message)
+            if hasattr(self.app, 'label_web_status'):
+                self.app.label_web_status.config(text="🌐 Off", fg="#999999")
+            self.web_active_var.set(False)
+        else:
+            self.web_active_var.set(True)
+            messagebox.showerror("Error", message)
+
+    def _show_web_log(self):
+        """Busca e invoca la ventana nativa del CMD del servidor"""
+        import ctypes
+        user32 = ctypes.windll.user32
+        
+        # Buscar la ventana por el título único que le pusimos en main.py
+        hwnd = user32.FindWindowW(None, "BusquedaServer_Console_V75_Live")
+        
+        if hwnd:
+            # SW_SHOW = 5, SW_RESTORE = 9
+            user32.ShowWindow(hwnd, 5) 
+            user32.SetForegroundWindow(hwnd)
+        else:
+            # Fallback al archivo de texto si por alguna razón no se encuentra la ventana
+            log_path = os.path.join(os.getcwd(), "app_log_server.txt")
+            if getattr(sys, 'frozen', False):
+                 log_path = os.path.join(os.path.dirname(sys.executable), "app_log_server.txt")
+                 
+            if os.path.exists(log_path):
+                os.startfile(log_path)
+            else:
+                messagebox.showinfo("Servidor Web", "No se encontró la ventana del servidor ni el archivo de log.")
+
+    def _open_web_ui(self):
+        """Abre la interfaz en el navegador"""
+        if not self.app.web_server_manager.open_web_ui():
+            if messagebox.askyesno("Servidor Web", "El servidor no parece estar iniciado. ¿Deseas iniciarlo ahora?"):
+                self._start_web_server()
+                self.app.web_server_manager.open_web_ui()

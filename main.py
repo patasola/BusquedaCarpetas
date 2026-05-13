@@ -46,6 +46,47 @@ def listen_for_wakeup(app):
         print(f"Error en servidor de instancia única: {e}")
 
 def main():
+    # 0. Si se pide modo servidor, arrancar Flask y salir
+    if "--server" in sys.argv:
+        try:
+            # Configurar consola nativa para que pueda ser invocada
+            import ctypes
+            import time
+            kernel32 = ctypes.windll.kernel32
+            user32 = ctypes.windll.user32
+            
+            # Asegurar que tiene consola (importante en modo --noconsole)
+            kernel32.AllocConsole()
+            time.sleep(0.2)
+            
+            # Ponerle un título único para encontrarla luego
+            # Usamos un título muy específico
+            unique_title = "BusquedaServer_Console_V75_Live"
+            kernel32.SetConsoleTitleW(unique_title)
+            time.sleep(0.2)
+            
+            # Ocultarla por defecto
+            hwnd = kernel32.GetConsoleWindow()
+            if hwnd:
+                user32.ShowWindow(hwnd, 0) # SW_HIDE
+            
+            # Redirigir log de servidor si es frozen
+            if getattr(sys, 'frozen', False):
+                log_path = os.path.join(os.path.dirname(sys.executable), "app_log_server.txt")
+                log_file = open(log_path, "w", encoding="utf-8", buffering=1)
+                sys.stdout = log_file
+                sys.stderr = log_file
+                print(f"--- Servidor Web V.7.5 (Consola Nativa) iniciado ---")
+            
+            # Asegurar que el path esté correcto para importar web_server
+            sys.path.append(os.getcwd())
+            from web_server.server import app as flask_app
+            print(f"Iniciando modo servidor Flask en {unique_title}...")
+            flask_app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+        except Exception as e:
+            print(f"Error fatal en modo servidor: {e}")
+        sys.exit(0)
+
     setup_logging()
     
     # 1. Verificar si ya hay una instancia corriendo

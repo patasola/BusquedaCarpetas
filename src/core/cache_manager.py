@@ -106,13 +106,20 @@ class CacheManager:
             print(f"[CACHE] Error guardando cache: {e}")
     
     def invalidar_cache(self):
-        """Invalida el cache actual"""
+        """Invalida el cache actual de forma robusta"""
         self.cache = CacheData()
+        self.cache.valido = False
         if os.path.exists(self.cache_file):
             try:
                 os.remove(self.cache_file)
-            except:
-                pass
+                print(f"[CACHE] Archivo eliminado: {self.cache_file}")
+            except Exception as e:
+                print(f"[CACHE] No se pudo borrar {self.cache_file} (posible bloqueo), intentando sobreescribir: {e}")
+                # Si no se puede borrar (bloqueado), intentamos vaciarlo
+                try:
+                    self.guardar_cache()
+                except Exception as e2:
+                    print(f"[CACHE] Error crítico invalidando caché: {e2}")
     
     def construir_cache(self):
         """Construye el cache usando scandir recursivo (ULTRA RÁPIDO)"""

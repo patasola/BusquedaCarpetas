@@ -129,26 +129,38 @@ class ContentIndexer:
         try:
             with self.db_lock:
                 conn = sqlite3.connect(self.db_path)
+                # Crear función personalizada en SQLite para extraer solo el nombre del archivo
+                conn.create_function("basename", 1, os.path.basename)
                 cursor = conn.cursor()
                 if search_field == "path":
-                    # Búsqueda LITERAL en la columna de ruta/nombre
-                    sql = "SELECT path, content FROM content_fts WHERE path LIKE ? "
+                    # Búsqueda LITERAL enfocada ÚNICAMENTE en el nombre del archivo
+                    sql = """
+                        SELECT f.path, f.content, m.mtime 
+                        FROM content_fts f
+                        LEFT JOIN file_metadata m ON f.path = m.path
+                        WHERE basename(f.path) LIKE ? 
+                    """
                     params = [f"%{query}%"]
                     if extension and extension != "all":
-                        sql += " AND path LIKE ?"
+                        sql += " AND f.path LIKE ?"
                         params.append(f"%{extension}")
-                    sql += " ORDER BY path ASC LIMIT 10000"
+                    sql += " ORDER BY f.path ASC LIMIT 10000"
                     cursor.execute(sql, params)
                 else:
                     # Búsqueda AVANZADA por CONTENIDO
                     advanced_query = self._parse_advanced_query(query)
                     final_match = f"content:({advanced_query})"
                     
-                    sql = "SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) FROM content_fts WHERE content_fts MATCH ?"
+                    sql = """
+                        SELECT f.path, snippet(content_fts, 1, '<b>', '</b>', '...', 64), m.mtime 
+                        FROM content_fts f
+                        LEFT JOIN file_metadata m ON f.path = m.path
+                        WHERE f.content_fts MATCH ?
+                    """
                     params = [final_match]
                     
                     if extension and extension != "all":
-                        sql += " AND path LIKE ?"
+                        sql += " AND f.path LIKE ?"
                         params.append(f"%{extension}")
                     
                     sql += " ORDER BY rank LIMIT 10000"
@@ -158,28 +170,33 @@ class ContentIndexer:
                     except sqlite3.OperationalError:
                         # Fallback a búsqueda simple
                         simple_query = query.replace('"', '').replace('*', '')
-                        sql_fallback = "SELECT path, snippet(content_fts, 1, '<b>', '</b>', '...', 64) FROM content_fts WHERE content_fts MATCH ?"
+                        sql_fallback = """
+                            SELECT f.path, snippet(content_fts, 1, '<b>', '</b>', '...', 64), m.mtime 
+                            FROM content_fts f
+                            LEFT JOIN file_metadata m ON f.path = m.path
+                            WHERE f.content_fts MATCH ?
+                        """
                         params_fallback = [f"content:{simple_query}*"]
                         if extension and extension != "all":
-                            sql_fallback += " AND path LIKE ?"
+                            sql_fallback += " AND f.path LIKE ?"
                             params_fallback.append(f"%{extension}")
                         sql_fallback += " ORDER BY rank LIMIT 10000"
                         cursor.execute(sql_fallback, params_fallback)
 
-                
                 rows = cursor.fetchall()
                 conn.close()
                 
                 results = []
-                for path, snippet in rows:
+                for path, snippet, mtime in rows:
                     is_folder = (snippet == "[FOLDER]")
                     norm_path = os.path.normpath(path)
                     results.append({
                         'name': os.path.basename(norm_path),
                         'path': norm_path,
                         'abs_path': norm_path,
-                        'snippet': "" if is_folder else (snippet or ""),
-                        'is_folder': is_folder
+                        'snippet': snippet if not is_folder else "",
+                        'is_folder': is_folder,
+                        'mtime': mtime
                     })
                 return results
         except Exception as e:
@@ -205,10 +222,16 @@ class ContentIndexer:
             folders_to_index = []
             supported_exts = {'.pdf', '.docx', '.xlsx', '.txt', '.py', '.sql', '.csv'}
             
+            # Asegurar que la ruta termine en separador para el LIKE, evitando colisiones con carpetas de nombre similar
+            # Ejemplo: "C:\Carpeta" no debe machear "C:\Carpeta2"
+            search_path = os.path.normpath(folder_path)
+            prefix_match = search_path + os.sep
+            
             with self.db_lock:
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
-                cursor.execute("SELECT path, mtime FROM file_metadata WHERE path LIKE ?", (folder_path + '%',))
+                # Buscamos la carpeta exacta O cualquier cosa que empiece por la carpeta + separador
+                cursor.execute("SELECT path, mtime FROM file_metadata WHERE path = ? OR path LIKE ?", (search_path, prefix_match + '%',))
                 existing_metadata = {row[0]: row[1] for row in cursor.fetchall()}
                 conn.close()
 
@@ -240,7 +263,8 @@ class ContentIndexer:
             total_folders = len(folders_to_index)
             
             if total_files == 0 and total_folders == 0:
-                if progress_callback: progress_callback(f"{folder_name} al día", 100)
+                if progress_callback: progress_callback(f"Terminado: {folder_name} (0 cambios detectados)", 100)
+                print(f"[CONTENT] Nada nuevo que indexar en {folder_name}")
                 return True
 
             # --- PASO 1: GUARDAR CARPETAS (Súper rápido) ---
@@ -257,7 +281,7 @@ class ContentIndexer:
                     batch_fts.append((p, "[FOLDER]"))
                     if len(batch_meta) >= 500:
                         with self.db_lock:
-                            cursor.executemany("INSERT OR REPLACE INTO file_metadata VALUES (?, 0, ?)", batch_meta)
+                            cursor.executemany("INSERT OR REPLACE INTO file_metadata VALUES (?, ?, ?)", batch_meta)
                             cursor.executemany("INSERT INTO content_fts (path, content) VALUES (?, ?)", batch_fts)
                             conn.commit()
                         batch_meta, batch_fts = [], []
@@ -265,7 +289,7 @@ class ContentIndexer:
                 
                 if batch_meta:
                     with self.db_lock:
-                        cursor.executemany("INSERT OR REPLACE INTO file_metadata VALUES (?, 0, ?)", batch_meta)
+                        cursor.executemany("INSERT OR REPLACE INTO file_metadata VALUES (?, ?, ?)", batch_meta)
                         cursor.executemany("INSERT INTO content_fts (path, content) VALUES (?, ?)", batch_fts)
                         conn.commit()
                 conn.close()
@@ -328,24 +352,56 @@ class ContentIndexer:
             return False
 
     def clear_all_index(self):
+        """Borra el índice de forma robusta, manejando bloqueos de archivo"""
         try:
+            # Intentar borrado físico (más limpio)
+            physical_delete_success = True
             if os.path.exists(self.db_path):
                 for suffix in ['', '-wal', '-shm']:
                     path = self.db_path + suffix
                     if os.path.exists(path):
-                        try: os.remove(path)
-                        except: pass
+                        try:
+                            os.remove(path)
+                        except:
+                            physical_delete_success = False
+            
+            # Si el borrado físico falló (archivo bloqueado por servidor web, etc),
+            # procedemos con un borrado lógico vía SQL que siempre funciona si hay conexión.
+            if not physical_delete_success and os.path.exists(self.db_path):
+                try:
+                    with self.db_lock:
+                        conn = sqlite3.connect(self.db_path)
+                        cursor = conn.cursor()
+                        # Borrar contenido de las tablas sin destruir el esquema
+                        cursor.execute("DELETE FROM file_metadata")
+                        cursor.execute("DELETE FROM content_fts")
+                        # Opcional: Reducir tamaño del archivo en disco
+                        cursor.execute("VACUUM")
+                        conn.commit()
+                        conn.close()
+                    print("[CONTENT] Índice vaciado mediante SQL (Borrado lógico)")
+                except Exception as e:
+                    print(f"[CONTENT] Error en borrado lógico: {e}")
+                    # Si esto también falla, entonces sí devolvemos False
+                    if not physical_delete_success: return False
+
+            # Asegurar que las tablas existan
             self._init_db()
             return True
-        except: return False
+        except Exception as e:
+            print(f"[CONTENT] Error crítico borrando índice: {e}")
+            return False
 
     def purge_location(self, folder_path):
         try:
+            search_path = os.path.normpath(folder_path)
+            prefix_match = search_path + os.sep
             with self.db_lock:
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM file_metadata WHERE path LIKE ?", (folder_path + '%',))
-                cursor.execute("DELETE FROM content_fts WHERE path LIKE ?", (folder_path + '%',))
+                # Eliminar la carpeta exacta O cualquier contenido bajo ella
+                cursor.execute("DELETE FROM file_metadata WHERE path = ? OR path LIKE ?", (search_path, prefix_match + '%',))
+                cursor.execute("DELETE FROM content_fts WHERE path = ? OR path LIKE ?", (search_path, prefix_match + '%',))
                 conn.commit()
                 conn.close()
             return True

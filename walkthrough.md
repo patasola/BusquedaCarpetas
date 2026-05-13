@@ -1,39 +1,32 @@
-# Walkthrough: V.6.3 - PARADISO
+# Walkthrough: V.7.6 - TOTAL CONTROL (Fixes)
 
-Esta versión marca la culminación del proceso de optimización del buscador, logrando un equilibrio perfecto entre velocidad extrema (Índice Nitro) y precisión de resultados.
+Esta versión resuelve problemas críticos de integridad de datos y bloqueos de archivos detectados tras la integración del servidor web en segundo plano.
 
-## 🚀 Mejoras Principales
+## 🚀 Mejoras y Correcciones (V.7.6)
 
-### 1. Motor de Búsqueda Unificado (Nitro Engine)
-- Se ha integrado el índice **SQLite FTS5** como motor principal de la aplicación.
-- Las búsquedas de nombres de carpetas y archivos ahora son instantáneas, independientemente de la profundidad de los discos.
-- Se ha separado la lógica: el sistema siempre busca nombres/rutas en el índice, y opcionalmente busca **contenido de texto** (PDF, Word, Excel) si se marca la casilla.
+### 1. Robustez del Índice (Anti-Lock System)
+- **Problema:** El servidor web (Flask) mantenía bloqueada la base de datos `content_index.db`, impidiendo que el usuario pudiera borrar el índice o resetearlo físicamente.
+- **Solución:** Se implementó un sistema de **Borrado Lógico mediante SQL**. Si el archivo está bloqueado, el sistema ahora vacía las tablas internamente en lugar de intentar borrar el archivo. Esto garantiza que "Borrar Índice" siempre funcione.
+- **Resultado:** El usuario puede resetear y reconstruir el índice de 0 sin necesidad de cerrar el servidor o la aplicación.
 
-### 2. Importación Masiva Inteligente (Smart TXT Import)
-- Nuevo botón **📄 Importar TXT** en la configuración.
-- Permite cargar múltiples ubicaciones de red o locales de una sola vez.
-- **Limpieza Automática:** El sistema detecta y elimina comillas (`"`) y espacios adicionales que Windows añade al usar "Copiar como ruta".
+### 2. Precisión de Indexación (Trailing Separator Fix)
+- **Problema:** La búsqueda por prefijos (`LIKE path%`) podía causar colisiones. Por ejemplo, al indexar o borrar una carpeta llamada "C:\Documentos", el sistema podía afectar accidentalmente a "C:\Documentos_Viejos".
+- **Solución:** Se añadió un separador de ruta forzado (`os.sep`) a las consultas internas. Ahora el sistema distingue perfectamente entre carpetas con nombres similares.
+- **Resultado:** Integridad total de los metadatos por cada ubicación configurada.
 
-### 3. Normalización de Rutas (Deduplicación)
-- Se corrigió el problema de resultados duplicados mediante la normalización de rutas (`os.path.normpath`).
-- El sistema ahora reconoce que `D:/Carpeta` y `D:\Carpeta` son el mismo elemento, manteniendo la lista de resultados limpia.
+### 3. Feedback de Escaneo Mejorado
+- **Problema:** Cuando el sistema no encontraba cambios, terminaba en 0 segundos con un mensaje genérico, lo que confundía al usuario ("¿Realmente hizo algo?").
+- **Solución:** Se actualizó el mensaje de progreso para indicar específicamente: **"Terminado: {Carpeta} (0 cambios detectados)"**.
+- **Resultado:** Claridad sobre el estado de la indexación incremental.
 
-### 4. Metadatos de Precisión (Anti-Ghosts)
-- Se refinó la lógica de enriquecimiento de datos.
-- Los nombres de Demandante/Demandado solo se asignan a las filas que coinciden **exactamente** con el radicado buscado, evitando la propagación de datos incorrectos en la lista.
+### 4. Caché de Carpetas Resiliente
+- **Problema:** Similar al índice de contenido, el archivo `carpetas_cache.pkl` podía quedar bloqueado.
+- **Solución:** Si falla la eliminación física del caché, el sistema ahora lo sobrescribe con una estructura vacía, forzando una reconstrucción limpia en el siguiente inicio.
 
-## 🛠️ Instrucciones de Mantenimiento
-Para asegurar que el sistema vea nuevas carpetas creadas en Windows:
-1. Ir a **Configuración e Índice** (Botón ⚡).
-2. Si se han añadido nuevas rutas, darle a **⚡ Iniciar Indexación**.
-3. El proceso es incremental: solo escaneará lo nuevo o modificado.
-
-## 📦 Archivos Modificados
-- `src/core/content_indexer.py`: Lógica de indexación de carpetas y búsqueda literal.
-- `src/ui/content_search_modal.py`: Nueva interfaz de importación y gestión masiva.
-- `src/managers/search_coordinator.py`: Coordinación de fases de búsqueda (Caché -> Nitro -> Contenido -> Disco).
-- `src/ui/results_renderer.py`: Renderizado deduplicado y normalizado.
-- `src/managers/app.py`: Sincronización de versiones y estados globales.
+## 🛠️ Archivos Actualizados
+- `src/core/content_indexer.py`: Nuevo sistema de borrado robusto y precisión de rutas.
+- `src/core/cache_manager.py`: Invalidación de caché a prueba de bloqueos.
+- `src/ui/content_search_modal.py`: Mejoras visuales en el reporte de progreso.
 
 ---
-*V.6.3 - "E quindi uscimmo a riveder le stelle"*
+*V.7.6 - "Total Control & Data Integrity"*

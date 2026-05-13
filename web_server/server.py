@@ -84,7 +84,8 @@ def search():
                 'snippet': r.get('snippet', ''),
                 'is_folder': r.get('is_folder', False),
                 'ext': os.path.splitext(r.get('name', ''))[1].lower().lstrip('.'),
-                'dir': os.path.dirname(r.get('path', ''))
+                'dir': os.path.dirname(r.get('path', '')),
+                'mtime': r.get('mtime')
             })
 
         return jsonify({

@@ -10,10 +10,20 @@ If WScript.Arguments.Count = 0 Then WScript.Quit
 
 url = WScript.Arguments(0)
 
-' Extraer el path de la URL
-originalPath = url
-originalPath = Replace(originalPath, "busqueda://open?path=", "")
-originalPath = Replace(originalPath, "busqueda://folder?path=", "")
+' Extraer el path de la URL de forma robusta
+Dim pos
+pos = InStr(LCase(url), "path=")
+If pos > 0 Then
+    originalPath = Mid(url, pos + 5)
+Else
+    ' Fallback si no encuentra path= (no debería ocurrir)
+    originalPath = url
+    originalPath = Replace(originalPath, "busqueda://open", "")
+    originalPath = Replace(originalPath, "busqueda://folder", "")
+    originalPath = Replace(originalPath, "/?path=", "")
+    originalPath = Replace(originalPath, "?path=", "")
+    originalPath = Replace(originalPath, ":", "")
+End If
 
 ' Decodificación manual de caracteres URL
 path = originalPath
@@ -23,15 +33,23 @@ path = Replace(path, "%2F", "\")
 path = Replace(path, "%20", " ")
 path = Replace(path, "%28", "(")
 path = Replace(path, "%29", ")")
-path = Replace(path, "%C3%B3", "ó")
-path = Replace(path, "%C3%B1", "ñ")
-path = Replace(path, "%C3%A9", "é")
-path = Replace(path, "%C3%A1", "á")
-path = Replace(path, "%C3%AD", "í")
-path = Replace(path, "%C3%BA", "ú")
 path = Replace(path, "%2B", "+")
 path = Replace(path, "%2C", ",")
 path = Replace(path, "/", "\")
+
+' UTF-8 Decoding for Spanish characters
+path = Replace(path, "%C3%B3", "ó")
+path = Replace(path, "%C3%93", "Ó")
+path = Replace(path, "%C3%B1", "ñ")
+path = Replace(path, "%C3%91", "Ñ")
+path = Replace(path, "%C3%A1", "á")
+path = Replace(path, "%C3%81", "Á")
+path = Replace(path, "%C3%A9", "é")
+path = Replace(path, "%C3%89", "É")
+path = Replace(path, "%C3%AD", "í")
+path = Replace(path, "%C3%8D", "Í")
+path = Replace(path, "%C3%BA", "ú")
+path = Replace(path, "%C3%9A", "Ú")
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("Shell.Application")

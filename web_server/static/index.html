@@ -118,6 +118,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-dismiss{padding:.5rem .75rem;border-radius:8px;font-size:.8rem;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer}
 .btn-dismiss:hover{background:var(--glass)}
 /* Protocol indicator */
+.results-header { display: flex; align-items: center; padding: 0.75rem 1rem; background: var(--bg2); border-bottom: 1px solid var(--border); font-size: 0.8rem; font-weight: 600; color: var(--text2); position: sticky; top: 0; z-index: 10; }
+  .results-header div { padding: 0 0.5rem; }
+  .sortable { cursor: pointer; user-select: none; transition: color 0.2s; }
+  .sortable:hover { color: var(--accent); }
+  .sortable.active { color: var(--accent); }
+  .sortable::after { content: ' ↕'; opacity: 0.3; font-size: 0.7rem; }
+  .sortable.asc::after { content: ' ↑'; opacity: 1; }
+  .sortable.desc::after { content: ' ↓'; opacity: 1; }
+
+  .col-date { width: 100px; flex-shrink: 0; }
+  .col-name { flex: 2; min-width: 200px; }
+  .col-path { flex: 3; min-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .result-item { display: flex; align-items: flex-start; padding: 1rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s; }
+  .result-item:hover { background: var(--glass); }
+  .result-date { width: 100px; flex-shrink: 0; font-size: 0.85rem; color: var(--text2); padding-top: 2px; }
+  .result-content { flex: 1; min-width: 0; }
+  .result-name { font-weight: 600; color: var(--text); margin-bottom: 0.2rem; display: flex; align-items: center; gap: 8px; }
 .proto-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;padding:.2rem .5rem;border-radius:6px;font-weight:500}
 .proto-ok{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
 .proto-no{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3)}
@@ -197,6 +215,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="tip"><code>término*</code> prefijo</div>
       </div>
     </div>
+    <div class="results-header" id="resultsHeader" style="display:none">
+      <div class="col-date sortable" data-sort="mtime">Fecha</div>
+      <div class="col-name sortable" data-sort="name">Nombre</div>
+      <div class="col-path sortable" data-sort="path">Ubicación</div>
+    </div>
     <div class="results-list" id="resultsList" style="display:none"></div>
     <div style="text-align:center; padding: 2rem; color: var(--text2); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 2rem;">
       BusquedaCarpetas V7 'Purgatorio' • <a href="/download/instalar_cliente.bat" style="color:var(--accent); text-decoration:none;">Descargar instalador de acceso directo</a>
@@ -232,8 +255,23 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 <script>
 const $ = id => document.getElementById(id);
 let debounceTimer, activeExt = 'all', activeField = 'content', activeCard = null;
+let currentResults = [];
+let sortConfig = { field: 'mtime', asc: false }; // Default sort by date desc
+
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const protocolInstalled = localStorage.getItem('busqueda_protocol') === 'ok';
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatDate(mtime) {
+  if (!mtime) return '–';
+  const d = new Date(mtime * 1000);
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 // ─── Install Banner ───────────────────────────────────────────────────────────
 if (!isLocalhost && !protocolInstalled) {
@@ -289,6 +327,7 @@ async function doSearch() {
   if (!q || q.length < 2) {
     $('welcomeMsg').style.display = '';
     $('resultsList').style.display = 'none';
+    $('resultsHeader').style.display = 'none';
     $('resultCount').textContent = '';
     hideDetail();
     return;
@@ -301,6 +340,7 @@ async function doSearch() {
     const url = `/api/search?q=${encodeURIComponent(q)}&ext=${activeExt}&field=${activeField}&limit=200`;
     const r = await fetch(url);
     const data = await r.json();
+    currentResults = data.results || [];
     renderResults(data);
   } catch(e) {
     $('resultCount').textContent = 'Error de conexión';
@@ -323,30 +363,38 @@ function getIcon(ext, isFolder) {
 
 function renderResults(data) {
   const list = $('resultsList');
+  const header = $('resultsHeader');
   $('welcomeMsg').style.display = 'none';
   list.innerHTML = '';
 
   const total = data.count || 0;
   const showing = data.showing || 0;
+  
+  if (!data.results || data.results.length === 0) {
+    header.style.display = 'none';
+    list.innerHTML = `<div class="welcome"><h2 style="font-size:1.3rem">Sin resultados</h2>
+      <p>No se encontraron documentos para "<em>${data.query || ''}</em>"</p></div>`;
+    list.style.display = 'flex';
+    $('resultCount').textContent = 'Sin resultados';
+    return;
+  }
+
+  header.style.display = 'flex';
   $('resultCount').innerHTML = total > showing
     ? `Mostrando <strong>${showing}</strong> de <strong>${total.toLocaleString('es-CO')}</strong> resultados`
     : `<strong>${total.toLocaleString('es-CO')}</strong> resultado${total !== 1 ? 's' : ''}`;
 
-  if (!data.results || data.results.length === 0) {
-    list.innerHTML = `<div class="welcome"><h2 style="font-size:1.3rem">Sin resultados</h2>
-      <p>No se encontraron documentos para "<em>${data.query || ''}</em>"</p></div>`;
-    list.style.display = 'flex';
-    return;
-  }
-
   data.results.forEach(item => {
     const icon = getIcon(item.ext, item.is_folder);
-    const card = document.createElement('div');
-    card.className = 'result-card';
-    card.innerHTML = `
-      <div class="file-icon ${icon.cls}">${icon.label}</div>
-      <div class="result-body">
-        <div class="result-name">${escHtml(item.name)}</div>
+    const itemEl = document.createElement('div');
+    itemEl.className = 'result-item';
+    itemEl.innerHTML = `
+      <div class="result-date">${formatDate(item.mtime)}</div>
+      <div class="result-content">
+        <div class="result-name">
+          <span class="file-icon ${icon.cls}">${icon.label}</span>
+          ${escHtml(item.name)}
+        </div>
         <div class="result-path">${escHtml(item.path)}</div>
         ${item.snippet ? `<div class="result-snippet">${item.snippet}</div>` : ''}
       </div>
@@ -355,7 +403,7 @@ function renderResults(data) {
         <button class="btn-sm" data-action="folder" title="Abrir carpeta">📂</button>
       </div>`;
 
-    card.addEventListener('click', e => {
+    itemEl.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
       if (btn) {
         e.stopPropagation();
@@ -363,13 +411,47 @@ function renderResults(data) {
         if (btn.dataset.action === 'folder') openFolder(item.path);
         return;
       }
-      showDetail(item, card);
+      showDetail(item, itemEl);
     });
-    list.appendChild(card);
+    list.appendChild(itemEl);
   });
 
   list.style.display = 'flex';
 }
+
+// ─── Sorting ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('.sortable').forEach(h => {
+  h.addEventListener('click', () => {
+    const field = h.dataset.sort;
+    if (sortConfig.field === field) {
+      sortConfig.asc = !sortConfig.asc;
+    } else {
+      sortConfig.field = field;
+      sortConfig.asc = false; // Por defecto descendente para fechas
+    }
+
+    // Actualizar visual de cabeceras
+    document.querySelectorAll('.sortable').forEach(sh => {
+      sh.classList.remove('active', 'asc', 'desc');
+    });
+    h.classList.add('active', sortConfig.asc ? 'asc' : 'desc');
+
+    // Ordenar
+    currentResults.sort((a, b) => {
+      let v1 = a[field];
+      let v2 = b[field];
+      if (field === 'name' || field === 'path') {
+        v1 = (v1 || '').toLowerCase();
+        v2 = (v2 || '').toLowerCase();
+      }
+      if (v1 < v2) return sortConfig.asc ? -1 : 1;
+      if (v1 > v2) return sortConfig.asc ? 1 : -1;
+      return 0;
+    });
+
+    renderResults({ results: currentResults, count: currentResults.length, showing: currentResults.length });
+  });
+});
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 function showDetail(item, cardEl) {
@@ -445,7 +527,6 @@ async function openFolder(path) {
   openWithProtocol('folder', path);
 }
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
 let toastTimer;
 function showToast(msg) {
   const t = $('toast');
@@ -453,11 +534,6 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
-}
-
-// ─── Utils ───────────────────────────────────────────────────────────────────
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // Focus search on load

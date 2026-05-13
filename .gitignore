@@ -1,7 +1,5 @@
 # Bases de datos SQLite y temporales (Buscador de Contenido)
-content_index.db
-content_index.db-shm
-content_index.db-wal
+content_index*.db*
 
 # Archivos de configuración local
 content_locations.json

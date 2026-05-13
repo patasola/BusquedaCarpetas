@@ -128,6 +128,10 @@ class BusquedaCarpetaApp:
         self._init_ui()
         self._init_managers_core()
         
+        # 4.5 Servidor Web Manager
+        from .web_server_manager import WebServerManager
+        self.web_server_manager = WebServerManager(self)
+        
         # 5. CARGA DIFERIDA (Para arranque instantáneo)
         # Retrasamos lo más pesado unos milisegundos para que la ventana aparezca YA
         self.master.after(50, self._deferred_initialization)
@@ -353,7 +357,7 @@ class BusquedaCarpetaApp:
         
         # Asignar referencias
         for ref in ['entry', 'modo_label', 'btn_buscar', 'btn_cancelar', 'tree', 
-                    'btn_copiar', 'btn_abrir', 'label_estado', 'label_carpeta_info', 'configurar_scrollbars', 'chk_archivos']:
+                    'btn_copiar', 'btn_abrir', 'label_estado', 'label_web_status', 'label_carpeta_info', 'configurar_scrollbars', 'chk_archivos']:
             setattr(self, ref, ui[ref])
             
         self.chk_archivos.config(variable=self.incluir_archivos)
@@ -414,6 +418,7 @@ class BusquedaCarpetaApp:
         self.btn_cancelar.config(command=self.cancelar_busqueda)
         self.btn_copiar.config(command=self.event_manager.copiar_ruta_seleccionada)
         self.btn_abrir.config(command=self.event_manager.abrir_carpeta_seleccionada)
+        self.label_web_status.bind("<Button-1>", self.menu_manager._toggle_web_server)
         
         # NUEVO: Configurar expansión de subcarpetas en resultados
         if hasattr(self, 'tree_expansion_handler'):
@@ -421,6 +426,9 @@ class BusquedaCarpetaApp:
         
         # Referencias UI
         self.ui_manager.configurar_referencias(*self._find_status_cache_frames())
+        
+        # AUTO-START SERVIDOR WEB (LAN)
+        self.master.after(1000, self.menu_manager._start_web_server)
 
     def _find_status_cache_frames(self):
         """Busca frames en jerarquía"""
@@ -732,6 +740,8 @@ class BusquedaCarpetaApp:
                 self.config.save_config()
             if hasattr(self, 'content_indexer'):
                 self.content_indexer.stop_indexing()
+            if hasattr(self, 'web_server_manager'):
+                self.web_server_manager.stop_server()
         except Exception as e:
             print(f"[ERROR] Error al cerrar: {e}")
         self.master.destroy()
