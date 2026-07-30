@@ -1,0 +1,1016 @@
+﻿olevba 0.60.2 on Python 3.12.2 - http://decalage.info/python/oletools
+===============================================================================
+FILE: CargarAnotaciones_v4.xlsm
+Type: OpenXML
+WARNING  For now, VBA stomping cannot be detected for files in memory
+-------------------------------------------------------------------------------
+VBA MACRO ThisWorkbook.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/ThisWorkbook'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Private Sub Workbook_SheetChange(ByVal Sh As Object, ByVal Target As Range)
+    If Sh.Name <> "Cargar Anotaciones" And Sh.Name <> "Tutelas" Then Exit Sub
+    If Target.Column <> 2 Then Exit Sub
+    If Target.Row < 5 Then Exit Sub
+    Call BuscarPartes(Target.Row, Sh.Name)
+End Sub
+
+Sub BuscarPartes(fila As Long, nombreHoja As String)
+    Dim ws As Worksheet
+    Dim procesCorto As String, llavProc As String, demandante As String, demandado As String
+    Dim conn As Object, rs As Object, SQL As String
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(nombreHoja)
+    procesCorto = Trim(ws.Cells(fila, 2).Value & "")
+    If procesCorto = "" Then
+        ws.Cells(fila, 10).Value = ""
+        ws.Cells(fila, 5).Value = ""
+        ws.Cells(fila, 6).Value = ""
+        Exit Sub
+    End If
+    llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+    ws.Cells(fila, 10).Value = llavProc
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    SQL = "SELECT A112NOMBSUJE FROM [Civilab].[dbo].[T112DRSUJEPROC] WHERE A112LLAVPROC = '" & llavProc & "' AND A112CODISUJE = '0001'"
+    Set rs = conn.Execute(SQL)
+    demandante = IIf(rs.EOF, "", rs.Fields(0).Value & "")
+    rs.Close
+    SQL = "SELECT A112NOMBSUJE FROM [Civilab].[dbo].[T112DRSUJEPROC] WHERE A112LLAVPROC = '" & llavProc & "' AND A112CODISUJE = '0002'"
+    Set rs = conn.Execute(SQL)
+    demandado = IIf(rs.EOF, "", rs.Fields(0).Value & "")
+    rs.Close
+    ws.Cells(fila, 5).Value = demandante
+    ws.Cells(fila, 6).Value = demandado
+    conn.Close
+    On Error GoTo 0
+End Sub
+
+-------------------------------------------------------------------------------
+VBA MACRO Hoja1.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Hoja1'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Macros_5Versiones_Corregidas.bas 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Macros_5Versiones_Corregidas'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+' =====================================================================
+' MACROS CORREGIDAS - 5 VERSIONES
+' =====================================================================
+' ERRORES CORREGIDOS EN TODAS LAS VERSIONES:
+'   1. llavProc: era Long (max 2,147,483,647 = 10 digitos).
+'      La llave tiene 23 digitos -> DESBORDAMIENTO. Ahora es String.
+'   2. fechaActu: era Long y se comparaba con "" -> TYPE MISMATCH.
+'      Ahora es Variant.
+'   3. Dim a, b, c As String: en VBA solo c es String, a y b son Variant.
+'      Ahora cada variable tiene su tipo explicito.
+'   4. SQL: llavProc se concatenaba sin comillas simples.
+'      Si la columna en BD es varchar/char, necesita comillas.
+' =====================================================================
+
+
+' =====================================================================
+' VERSION 1: SIN TRIGGERS, UPDATE SIMPLE (La mas rapida)
+' =====================================================================
+Sub CargarAnotaciones_V1()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim seleccionar As String, procesCorto As String
+    Dim anotactu As String, fechaStr As String
+    Dim llavProc As String
+    Dim conn As Object, rs As Object, SQL As String
+    Dim numeProc As String, consProc As Long, nextConsactu As Long
+    Dim fechaActu As Variant
+    
+    Set ws = ThisWorkbook.Sheets("Cargar Anotaciones")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    For i = 5 To lastRow
+        seleccionar = UCase(Trim(ws.Cells(i, 1).Value & ""))
+        If seleccionar <> "SI" Then GoTo SiguienteFila_V1
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_V1
+        
+        fechaActu = ws.Cells(i, 3).Value
+        If IsEmpty(fechaActu) Or Trim(fechaActu & "") = "" Then fechaActu = Date
+        fechaStr = Format(fechaActu, "YYYYMMDD")
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        If anotactu = "" Then GoTo SiguienteFila_V1
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        
+        ' --- Buscar proceso ---
+        On Error Resume Next
+        SQL = "SELECT A103NUMEPROC, A103CONSPROC FROM [Civilab].[dbo].[T103DAINFOPROC] WHERE A103LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Or rs.EOF Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Proceso no encontrado"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V1
+        End If
+        numeProc = rs.Fields(0).Value & ""
+        consProc = Val(rs.Fields(1).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- Obtener siguiente consecutivo ---
+        On Error Resume Next
+        SQL = "SELECT ISNULL(MAX(A110CONSACTU), 0) + 1 FROM [Civilab].[dbo].[T110DRACTUPROC] WHERE A110LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error consecutivo"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V1
+        End If
+        nextConsactu = Val(rs.Fields(0).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- INSERT ---
+        On Error Resume Next
+        SQL = "INSERT INTO [Civilab].[dbo].[T110DRACTUPROC] " & _
+              "(A110LLAVPROC, A110CONSACTU, A110NUMEPROC, A110CONSPROC, " & _
+              "A110CODIACTU, A110CODIPADR, A110DESCACTU, A110TIPOACTU, " & _
+              "A110LEGAJUDI, A110FLAGTERM, A110FLAGUBIC, A110ANOTACTU, A110FECHINIC, " & _
+              "A110FECHDESA, A110FECHREGI) VALUES (" & _
+              "'" & llavProc & "', " & nextConsactu & ", '" & numeProc & "', " & consProc & ", " & _
+              "'30000123', '30000123', 'Recepcion memorial', 'S', 'N', 'NO', 'N', " & _
+              "'" & Replace(anotactu, "'", "''") & "', NULL, " & _
+              "'" & fechaStr & "', '" & fechaStr & "')"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error INSERT: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V1
+        End If
+        On Error GoTo 0
+        
+        ' --- UPDATE ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T103DAINFOPROC] SET " & _
+              "A103FECHDESS = '" & fechaStr & "', " & _
+              "A103ANOTACTS = '" & Replace(anotactu, "'", "''") & "' " & _
+              "WHERE A103LLAVPROC = '" & llavProc & "'"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "WARN"
+            ws.Cells(i, 8).Value = "INSERT OK pero UPDATE fallo: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 255, 200)
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V1
+        End If
+        On Error GoTo 0
+        
+        ws.Cells(i, 7).Value = "OK"
+        ws.Cells(i, 8).Value = "V1 - Simple"
+        ws.Cells(i, 7).Interior.Color = RGB(179, 230, 179)
+        ws.Cells(i, 1).Value = "NO"
+        contOK = contOK + 1
+        
+SiguienteFila_V1:
+    Next i
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "V1 Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr, vbInformation
+End Sub
+
+
+' =====================================================================
+' VERSION 2: CON TRANSACCION (Mas segura, rollback si falla)
+' =====================================================================
+Sub CargarAnotaciones_V2()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim seleccionar As String, procesCorto As String
+    Dim anotactu As String, fechaStr As String
+    Dim llavProc As String
+    Dim conn As Object, rs As Object, SQL As String
+    Dim numeProc As String, consProc As Long, nextConsactu As Long
+    Dim fechaActu As Variant
+    
+    Set ws = ThisWorkbook.Sheets("Cargar Anotaciones")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    For i = 5 To lastRow
+        seleccionar = UCase(Trim(ws.Cells(i, 1).Value & ""))
+        If seleccionar <> "SI" Then GoTo SiguienteFila_V2
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_V2
+        
+        fechaActu = ws.Cells(i, 3).Value
+        If IsEmpty(fechaActu) Or Trim(fechaActu & "") = "" Then fechaActu = Date
+        fechaStr = Format(fechaActu, "YYYYMMDD")
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        If anotactu = "" Then GoTo SiguienteFila_V2
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        
+        ' --- Buscar proceso ---
+        On Error Resume Next
+        SQL = "SELECT A103NUMEPROC, A103CONSPROC FROM [Civilab].[dbo].[T103DAINFOPROC] WHERE A103LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Or rs.EOF Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Proceso no encontrado"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V2
+        End If
+        numeProc = rs.Fields(0).Value & ""
+        consProc = Val(rs.Fields(1).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- Obtener siguiente consecutivo ---
+        On Error Resume Next
+        SQL = "SELECT ISNULL(MAX(A110CONSACTU), 0) + 1 FROM [Civilab].[dbo].[T110DRACTUPROC] WHERE A110LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error consecutivo"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V2
+        End If
+        nextConsactu = Val(rs.Fields(0).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- TRANSACCION ---
+        On Error Resume Next
+        conn.Execute "BEGIN TRANSACTION"
+        
+        SQL = "INSERT INTO [Civilab].[dbo].[T110DRACTUPROC] " & _
+              "(A110LLAVPROC, A110CONSACTU, A110NUMEPROC, A110CONSPROC, " & _
+              "A110CODIACTU, A110CODIPADR, A110DESCACTU, A110TIPOACTU, " & _
+              "A110LEGAJUDI, A110FLAGTERM, A110FLAGUBIC, A110ANOTACTU, A110FECHINIC, " & _
+              "A110FECHDESA, A110FECHREGI) VALUES (" & _
+              "'" & llavProc & "', " & nextConsactu & ", '" & numeProc & "', " & consProc & ", " & _
+              "'30000123', '30000123', 'Recepcion memorial', 'S', 'N', 'NO', 'N', " & _
+              "'" & Replace(anotactu, "'", "''") & "', NULL, " & _
+              "'" & fechaStr & "', '" & fechaStr & "')"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            conn.Execute "ROLLBACK TRANSACTION"
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error INSERT: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V2
+        End If
+        
+        SQL = "UPDATE [Civilab].[dbo].[T103DAINFOPROC] SET " & _
+              "A103FECHDESS = '" & fechaStr & "', " & _
+              "A103ANOTACTS = '" & Replace(anotactu, "'", "''") & "' " & _
+              "WHERE A103LLAVPROC = '" & llavProc & "'"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            conn.Execute "ROLLBACK TRANSACTION"
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error UPDATE: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V2
+        End If
+        
+        conn.Execute "COMMIT TRANSACTION"
+        On Error GoTo 0
+        
+        ws.Cells(i, 7).Value = "OK"
+        ws.Cells(i, 8).Value = "Sin error"
+        ws.Cells(i, 7).Interior.Color = RGB(179, 230, 179)
+        ws.Cells(i, 1).Value = "NO"
+        contOK = contOK + 1
+        
+SiguienteFila_V2:
+    Next i
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "V2 Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr, vbInformation
+End Sub
+
+
+' =====================================================================
+' VERSION 3: INSERT NULL, LUEGO UPDATE (Bypass de triggers en fechas)
+' =====================================================================
+Sub CargarAnotaciones_V3()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim seleccionar As String, procesCorto As String
+    Dim anotactu As String, fechaStr As String
+    Dim llavProc As String
+    Dim conn As Object, rs As Object, SQL As String
+    Dim numeProc As String, consProc As Long, nextConsactu As Long
+    Dim fechaActu As Variant
+    
+    Set ws = ThisWorkbook.Sheets("Cargar Anotaciones")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    For i = 5 To lastRow
+        seleccionar = UCase(Trim(ws.Cells(i, 1).Value & ""))
+        If seleccionar <> "SI" Then GoTo SiguienteFila_V3
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_V3
+        
+        fechaActu = ws.Cells(i, 3).Value
+        If IsEmpty(fechaActu) Or Trim(fechaActu & "") = "" Then fechaActu = Date
+        fechaStr = Format(fechaActu, "YYYYMMDD")
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        If anotactu = "" Then GoTo SiguienteFila_V3
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        
+        ' --- Buscar proceso ---
+        On Error Resume Next
+        SQL = "SELECT A103NUMEPROC, A103CONSPROC FROM [Civilab].[dbo].[T103DAINFOPROC] WHERE A103LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Or rs.EOF Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Proceso no encontrado"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V3
+        End If
+        numeProc = rs.Fields(0).Value & ""
+        consProc = Val(rs.Fields(1).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- Obtener siguiente consecutivo ---
+        On Error Resume Next
+        SQL = "SELECT ISNULL(MAX(A110CONSACTU), 0) + 1 FROM [Civilab].[dbo].[T110DRACTUPROC] WHERE A110LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error consecutivo"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V3
+        End If
+        nextConsactu = Val(rs.Fields(0).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- PASO 1: INSERT sin fechas (NULL) ---
+        On Error Resume Next
+        SQL = "INSERT INTO [Civilab].[dbo].[T110DRACTUPROC] " & _
+              "(A110LLAVPROC, A110CONSACTU, A110NUMEPROC, A110CONSPROC, " & _
+              "A110CODIACTU, A110CODIPADR, A110DESCACTU, A110TIPOACTU, " & _
+              "A110LEGAJUDI, A110FLAGTERM, A110FLAGUBIC, A110ANOTACTU, A110FECHINIC, " & _
+              "A110FECHDESA, A110FECHREGI) VALUES (" & _
+              "'" & llavProc & "', " & nextConsactu & ", '" & numeProc & "', " & consProc & ", " & _
+              "'30000123', '30000123', 'Recepcion memorial', 'S', 'N', 'NO', 'N', " & _
+              "'" & Replace(anotactu, "'", "''") & "', NULL, NULL, NULL)"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error INSERT: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V3
+        End If
+        On Error GoTo 0
+        
+        ' --- PASO 2: UPDATE para poner las fechas ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T110DRACTUPROC] SET " & _
+              "A110FECHDESA = '" & fechaStr & "', " & _
+              "A110FECHREGI = '" & fechaStr & "' " & _
+              "WHERE A110LLAVPROC = '" & llavProc & "' AND A110CONSACTU = " & nextConsactu
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "WARN"
+            ws.Cells(i, 8).Value = "INSERT OK, UPDATE fechas fallo: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 255, 200)
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V3
+        End If
+        On Error GoTo 0
+        
+        ' --- UPDATE tabla principal ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T103DAINFOPROC] SET " & _
+              "A103FECHDESS = '" & fechaStr & "', " & _
+              "A103ANOTACTS = '" & Replace(anotactu, "'", "''") & "' " & _
+              "WHERE A103LLAVPROC = '" & llavProc & "'"
+        conn.Execute SQL
+        Err.Clear
+        On Error GoTo 0
+        
+        ws.Cells(i, 7).Value = "OK"
+        ws.Cells(i, 8).Value = "V3 - NULL+UPDATE"
+        ws.Cells(i, 7).Interior.Color = RGB(179, 230, 179)
+        ws.Cells(i, 1).Value = "NO"
+        contOK = contOK + 1
+        
+SiguienteFila_V3:
+    Next i
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "V3 Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr, vbInformation
+End Sub
+
+
+' =====================================================================
+' VERSION 4: DESACTIVA TRIGGERS (La mas agresiva)
+' =====================================================================
+Sub CargarAnotaciones_V4()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim seleccionar As String, procesCorto As String
+    Dim anotactu As String, fechaStr As String
+    Dim llavProc As String
+    Dim conn As Object, rs As Object, SQL As String
+    Dim numeProc As String, consProc As Long, nextConsactu As Long
+    Dim fechaActu As Variant
+    
+    Set ws = ThisWorkbook.Sheets("Cargar Anotaciones")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    ' --- Desactivar triggers ---
+    On Error Resume Next
+    conn.Execute "DISABLE TRIGGER ALL ON [Civilab].[dbo].[T110DRACTUPROC]"
+    conn.Execute "DISABLE TRIGGER ALL ON [Civilab].[dbo].[T103DAINFOPROC]"
+    If Err.Number <> 0 Then
+        MsgBox "No se pudieron desactivar los triggers. Error: " & Err.Description & vbCrLf & _
+               "Puede que no tengas permisos ALTER TABLE. Prueba otra version.", vbCritical
+        Err.Clear
+        On Error GoTo 0
+        conn.Close
+        Set conn = Nothing
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    For i = 5 To lastRow
+        seleccionar = UCase(Trim(ws.Cells(i, 1).Value & ""))
+        If seleccionar <> "SI" Then GoTo SiguienteFila_V4
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_V4
+        
+        fechaActu = ws.Cells(i, 3).Value
+        If IsEmpty(fechaActu) Or Trim(fechaActu & "") = "" Then fechaActu = Date
+        fechaStr = Format(fechaActu, "YYYYMMDD")
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        If anotactu = "" Then GoTo SiguienteFila_V4
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        
+        ' --- Buscar proceso ---
+        On Error Resume Next
+        SQL = "SELECT A103NUMEPROC, A103CONSPROC FROM [Civilab].[dbo].[T103DAINFOPROC] WHERE A103LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Or rs.EOF Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Proceso no encontrado"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V4
+        End If
+        numeProc = rs.Fields(0).Value & ""
+        consProc = Val(rs.Fields(1).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- Obtener siguiente consecutivo ---
+        On Error Resume Next
+        SQL = "SELECT ISNULL(MAX(A110CONSACTU), 0) + 1 FROM [Civilab].[dbo].[T110DRACTUPROC] WHERE A110LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error consecutivo"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V4
+        End If
+        nextConsactu = Val(rs.Fields(0).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- INSERT (triggers desactivados) ---
+        On Error Resume Next
+        SQL = "INSERT INTO [Civilab].[dbo].[T110DRACTUPROC] " & _
+              "(A110LLAVPROC, A110CONSACTU, A110NUMEPROC, A110CONSPROC, " & _
+              "A110CODIACTU, A110CODIPADR, A110DESCACTU, A110TIPOACTU, " & _
+              "A110LEGAJUDI, A110FLAGTERM, A110FLAGUBIC, A110ANOTACTU, A110FECHINIC, " & _
+              "A110FECHDESA, A110FECHREGI) VALUES (" & _
+              "'" & llavProc & "', " & nextConsactu & ", '" & numeProc & "', " & consProc & ", " & _
+              "'30000123', '30000123', 'Recepcion memorial', 'S', 'N', 'NO', 'N', " & _
+              "'" & Replace(anotactu, "'", "''") & "', NULL, " & _
+              "'" & fechaStr & "', '" & fechaStr & "')"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error INSERT: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V4
+        End If
+        On Error GoTo 0
+        
+        ' --- UPDATE tabla principal ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T103DAINFOPROC] SET " & _
+              "A103FECHDESS = '" & fechaStr & "', " & _
+              "A103ANOTACTS = '" & Replace(anotactu, "'", "''") & "' " & _
+              "WHERE A103LLAVPROC = '" & llavProc & "'"
+        conn.Execute SQL
+        Err.Clear
+        On Error GoTo 0
+        
+        ws.Cells(i, 7).Value = "OK"
+        ws.Cells(i, 8).Value = "V4 - Sin triggers"
+        ws.Cells(i, 7).Interior.Color = RGB(179, 230, 179)
+        ws.Cells(i, 1).Value = "NO"
+        contOK = contOK + 1
+        
+SiguienteFila_V4:
+    Next i
+    
+    ' --- Reactivar triggers SIEMPRE ---
+    On Error Resume Next
+    conn.Execute "ENABLE TRIGGER ALL ON [Civilab].[dbo].[T110DRACTUPROC]"
+    conn.Execute "ENABLE TRIGGER ALL ON [Civilab].[dbo].[T103DAINFOPROC]"
+    Err.Clear
+    On Error GoTo 0
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "V4 Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr & vbCrLf & _
+           "Triggers reactivados.", vbInformation
+End Sub
+
+
+' =====================================================================
+' VERSION 5 - PASO 1: Inserta sin fechas
+' =====================================================================
+Sub CargarAnotaciones_V5_PASO1()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim seleccionar As String, procesCorto As String
+    Dim anotactu As String
+    Dim llavProc As String
+    Dim conn As Object, rs As Object, SQL As String
+    Dim numeProc As String, consProc As Long, nextConsactu As Long
+    
+    Set ws = ThisWorkbook.Sheets("Cargar Anotaciones")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    For i = 5 To lastRow
+        seleccionar = UCase(Trim(ws.Cells(i, 1).Value & ""))
+        If seleccionar <> "SI" Then GoTo SiguienteFila_V5P1
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_V5P1
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        If anotactu = "" Then GoTo SiguienteFila_V5P1
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        
+        ' --- Buscar proceso ---
+        On Error Resume Next
+        SQL = "SELECT A103NUMEPROC, A103CONSPROC FROM [Civilab].[dbo].[T103DAINFOPROC] WHERE A103LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Or rs.EOF Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Proceso no encontrado"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V5P1
+        End If
+        numeProc = rs.Fields(0).Value & ""
+        consProc = Val(rs.Fields(1).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- Obtener siguiente consecutivo ---
+        On Error Resume Next
+        SQL = "SELECT ISNULL(MAX(A110CONSACTU), 0) + 1 FROM [Civilab].[dbo].[T110DRACTUPROC] WHERE A110LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error consecutivo"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V5P1
+        End If
+        nextConsactu = Val(rs.Fields(0).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- INSERT sin fechas ---
+        On Error Resume Next
+        SQL = "INSERT INTO [Civilab].[dbo].[T110DRACTUPROC] " & _
+              "(A110LLAVPROC, A110CONSACTU, A110NUMEPROC, A110CONSPROC, " & _
+              "A110CODIACTU, A110CODIPADR, A110DESCACTU, A110TIPOACTU, " & _
+              "A110LEGAJUDI, A110FLAGTERM, A110FLAGUBIC, A110ANOTACTU, A110FECHINIC, " & _
+              "A110FECHDESA, A110FECHREGI) VALUES (" & _
+              "'" & llavProc & "', " & nextConsactu & ", '" & numeProc & "', " & consProc & ", " & _
+              "'30000123', '30000123', 'Recepcion memorial', 'S', 'N', 'NO', 'N', " & _
+              "'" & Replace(anotactu, "'", "''") & "', NULL, NULL, NULL)"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error INSERT: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V5P1
+        End If
+        On Error GoTo 0
+        
+        ' Guardar consecutivo en columna 9 para el PASO 2
+        ws.Cells(i, 9).Value = nextConsactu
+        
+        ws.Cells(i, 7).Value = "PASO1-OK"
+        ws.Cells(i, 8).Value = "V5 - Esperando PASO2"
+        ws.Cells(i, 7).Interior.Color = RGB(255, 255, 179)
+        ' NO cambiar columna 1, el PASO 2 lo necesita
+        contOK = contOK + 1
+        
+SiguienteFila_V5P1:
+    Next i
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "V5 PASO 1 Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr & vbCrLf & vbCrLf & _
+           "Espera 10 segundos y luego ejecuta PASO 2.", vbInformation
+End Sub
+
+
+' =====================================================================
+' VERSION 5 - PASO 2: Actualiza fechas de los registros del PASO 1
+' =====================================================================
+Sub CargarAnotaciones_V5_PASO2()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim procesCorto As String, fechaStr As String
+    Dim llavProc As String
+    Dim conn As Object, SQL As String
+    Dim nextConsactu As Long
+    Dim fechaActu As Variant
+    Dim anotactu As String
+    Dim estado As String
+    
+    Set ws = ThisWorkbook.Sheets("Cargar Anotaciones")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    For i = 5 To lastRow
+        estado = Trim(ws.Cells(i, 7).Value & "")
+        If estado <> "PASO1-OK" Then GoTo SiguienteFila_V5P2
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_V5P2
+        
+        fechaActu = ws.Cells(i, 3).Value
+        If IsEmpty(fechaActu) Or Trim(fechaActu & "") = "" Then fechaActu = Date
+        fechaStr = Format(fechaActu, "YYYYMMDD")
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        nextConsactu = Val(ws.Cells(i, 9).Value & "")
+        
+        If nextConsactu = 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "No hay consecutivo en col I"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            GoTo SiguienteFila_V5P2
+        End If
+        
+        ' --- UPDATE fechas en T110 ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T110DRACTUPROC] SET " & _
+              "A110FECHDESA = '" & fechaStr & "', " & _
+              "A110FECHREGI = '" & fechaStr & "' " & _
+              "WHERE A110LLAVPROC = '" & llavProc & "' AND A110CONSACTU = " & nextConsactu
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error UPDATE fechas: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_V5P2
+        End If
+        On Error GoTo 0
+        
+        ' --- UPDATE tabla principal ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T103DAINFOPROC] SET " & _
+              "A103FECHDESS = '" & fechaStr & "', " & _
+              "A103ANOTACTS = '" & Replace(anotactu, "'", "''") & "' " & _
+              "WHERE A103LLAVPROC = '" & llavProc & "'"
+        conn.Execute SQL
+        Err.Clear
+        On Error GoTo 0
+        
+        ws.Cells(i, 7).Value = "OK"
+        ws.Cells(i, 8).Value = "V5 - Completo"
+        ws.Cells(i, 7).Interior.Color = RGB(179, 230, 179)
+        ws.Cells(i, 1).Value = "NO"
+        contOK = contOK + 1
+        
+SiguienteFila_V5P2:
+    Next i
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "V5 PASO 2 Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr, vbInformation
+End Sub
+
+' =====================================================================
+' TUTELAS - VERSION 1
+' A110CODIACTU = '30020028', A110CODIPADR = '00000100'
+' =====================================================================
+Sub CargarTutelas_V1()
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim seleccionar As String, procesCorto As String
+    Dim anotactu As String, fechaStr As String
+    Dim llavProc As String
+    Dim conn As Object, rs As Object, SQL As String
+    Dim numeProc As String, consProc As Long, nextConsactu As Long
+    Dim fechaActu As Variant
+    
+    Set ws = ThisWorkbook.Sheets("Tutelas")
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    If lastRow < 5 Then
+        MsgBox "No hay datos para procesar (fila 5 en adelante).", vbExclamation
+        Exit Sub
+    End If
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "DSN=csjsql;Trusted_Connection=yes;"
+    
+    Dim contOK As Long: contOK = 0
+    Dim contErr As Long: contErr = 0
+    
+    For i = 5 To lastRow
+        seleccionar = UCase(Trim(ws.Cells(i, 1).Value & ""))
+        If seleccionar <> "SI" Then GoTo SiguienteFila_T1
+        
+        procesCorto = Trim(ws.Cells(i, 2).Value & "")
+        If procesCorto = "" Then GoTo SiguienteFila_T1
+        
+        fechaActu = ws.Cells(i, 3).Value
+        If IsEmpty(fechaActu) Or Trim(fechaActu & "") = "" Then fechaActu = Date
+        fechaStr = Format(fechaActu, "YYYYMMDD")
+        
+        anotactu = Trim(ws.Cells(i, 4).Value & "")
+        If anotactu = "" Then GoTo SiguienteFila_T1
+        
+        llavProc = "110013105017" & Left(procesCorto, 4) & Format(Val(Right(procesCorto, Len(procesCorto) - 5)), "00000") & "00"
+        
+        ' --- Buscar proceso ---
+        On Error Resume Next
+        SQL = "SELECT A103NUMEPROC, A103CONSPROC FROM [Civilab].[dbo].[T103DAINFOPROC] WHERE A103LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Or rs.EOF Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Proceso no encontrado"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_T1
+        End If
+        numeProc = rs.Fields(0).Value & ""
+        consProc = Val(rs.Fields(1).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- Siguiente consecutivo ---
+        On Error Resume Next
+        SQL = "SELECT ISNULL(MAX(A110CONSACTU), 0) + 1 FROM [Civilab].[dbo].[T110DRACTUPROC] WHERE A110LLAVPROC = '" & llavProc & "'"
+        Set rs = conn.Execute(SQL)
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error consecutivo"
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            If Not rs Is Nothing Then rs.Close
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_T1
+        End If
+        nextConsactu = Val(rs.Fields(0).Value & "")
+        rs.Close
+        On Error GoTo 0
+        
+        ' --- INSERT TUTELAS ---
+        On Error Resume Next
+        SQL = "INSERT INTO [Civilab].[dbo].[T110DRACTUPROC] " & _
+              "(A110LLAVPROC, A110CONSACTU, A110NUMEPROC, A110CONSPROC, " & _
+              "A110CODIACTU, A110CODIPADR, A110DESCACTU, A110TIPOACTU, " & _
+              "A110LEGAJUDI, A110FLAGTERM, A110FLAGUBIC, A110ANOTACTU, A110FECHINIC, " & _
+              "A110FECHDESA, A110FECHREGI) VALUES (" & _
+              "'" & llavProc & "', " & nextConsactu & ", '" & numeProc & "', " & consProc & ", " & _
+              "'30020028', '00000100', 'Sentencia tutela primera Instancia', 'S', 'N', 'NO', 'N', " & _
+              "'" & Replace(anotactu, "'", "''") & "', NULL, " & _
+              "'" & fechaStr & "', '" & fechaStr & "')"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "ERROR"
+            ws.Cells(i, 8).Value = "Error INSERT: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 200, 200)
+            contErr = contErr + 1
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_T1
+        End If
+        On Error GoTo 0
+        
+        ' --- UPDATE ---
+        On Error Resume Next
+        SQL = "UPDATE [Civilab].[dbo].[T103DAINFOPROC] SET " & _
+              "A103FECHDESS = '" & fechaStr & "', " & _
+              "A103ANOTACTS = '" & Replace(anotactu, "'", "''") & "' " & _
+              "WHERE A103LLAVPROC = '" & llavProc & "'"
+        conn.Execute SQL
+        
+        If Err.Number <> 0 Then
+            ws.Cells(i, 7).Value = "WARN"
+            ws.Cells(i, 8).Value = "INSERT OK pero UPDATE fallo: " & Err.Description
+            ws.Cells(i, 7).Interior.Color = RGB(255, 255, 200)
+            Err.Clear
+            On Error GoTo 0
+            GoTo SiguienteFila_T1
+        End If
+        On Error GoTo 0
+        
+        ws.Cells(i, 7).Value = "OK"
+        ws.Cells(i, 8).Value = "Tutela cargada"
+        ws.Cells(i, 7).Interior.Color = RGB(179, 230, 179)
+        ws.Cells(i, 1).Value = "NO"
+        contOK = contOK + 1
+        
+SiguienteFila_T1:
+    Next i
+    
+    conn.Close
+    Set conn = Nothing
+    MsgBox "Tutelas Completado." & vbCrLf & "OK: " & contOK & "  |  Errores: " & contErr, vbInformation
+End Sub
+
+
+-------------------------------------------------------------------------------
+VBA MACRO Hoja2.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Hoja2'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
++----------+--------------------+---------------------------------------------+
+|Type      |Keyword             |Description                                  |
++----------+--------------------+---------------------------------------------+
+|Suspicious|Open                |May open a file                              |
+|Suspicious|Call                |May call a DLL using Excel 4 Macros (XLM/XLF)|
+|Suspicious|CreateObject        |May create an OLE object                     |
+|Suspicious|Hex Strings         |Hex-encoded strings were detected, may be    |
+|          |                    |used to obfuscate strings (option --decode to|
+|          |                    |see all)                                     |
+|Suspicious|Base64 Strings      |Base64-encoded strings were detected, may be |
+|          |                    |used to obfuscate strings (option --decode to|
+|          |                    |see all)                                     |
++----------+--------------------+---------------------------------------------+
+
