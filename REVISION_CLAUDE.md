@@ -6,6 +6,16 @@ Notación: `archivo:línea` referencia el código real. Severidad: 🔴 Crítico
 
 ---
 
+## ✅ Actualización (2026-07-30) — resuelto desde esta revisión
+
+- **§2 Código muerto y duplicado (D1-D6, D9, D10):** eliminado — `SearchManager`, `tree_explorer.py`, `historial_storage.py`, `src/components/` (import roto), `ui/changelog_viewer.py`, `ui/manual_viewer.py`, método duplicado `verificar_problemas_cache`, ~230 líneas de cadena de búsqueda muerta en `search_coordinator.py`, código de resize inalcanzable en `app.py`. Ver CHANGELOG [7.7.0].
+- **Bug nuevo encontrado y corregido en el camino:** F1 (Manual de Usuario) estaba completamente roto — dos bindings distintos llamaban a atributos/métodos inexistentes. Ver CHANGELOG [7.7.0].
+- **Servidor web auto-arranque (mencionado como preocupación en la sección de Seguridad §1 y en el hallazgo #13 de orquestación):** ya no arranca solo al abrir la app; apagado por defecto, se activa manualmente. Ver CHANGELOG [7.10.0].
+- **Latencia del enriquecimiento Demandante/Demandado:** diagnosticada a fondo — no era la consulta SQL (confirmada en 17ms contra la BD real), sino (a) dos `time.sleep()` fijos de 1.5s total, y (b) el enriquecimiento estaba encadenado al final de un pipeline de 4 fases, esperando las fases lentas de contenido/disco. Ambos corregidos. De paso se encontró y corrigió un bug real de FTS5: términos con guión (`2022-464`, el formato de radicado) rompían la búsqueda de contenido. Ver CHANGELOG [7.8.0], [7.9.0], [7.11.0].
+- **§1 Seguridad, §4 Robustez de persistencia, §5 refactor de `file_explorer_manager.py`, §6 tema oscuro, D7 (results_display vs results_renderer):** sin cambios — quedan pendientes, no se tocaron en esta ronda a petición explícita del usuario (seguridad) o por requerir una decisión de diseño primero (D7).
+
+---
+
 ## 0. Arquitectura general (contexto)
 
 - Desktop (Tkinter) + servidor web LAN (Flask) comparten el mismo `content_index.db` (SQLite FTS5) y `carpetas_cache.pkl`.

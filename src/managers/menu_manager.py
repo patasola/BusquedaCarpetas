@@ -10,7 +10,7 @@ class MenuManager:
         self.app = app
         self.menubar = None
         self.menu_visible = False  # Estado inicial: oculto
-        self.web_active_var = tk.BooleanVar(value=True) # Valor inicial para el checkbutton
+        self.web_active_var = tk.BooleanVar(value=False) # Apagado por defecto
 
     def _resource_path(self, relative_path):
         """Obtiene la ruta absoluta de los recursos, compatible con PyInstaller"""

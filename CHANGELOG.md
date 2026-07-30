@@ -1,5 +1,31 @@
 # Changelog - BusquedaCarpetas
 
+## [7.11.0] - 2026-07-30 (V.12.5 en el título de la ventana)
+
+### ⚡ La consulta de Demandante/Demandado ya no espera al pipeline completo
+
+- **FIXED:** `search_coordinator.py::_perform_search_async` disparaba el enriquecimiento de partes (`_trigger_background_enrichment`) hasta el final de las 4 fases de búsqueda (Caché → Nitro/índice → Contenido de archivos → Barrido de disco en todas las ubicaciones OneDrive). Las dos últimas fases pueden tardar varios segundos, y el SQL de partes (confirmado en 17ms contra la BD real) esperaba a que terminaran aunque el resultado ya estuviera visible desde la fase de Caché. Ahora se dispara justo después de Caché+Nitro (las fases rápidas), corriendo en paralelo con Contenido/Disco en vez de esperarlas.
+
+## [7.10.0] - 2026-07-30 (V.12.4 en el título de la ventana)
+
+### 🌐 Servidor web apagado por defecto
+
+- **CHANGED:** El servidor web (LAN) ya no arranca automáticamente al abrir la app (`app.py` tenía `master.after(1000, self.menu_manager._start_web_server)`, se quitó). Ahora solo se activa manualmente con el label/botón "🌐 Off" de la esquina inferior derecha, o desde el menú.
+- **FIXED:** El checkbutton del menú (`web_active_var`) partía en `True` aunque el label visual ya nacía en "Off" — quedaban desincronizados hasta el auto-arranque. Ahora ambos parten en `False`/"Off" de forma consistente.
+
+## [7.9.0] - 2026-07-30 (V.12.3 en el título de la ventana)
+
+### 🐛 Búsqueda de contenido rota para radicados (AAAA-NNNNN)
+
+- **FIXED:** `content_indexer.py::_parse_advanced_query` — cualquier término con guión interno (ej. `2022-464`, el formato exacto de radicado) rompía la sintaxis FTS5 al pasar sin comillas dentro de `content:(...)`, arrojando `no such column: 464` en cada búsqueda. Confirmado reproduciendo el error de forma aislada contra una tabla FTS5 de prueba. Como "Incluir archivos" activa esta búsqueda en paralelo a la de carpetas, el error se disparaba en cada tecla al escribir un radicado. Se corrigió envolviendo en comillas los términos con guión o dos puntos, forzando coincidencia de frase literal.
+- **VERIFIED:** La consulta SQL Server de Demandante/Demandado (`T112DRSUJEPROC`, índice sobre `A112LLAVPROC`) se probó directamente contra la base real: 17ms para una consulta batch de 10 radicados sobre 1.6M de filas. El SQL nunca fue el cuello de botella — el retraso percibido venía de la acumulación de búsquedas de contenido rotas repitiéndose en cada tecla.
+
+## [7.8.0] - 2026-07-30 (V.12.2 en el título de la ventana)
+
+### ⚡ Latencia del enriquecimiento de Demandante/Demandado
+
+- **FIXED:** `_enrich_worker` (`search_coordinator.py`) tenía dos `time.sleep()` fijos que sumaban 1.5s de espera artificial en CADA búsqueda antes de consultar la BD, sin relación con la velocidad real de la consulta SQL (comparado directamente contra el macro `CargarAnotaciones_v4.xlsm`, que ejecuta el mismo tipo de consulta sin ninguna espera). Se quitó el sleep inicial de 1s (los resultados ya están en el árbol cuando corre este worker) y el sleep de 0.5s se reemplazó por un `threading.Event` que libera al worker en cuanto el hilo principal termina de leer el TreeView, con 1s como tope de seguridad en vez de espera fija.
+
 ## [7.7.0] - 2026-07-30 (V.12.1 en el título de la ventana)
 
 ### 🧹 Limpieza de Código y Corrección de Atajos

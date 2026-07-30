@@ -101,6 +101,11 @@ class ContentIndexer:
                 continue
                 
             # Término normal o frase
+            # Términos con guión interno (radicados tipo "2022-464") rompen la sintaxis
+            # de columna/exclusión de FTS5 si van sin comillas (ej: "no such column: 464").
+            # Se envuelven en comillas para forzarlos a coincidencia de frase literal.
+            if not (token.startswith('"') and token.endswith('"')) and ('-' in token or ':' in token):
+                token = f'"{token}"'
             parsed_parts.append(token)
             
         # 2. Correcciones finales para FTS5

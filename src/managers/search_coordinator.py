@@ -130,6 +130,13 @@ class SearchCoordinator:
             except Exception as e:
                 print(f"[SEARCH COORDINATOR] Error en Fase Nitro: {e}")
 
+            # Enriquecimiento de metadatos (Demandante/Demandado): se dispara aquí, apenas
+            # terminan las fases rápidas (Caché + Nitro), en vez de esperar a que terminen
+            # también la búsqueda de contenido y el barrido de disco (Fases 3-4), que pueden
+            # tardar varios segundos en ubicaciones OneDrive. Corre en su propio hilo, así que
+            # no bloquea las fases siguientes.
+            self._trigger_background_enrichment([], criterio, search_id)
+
             # --- FASE 3: BÚSQUEDA DE CONTENIDO (Solo si se marca la casilla) ---
             if incluir_contenido:
                 try:
@@ -183,12 +190,7 @@ class SearchCoordinator:
             # --- FINALIZACIÓN ---
             tiempo_total = time.time() - start_time
             self.app.master.after(0, self.app.ui_manager.habilitar_busqueda)
-            
-            # Enriquecimiento final de metadatos (el que ya teníamos funcionando)
-            # Como usamos mostrar_resultados_incrementales, los items ya están en el árbol con iid=ruta_abs
-            # No necesitamos pasar todos los resultados, el worker buscará radicado del criterio
-            self._trigger_background_enrichment([], criterio, search_id)
-            
+
             if not silenciosa:
                 self.app.master.after(0, lambda: self.app.ui_manager.actualizar_estado(
                     f"✅ Búsqueda completa ({tiempo_total:.2f}s)"
@@ -213,24 +215,23 @@ class SearchCoordinator:
             
             if not hasattr(self.app, 'database_manager') or not self.app.database_manager:
                 return
-            
-            # Esperar un momento para que la UI se pueble en búsquedas instantáneas
-            import time
-            time.sleep(1.0)
-            
-            # Recolectar nombres de carpeta actuales del TreeView en el hilo principal
+
+            # Recolectar nombres de carpeta actuales del TreeView en el hilo principal.
+            # Los items ya están en el árbol (mostrar_resultados_incrementales corrió antes
+            # de disparar este worker), así que solo esperamos a que el callback en el hilo
+            # principal termine de leerlos, con 1s como tope de seguridad.
             items_to_check = []
+            items_ready = threading.Event()
             def _get_items():
                 if hasattr(self.app, 'tree'):
                     for item_id in self.app.tree.get_children():
                         text = str(self.app.tree.item(item_id, 'text'))
                         items_to_check.append((item_id, text))
-            
+                items_ready.set()
+
             self.app.master.after(0, _get_items)
-            
-            # Dar tiempo a que main thread llene la lista
-            time.sleep(0.5)
-            
+            items_ready.wait(timeout=1.0)
+
             if not items_to_check: return
             
             # Extraer radicados únicos

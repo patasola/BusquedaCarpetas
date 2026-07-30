@@ -417,9 +417,9 @@ class BusquedaCarpetaApp:
         
         # Referencias UI
         self.ui_manager.configurar_referencias(*self._find_status_cache_frames())
-        
-        # AUTO-START SERVIDOR WEB (LAN)
-        self.master.after(1000, self.menu_manager._start_web_server)
+
+        # Servidor web (LAN): apagado por defecto, se activa manualmente
+        # con el botón/label inferior (label_web_status) o desde el menú.
 
     def _find_status_cache_frames(self):
         """Busca frames en jerarquía"""

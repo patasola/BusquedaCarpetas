@@ -1,7 +1,7 @@
 # src/core/constants.py - Constantes V7 (Purgatorio)
 
 # Información de la aplicación
-APP_VERSION = "V7.7 - Code Cleanup & Fixes"
+APP_VERSION = "V7.11 - Early Party Enrichment Trigger"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana

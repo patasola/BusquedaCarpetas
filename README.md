@@ -16,9 +16,10 @@ Sistema de búsqueda de alta fidelidad para documentos locales (PDF, Word, Excel
 - `/client`: Manejador de protocolo `busqueda://` para integración con Windows.
 
 ## 💻 Instalación para Usuarios
-1. Acceder a `http://[IP-DEL-SERVIDOR]:8080`.
-2. Hacer clic en **🔌 Configurar** para descargar e instalar el acceso directo.
-3. ¡Listo! Ya puedes buscar y abrir archivos con un solo clic.
+1. En el equipo que aloja el servidor: en la app de escritorio, activar el label **🌐 Off** (esquina inferior derecha) — el servidor web viene **apagado por defecto** y debe encenderse manualmente en cada sesión.
+2. Acceder a `http://[IP-DEL-SERVIDOR]:8080`.
+3. Hacer clic en **🔌 Configurar** para descargar e instalar el acceso directo.
+4. ¡Listo! Ya puedes buscar y abrir archivos con un solo clic.
 
 ---
 *Desarrollado para optimizar el flujo de trabajo en el Consejo Superior de la Judicatura.*
