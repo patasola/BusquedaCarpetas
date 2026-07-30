@@ -82,13 +82,26 @@ class WebServerManager:
             return True, "El servidor no está corriendo."
             
         try:
-            # Intentar matar procesos python que tengan el puerto 8080 (Windows)
-            # Una forma más limpia es guardar el PID, pero Popen ya nos lo da.
             if self.process:
                 self.process.terminate()
                 self.process = None
             
-            # Fallback agresivo para Windows si Popen no bastó
+            # Buscar el PID que usa el puerto 8080 y matarlo de forma robusta
+            import re
+            result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, creationflags=0x08000000)
+            pids_to_kill = set()
+            for line in result.stdout.splitlines():
+                if f":{self.port} " in line and "LISTENING" in line:
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        pid = parts[-1]
+                        if pid != "0":
+                            pids_to_kill.add(pid)
+            
+            for pid in pids_to_kill:
+                subprocess.run(["taskkill", "/F", "/PID", pid, "/T"], creationflags=0x08000000, capture_output=True)
+            
+            # Fallback por compatibilidad
             subprocess.run(["taskkill", "/F", "/IM", "pythonw.exe", "/T"], 
                           creationflags=0x08000000, capture_output=True)
             

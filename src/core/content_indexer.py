@@ -214,9 +214,47 @@ class ContentIndexer:
                 return {'total_files': total}
         except: return {'total_files': 0}
 
+    def _purge_deleted_files(self, folder_path, progress_callback=None):
+        """Elimina del índice archivos/carpetas que ya no existen en disco"""
+        search_path = os.path.normpath(folder_path)
+        prefix_match = search_path + os.sep
+        
+        try:
+            with self.db_lock:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT path FROM file_metadata WHERE path = ? OR path LIKE ?", 
+                               (search_path, prefix_match + '%',))
+                indexed_paths = [row[0] for row in cursor.fetchall()]
+                conn.close()
+            
+            orphans = [p for p in indexed_paths if not os.path.exists(p)]
+            
+            if orphans:
+                if progress_callback:
+                    progress_callback(f"Limpiando {len(orphans)} entradas huérfanas...", 0)
+                with self.db_lock:
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    for p in orphans:
+                        cursor.execute("DELETE FROM file_metadata WHERE path = ?", (p,))
+                        cursor.execute("DELETE FROM content_fts WHERE path = ?", (p,))
+                    conn.commit()
+                    conn.close()
+                print(f"[CONTENT] Purgados {len(orphans)} archivos huérfanos de {os.path.basename(folder_path)}")
+            
+            return len(orphans)
+        except Exception as e:
+            print(f"[CONTENT] Error purgado huérfanos: {e}")
+            return 0
+
     def index_folder(self, folder_path, progress_callback=None, skip_content=False):
         self.stop_requested = False
         folder_name = os.path.basename(folder_path)
+        
+        # Purgar archivos borrados antes de indexar (Limpieza de resultados fantasma)
+        self._purge_deleted_files(folder_path, progress_callback)
+        
         try:
             files_to_index = []
             folders_to_index = []

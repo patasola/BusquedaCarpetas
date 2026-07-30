@@ -639,7 +639,19 @@ class ContentSearchModal:
             self.modal.update()
             
             def run():
+                # Detener temporalmente el servidor web si está activo para evitar bloqueos
+                server_was_running = False
+                if hasattr(self.app, 'web_server_manager') and self.app.web_server_manager.is_running():
+                    server_was_running = True
+                    self.app.web_server_manager.stop_server()
+                    time.sleep(1) # Esperar un segundo para liberar el archivo de base de datos
+                
                 success = self.indexer.clear_all_index()
+                
+                # Volver a iniciar el servidor web si estaba activo
+                if server_was_running:
+                    self.app.web_server_manager.start_server()
+                    
                 if self.modal and self.modal.winfo_exists():
                     self.modal.after(0, lambda: self._post_clear(success))
                     
@@ -659,6 +671,9 @@ class ContentSearchModal:
             self.status_var.set("📊 Índice eliminado")
             self._populate_config_tree()
             self._update_status_from_locs()
+        else:
+            messagebox.showerror("Error", "No se pudo borrar el índice. Es posible que otro proceso esté bloqueando la base de datos de búsqueda. Por favor, cierra la aplicación, vuelve a abrirla e intenta de nuevo.", parent=self.modal)
+            self.status_var.set("❌ Error borrando índice")
 
     def _do_search(self, query, search_type, tree):
         if not query: return

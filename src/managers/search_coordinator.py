@@ -109,14 +109,24 @@ class SearchCoordinator:
                 res_nitro = self.app.content_indexer.search(criterio, search_field="path")
                 if res_nitro:
                     res_ui_nitro = []
+                    stale_paths = []
                     for r in res_nitro:
-                        # Identificar si es una carpeta (icono expandible)
-                        es_carpeta = r.get('is_folder', False)
-                        res_ui_nitro.append((r['name'], r['path'], r['abs_path'], es_carpeta, "Nitro", "", ""))
+                        ruta = r.get('abs_path', r.get('path', ''))
+                        if os.path.exists(ruta):
+                            # Identificar si es una carpeta (icono expandible)
+                            es_carpeta = r.get('is_folder', False)
+                            res_ui_nitro.append((r['name'], r['path'], r['abs_path'], es_carpeta, "Nitro", "", ""))
+                        else:
+                            stale_paths.append(ruta)
                     
-                    self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
-                        res_ui_nitro, "N", time.time() - start_time
-                    ))
+                    if res_ui_nitro:
+                        self.app.master.after(0, lambda: self.app.ui_manager.mostrar_resultados_incrementales(
+                            res_ui_nitro, "N", time.time() - start_time
+                        ))
+                        
+                    # Purgar obsoletos si los hay
+                    if stale_paths and hasattr(self, '_cleanup_stale_nitro'):
+                        threading.Thread(target=self._cleanup_stale_nitro, args=(stale_paths,), daemon=True).start()
             except Exception as e:
                 print(f"[SEARCH COORDINATOR] Error en Fase Nitro: {e}")
 
@@ -197,35 +207,87 @@ class SearchCoordinator:
         threading.Thread(target=self._enrich_worker, args=(resultados, criterio, search_id), daemon=True).start()
 
     def _enrich_worker(self, resultados, criterio, search_id):
-        """Worker que consulta BD y actualiza UI"""
+        """Worker que consulta BD y actualiza UI por cada resultado"""
         try:
             if search_id != self.current_search_id: return
             
             if not hasattr(self.app, 'database_manager') or not self.app.database_manager:
                 return
             
-            radicado = self._convertir_a_radicado(criterio)
-            if not radicado: return
+            # Esperar un momento para que la UI se pueble en búsquedas instantáneas
+            import time
+            time.sleep(1.0)
             
-            # Consultar BD (operación lenta)
-            demandante, demandado = self.app.database_manager.obtener_info_proceso(radicado)
+            # Recolectar nombres de carpeta actuales del TreeView en el hilo principal
+            items_to_check = []
+            def _get_items():
+                if hasattr(self.app, 'tree'):
+                    for item_id in self.app.tree.get_children():
+                        text = str(self.app.tree.item(item_id, 'text'))
+                        items_to_check.append((item_id, text))
             
-            # Verificar cancelación ANTES de actualizar UI
-            if search_id != self.current_search_id: return
+            self.app.master.after(0, _get_items)
             
-            if demandante or demandado:
-                # Actualizar UI en hilo principal
-                self.app.master.after(0, lambda: self.app.ui_manager.actualizar_metadata_resultados(
-                    demandante, demandado
-                ))
+            # Dar tiempo a que main thread llene la lista
+            time.sleep(0.5)
+            
+            if not items_to_check: return
+            
+            # Extraer radicados únicos
+            radicados_a_consultar = {} # radicado: [item_ids]
+            
+            for item_id, text in items_to_check:
+                rad = self._convertir_a_radicado(text)
+                if rad:
+                    if rad not in radicados_a_consultar:
+                        radicados_a_consultar[rad] = []
+                    radicados_a_consultar[rad].append(item_id)
+            
+            # Consultar BD en bloque (Batch) para velocidad máxima
+            resultados_batch = self.app.database_manager.obtener_info_procesos_batch(list(radicados_a_consultar.keys()))
+            
+            # Actualizar UI agrupando por radicado
+            for radicado, item_ids in radicados_a_consultar.items():
+                if search_id != self.current_search_id: return
                 
-                # Actualizar también el historial si es posible
-                if hasattr(self.app, 'historial_manager') and self.app.historial_manager:
-                     self.app.master.after(0, lambda: self.app.historial_manager.actualizar_ultima_busqueda(
-                        demandante, demandado
-                    ))
+                if radicado in resultados_batch:
+                    demandante, demandado = resultados_batch[radicado]
+                    if demandante or demandado:
+                        self.app.master.after(0, lambda ids=item_ids, d1=demandante, d2=demandado: 
+                            self.app.ui_manager.actualizar_metadata_por_ids(ids, d1, d2))
+                        
+            # Si el criterio en sí mismo era un radicado, actualizar historial
+            rad_criterio = self._convertir_a_radicado(criterio)
+            if rad_criterio:
+                if rad_criterio in resultados_batch:
+                    dem1, dem2 = resultados_batch[rad_criterio]
+                else:
+                    dem1, dem2 = self.app.database_manager.obtener_info_proceso(rad_criterio)
+                    
+                if hasattr(self.app, 'historial_manager') and self.app.historial_manager and (dem1 or dem2):
+                     self.app.master.after(0, lambda d1=dem1, d2=dem2: 
+                        self.app.historial_manager.actualizar_ultima_busqueda(d1, d2))
+
         except Exception as e:
             print(f"[BG ENRICH] Error: {e}")
+
+    def _cleanup_stale_nitro(self, stale_paths):
+        """Elimina del índice los resultados Nitro que ya no existen en disco"""
+        if not stale_paths or not hasattr(self.app, 'content_indexer'): return
+        try:
+            import sqlite3
+            db_path = self.app.content_indexer.db_path
+            with self.app.content_indexer.db_lock:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                for p in stale_paths:
+                    cursor.execute("DELETE FROM file_metadata WHERE path = ?", (p,))
+                    cursor.execute("DELETE FROM content_fts WHERE path = ?", (p,))
+                conn.commit()
+                conn.close()
+            print(f"[SEARCH COORDINATOR] Purgados {len(stale_paths)} resultados fantasma Nitro de forma diferida.")
+        except Exception as e:
+            print(f"[SEARCH COORDINATOR] Error limpiando resultados fantasma diferidos: {e}")
 
     
     def _append_results_batch(self, resultados, criterio, loc_name, start_time, silenciosa, search_id):
@@ -340,15 +402,24 @@ class SearchCoordinator:
         except:
             return False
 
-    def _convertir_a_radicado(self, criterio):
-        """Helper para extraer radicado de 23 dígitos"""
+    def _convertir_a_radicado(self, texto):
+        """Helper para extraer radicado de 23 dígitos de cualquier texto"""
+        if not texto: return None
         import re
-        # Formato AAAA-XXXXX -> 23 dígitos
-        match = re.match(r'(\d{4})-(\d+)$', criterio)
+        
+        # 1. Buscar si hay exactamente 23 dígitos seguidos (o que al limpiar lo sean)
+        digitos = ''.join(filter(str.isdigit, texto))
+        if len(digitos) >= 23:
+            match_23 = re.search(r'\b(\d{23})\b', texto)
+            if match_23: return match_23.group(1)
+            
+        # 2. Buscar formato AAAA-XXXXX en cualquier parte del texto
+        match = re.search(r'\b(\d{4})-(\d{1,5})\b', texto)
         if match:
             año = match.group(1)
             exp = match.group(2).zfill(5)
             return f"110013105017{año}{exp}00"
+            
         return None
     
     def _should_use_cache(self, criterio):

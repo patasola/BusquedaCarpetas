@@ -89,13 +89,13 @@ class DatabaseManager:
                 if len(radicado_limpio) > 23:
                     radicado_limpio = radicado_limpio[:23]
                 
-                query = """
+                query = f"""
                     SELECT A112CODISUJE, A112NOMBSUJE 
                     FROM T112DRSUJEPROC 
-                    WHERE A112LLAVPROC = ?
+                    WHERE A112LLAVPROC = '{radicado_limpio}'
                 """
                 
-                cursor.execute(query, (radicado_limpio,))
+                cursor.execute(query)
                 rows = cursor.fetchall()
                 
                 demandantes = []
@@ -136,6 +136,102 @@ class DatabaseManager:
                     cursor.close()
                 except:
                     pass
+
+    def obtener_info_procesos_batch(self, radicados_list):
+        """
+        Busca información de partes para múltiples radicados en una sola consulta.
+        Retorna: dict {radicado: (demandante, demandado)}
+        """
+        # Filtrar los que ya están en caché para no volver a consultarlos
+        resultados = {}
+        faltantes = []
+        
+        for rad in radicados_list:
+            if rad in self._cache:
+                resultados[rad] = self._cache[rad]
+            else:
+                rad_limpio = ''.join(filter(str.isdigit, str(rad)))
+                if len(rad_limpio) > 23: rad_limpio = rad_limpio[:23]
+                if rad_limpio:
+                    faltantes.append(rad_limpio)
+        
+        if not faltantes:
+            self.last_query_time = time.time()
+            return resultados
+            
+        # Deduplicar
+        faltantes = list(set(faltantes))
+        
+        with self._lock:
+            if not self.connection:
+                if not self.conectar():
+                    return resultados
+                    
+            try:
+                cursor = self.connection.cursor()
+                
+                # Procesar en lotes de 200 para evitar queries gigantes
+                chunk_size = 200
+                for i in range(0, len(faltantes), chunk_size):
+                    chunk = faltantes[i:i + chunk_size]
+                    placeholders = ','.join([f"'{rad}'" for rad in chunk])
+                    
+                    query = f"""
+                        SELECT A112LLAVPROC, A112CODISUJE, A112NOMBSUJE 
+                        FROM T112DRSUJEPROC 
+                        WHERE A112LLAVPROC IN ({placeholders})
+                    """
+                    
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                    
+                    # Agrupar por radicado temporalmente
+                    temp_data = {} # radicado: {demandantes: [], demandados: []}
+                    for rad in chunk:
+                        temp_data[rad] = {'dem1': [], 'dem2': []}
+                        
+                    for row in rows:
+                        llav = row[0].strip()
+                        codigo = row[1]
+                        nombre = row[2].strip() if row[2] else ""
+                        
+                        if llav in temp_data:
+                            if codigo == '0001':
+                                temp_data[llav]['dem1'].append(nombre)
+                            elif codigo == '0002':
+                                temp_data[llav]['dem2'].append(nombre)
+                                
+                    for rad in chunk:
+                        d1 = " | ".join(temp_data[rad]['dem1']) if temp_data[rad]['dem1'] else "Desconocido"
+                        d2 = " | ".join(temp_data[rad]['dem2']) if temp_data[rad]['dem2'] else "Desconocido"
+                        
+                        if d1 == "Desconocido" and d2 == "Desconocido":
+                            res_tuple = (None, None)
+                        else:
+                            res_tuple = (d1, d2)
+                            
+                        self._cache[rad] = res_tuple
+                        resultados[rad] = res_tuple
+                        
+                # Limpiar cache si excede limite
+                if len(self._cache) > self._cache_max_size:
+                    keys_to_remove = list(self._cache.keys())[:len(faltantes)]
+                    for k in keys_to_remove:
+                        self._cache.pop(k, None)
+                        
+                self.last_query_time = time.time()
+                
+            except pyodbc.Error as e:
+                print(f"[DB Batch Query Error] {e}")
+                if "08S01" in str(e) or "08001" in str(e):
+                    self.connection = None
+            finally:
+                try:
+                    cursor.close()
+                except:
+                    pass
+                    
+        return resultados
 
     def test_connection(self, dsn, user="", password=""):
         """Prueba una configuración de conexión"""

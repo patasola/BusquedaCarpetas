@@ -270,6 +270,22 @@ class UIManager:
             import sys
             sys.stdout.flush() 
 
+    def actualizar_metadata_por_ids(self, item_ids, demandante, demandado):
+        """Actualiza metadata SOLO en los items especificados"""
+        try:
+            if not hasattr(self.app, 'tree'): return
+            tree = self.app.tree
+            
+            for item_id in item_ids:
+                if tree.exists(item_id):
+                    values = list(tree.item(item_id, 'values'))
+                    if len(values) >= 5:
+                        values[2] = demandante or ""
+                        values[3] = demandado or ""
+                        tree.item(item_id, values=tuple(values))
+        except Exception as e:
+            print(f"[UI ERROR] Falló actualizar metadata por IDs: {e}")
+
     def copiar_ruta(self):
         """Copia la ruta de la carpeta seleccionada al portapapeles"""
         try:
