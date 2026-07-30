@@ -24,7 +24,7 @@ class KeyboardManager:
         
         # Atajos principales
         shortcuts = {
-            '<F1>': lambda e: self.app.mostrar_manual(),
+            '<F1>': lambda e: self.app.menu_manager.mostrar_manual(),
             '<F4>': lambda e: self.app.ui_manager.cambiar_modo_entrada(),
             '<F5>': lambda e: self.app.ui_manager.enfocar_y_seleccionar_campo(),
             '<F6>': self._handle_f6,

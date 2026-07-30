@@ -8,7 +8,6 @@ from ..core.config import ConfigManager
 from ..core.cache_manager import CacheManager
 from ..core.search_engine import SearchEngine
 from .search_coordinator import SearchCoordinator
-from .search_manager import SearchManager
 from ..ui.ui_components import UIComponents
 from .ui_manager import UIManager
 from .event_manager import EventManager
@@ -366,13 +365,6 @@ class BusquedaCarpetaApp:
         self.label_carpeta_info.bind("<Button-1>", lambda e: self.menu_manager._show_locations_config())
         self.label_carpeta_info.configure(cursor="hand2")
         self.location_tooltip = LocationTooltip(self.label_carpeta_info, self.multi_location_search)
-        
-        # Tree explorer
-        try:
-            from .tree_explorer import TreeExplorer
-            self.tree_explorer = TreeExplorer(self.main_container, self)
-        except ImportError:
-            self.tree_explorer = None
 
     def _start_location_rotation(self):
         """Rotación de texto en barra"""
@@ -386,7 +378,6 @@ class BusquedaCarpetaApp:
         self.theme_manager.aplicar_tema()
         self.ui_manager = UIManager(self)
         self.ui_manager.configurar_validacion()
-        self.search_manager = SearchManager(self.cache_manager, self.search_engine, None, self.ui_manager)
         self.search_coordinator = SearchCoordinator(self)
         self.event_manager = EventManager(self)
         self.navigation_manager = NavigationManager(self)
@@ -675,26 +666,6 @@ class BusquedaCarpetaApp:
             tk.Label(inner_frame, text=f": {desc}", bg='#34495e', 
                     fg='#ecf0f1', font=('Segoe UI', 9)).pack(side='left')
     
-    def _start_main_resize(self, event):
-        """Inicia redimensionamiento de la app principal"""
-        self.resize_start_x = event.x_root
-        self.resize_start_width = self.main_container_wrapper.winfo_width()
-
-    def _do_main_resize(self, event):
-        """Realiza redimensionamiento de la app principal"""
-        if not hasattr(self, 'main_container_wrapper'):
-            return
-        
-        # Calcular diferencia
-        diff = event.x_root - self.resize_start_x
-        new_width = self.resize_start_width + diff
-        
-        # Limitar ancho (mínimo 600px, máxim        new_width = max(600, min(screen_width - 300, new_width))
-        
-        # Aplicar nuevo ancho al wrapper del main container
-        self.main_container_wrapper.config(width=new_width)
-        self.main_container_wrapper.pack_propagate(False)
-
     def _init_content_search(self):
         """Inicializa los componentes de búsqueda por contenido"""
         try:

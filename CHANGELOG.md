@@ -1,4 +1,23 @@
-# Changelog - BusquedaCarpetas V.6.2 (Empíreo Sincro)
+# Changelog - BusquedaCarpetas
+
+## [7.7.0] - 2026-07-30 (V.12.1 en el título de la ventana)
+
+### 🧹 Limpieza de Código y Corrección de Atajos
+
+#### Refactor: eliminación de código muerto y duplicado
+- **REMOVED:** Clase `SearchManager` completa (151 líneas) — se instanciaba pero ningún método se llegó a invocar nunca; toda búsqueda real pasa por `SearchCoordinator`.
+- **REMOVED:** `tree_explorer.py` (432 líneas) — se instanciaba pero su único punto de entrada (`setup_explorer_mode()`) nunca se llamaba.
+- **REMOVED:** `src/historial/historial_storage.py` — duplicaba la persistencia que ya hace `historial_manager.py`.
+- **REMOVED:** `src/components/` y `ui/components/tree_view.py` — el primero tenía un import roto a un archivo inexistente; `ConfigurableTreeView` nunca se instanciaba.
+- **REMOVED:** `ui/changelog_viewer.py` y `ui/manual_viewer.py` — sin uso (el manual/changelog real se renderiza desde `menu_manager.py`).
+- **REMOVED:** Definición duplicada de `verificar_problemas_cache` en `search_coordinator.py` (la primera quedaba sombreada e inalcanzable).
+- **REMOVED:** ~230 líneas de una cadena de búsqueda alterna inalcanzable en `search_coordinator.py` (`_search_traditional`, `_search_from_cache`, `_on_search_completed_async`, `_on_search_error`, etc.).
+
+#### Fixed
+- **FIXED:** El atajo **F1** (Manual de Usuario) estaba completamente roto — dos bindings distintos (`event_manager.py` y `keyboard_manager.py`) llamaban a métodos/atributos que nunca existieron en `BusquedaCarpetaApp`, fallando en silencio (el error solo quedaba en `app_log.txt`). Ahora F1 llama correctamente a `menu_manager.mostrar_manual()`.
+
+#### Versión
+- **BUMP:** Título de ventana `V.12.0` → `V.12.1` y `APP_VERSION` (diálogo Acerca de) `V7.6` → `V7.7`, para poder distinguir a simple vista si se está corriendo el build actualizado.
 
 ## [6.2.0] - 2026-04-14
 

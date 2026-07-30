@@ -19,7 +19,6 @@ class EventManager:
     def _config_atajos_teclado(self):
         """Configura atajos de teclado globales"""
         atajos = {
-            "<F1>": lambda e: self.app.manual_viewer.show_manual(),
             "<F2>": lambda e: self._fix_f2_focus(),
             "<F3>": lambda e: self.copiar_ruta_seleccionada(),
             "<F5>": lambda e: self.app.ui_manager.enfocar_y_seleccionar_campo(),
@@ -167,29 +166,6 @@ class EventManager:
         self.app.tree.selection_set(elemento)
         self.app.tree.focus(elemento)
         self.app.tree.see(elemento)
-    
-    def on_tree_select(self, event):
-        """Maneja selección en el TreeView"""
-        seleccion = self.app.tree.selection()
-        hay_seleccion = len(seleccion) > 0
-        estado = tk.NORMAL if hay_seleccion else tk.DISABLED
-        
-        self.app.btn_abrir.config(state=estado)
-        self.app.btn_copiar.config(state=estado)
-        self.app.configurar_scrollbars()
-        
-        # [NUEVO] Sincronizar con el explorador de archivos
-        if hay_seleccion:
-            try:
-                # Obtener la ruta absoluta del item seleccionado
-                # El ResultsRenderer inserta la ruta absoluta en el último índice de values
-                values = self.app.tree.item(seleccion[0], 'values')
-                if values and len(values) >= 5:
-                    ruta_abs = values[4] # Índice 4 es RutaAbsoluta
-                    if os.path.exists(ruta_abs):
-                        self.app.file_explorer_manager.focus_path(ruta_abs)
-            except Exception as e:
-                print(f"[DEBUG] Error sincronizando selección: {e}")
     
     def abrir_carpeta_seleccionada(self):
         """Abre la carpeta seleccionada - CORREGIDO FINAL"""
