@@ -22,6 +22,31 @@ class WindowManager:
         self.manual_app_width = None
         self._is_auto_resizing = False  # Lock para evitar bucles de eventos
     
+    def _clamp_geometry_to_screen(self, geometry_str):
+        """
+        Corrige una geometría guardada (formato 'WxH+X+Y') si quedaría fuera de la
+        pantalla actual — por ejemplo, tras cambiar de resolución, desconectar un
+        segundo monitor, o mover el equipo a otra pantalla. Sin esto, la ventana
+        puede abrirse invisible (posición fuera del área visible) y parecer que la
+        app "no carga", aunque el proceso sí esté corriendo.
+        """
+        import re
+        match = re.match(r'^(\d+)x(\d+)\+(-?\d+)\+(-?\d+)$', geometry_str)
+        if not match:
+            return geometry_str
+
+        w, h, x, y = (int(v) for v in match.groups())
+
+        # No dejar que la ventana sea más grande que la pantalla disponible
+        w = min(w, self.screen_width)
+        h = min(h, self.screen_height)
+
+        # Acotar posición para que la ventana quede siempre visible
+        x = max(0, min(x, self.screen_width - w))
+        y = max(0, min(y, self.screen_height - h))
+
+        return f"{w}x{h}+{x}+{y}"
+
     def configurar_ventana(self, saved_geometry=None, manual_app_width=None):
         """Configura las propiedades básicas de la ventana"""
         from ..core.constants import APP_TITLE
@@ -48,8 +73,9 @@ class WindowManager:
         
         if saved_geometry:
             try:
-                self.master.geometry(saved_geometry)
-                print(f"[DEBUG] Geometría cargada: {saved_geometry}")
+                safe_geometry = self._clamp_geometry_to_screen(saved_geometry)
+                self.master.geometry(safe_geometry)
+                print(f"[DEBUG] Geometría cargada: {safe_geometry}")
             except:
                 x = max(0, (self.screen_width - self.base_app_width) // 2)
                 y = max(0, (self.screen_height - initial_height) // 2)

@@ -20,8 +20,6 @@ from .menu_manager import MenuManager
 from .dual_panel_manager import DualPanelManager
 from .keyboard_manager import KeyboardManager
 from ..core.multi_location_search import MultiLocationSearch
-from .search_methods import SearchMethods
-from ..ui.results_display import ResultsDisplay
 from ..ui.theme_manager import ThemeManager
 from .column_manager import ColumnManager
 
@@ -373,8 +371,6 @@ class BusquedaCarpetaApp:
 
     def _init_managers_core(self):
         """Inicializa solo los managers esenciales para el UI base"""
-        self.search_methods = SearchMethods(self)
-        self.results_display = ResultsDisplay(self)
         self.theme_manager.aplicar_tema()
         self.ui_manager = UIManager(self)
         self.ui_manager.configurar_validacion()
@@ -442,7 +438,7 @@ class BusquedaCarpetaApp:
         find_frames(self.master)
         return status_frame, cache_frame
 
-    # BÚSQUEDA - Delegada a SearchMethods
+    # BÚSQUEDA - Delegada a SearchCoordinator
     def buscar_carpeta(self, silenciosa=False):
         """Búsqueda principal"""
         criterio = self.entry.get().strip()
@@ -458,7 +454,7 @@ class BusquedaCarpetaApp:
             self.btn_buscar.configure(text='Buscando...')
             self.ui_manager.actualizar_estado("Iniciando...")
         
-        self.master.after(1, lambda: self.search_methods.ejecutar_busqueda(criterio, silenciosa=silenciosa))
+        self.master.after(1, lambda: self.search_coordinator.ejecutar_busqueda(criterio, silenciosa=silenciosa))
 
     def cancelar_busqueda(self):
         """Cancela búsqueda"""
@@ -606,13 +602,6 @@ class BusquedaCarpetaApp:
 
     def obtener_seleccion_tabla(self):
         return self.ui_manager.obtener_seleccion_tabla()
-
-    # Delegación
-    def buscar_carpetas(self, criterio):
-        return self.search_coordinator.ejecutar_busqueda(criterio)
-
-    def mostrar_resultados(self, resultados, criterio, metodo="C"):
-        self.ui_manager.mostrar_resultados(resultados, criterio, metodo)
 
     def actualizar_estado(self, mensaje):
         self.ui_manager.actualizar_estado(mensaje)

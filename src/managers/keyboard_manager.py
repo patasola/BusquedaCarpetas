@@ -37,10 +37,18 @@ class KeyboardManager:
             self.app.master.bind(key, handler)
         
         # Atajos de paneles
-        self.app.master.bind('<Control-Shift-h>', lambda e: self.toggle_historial())
-        self.app.master.bind('<Control-Shift-H>', lambda e: self.toggle_historial())
-        self.app.master.bind('<Control-Shift-e>', lambda e: self.toggle_explorador())
-        self.app.master.bind('<Control-Shift-E>', lambda e: self.toggle_explorador())
+        # NOTA: en Tkinter, un binding con letra MAYÚSCULA (ej. <Control-E>) implica
+        # Shift también (la "E" solo se produce con Shift presionado). Eso hace que
+        # <Control-Shift-E>/<Control-Shift-H> aquí y <Control-E>/<Control-H> en
+        # event_manager.py (centrar ventana / toggle historial) capturen la MISMA
+        # combinación de teclas. Sin "break", ambos handlers se disparan uno tras
+        # otro (el de aquí primero, por estar bindeado directo al widget en vez de
+        # con bind_all). Se retorna "break" para no propagar el evento y evitar el
+        # disparo duplicado/colisión.
+        self.app.master.bind('<Control-Shift-h>', lambda e: self.toggle_historial() or "break")
+        self.app.master.bind('<Control-Shift-H>', lambda e: self.toggle_historial() or "break")
+        self.app.master.bind('<Control-Shift-e>', lambda e: self.toggle_explorador() or "break")
+        self.app.master.bind('<Control-Shift-E>', lambda e: self.toggle_explorador() or "break")
 
         # F12: Toggle tema
         self.app.master.bind('<F12>', lambda e: self._toggle_tema())

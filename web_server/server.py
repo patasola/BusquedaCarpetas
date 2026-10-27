@@ -48,6 +48,9 @@ def search_normalized(q, field, extension):
 _indexing_status = {'running': False, 'message': 'Listo', 'progress': 0}
 _indexing_lock = threading.Lock()
 
+# Almacén temporal para detecciones de OneDrive (token -> {paths, time})
+_onedrive_detections = {}
+
 # ─── Rutas Principales ───────────────────────────────────────────────────────
 
 @app.route('/')
@@ -177,6 +180,66 @@ def get_locations():
         return jsonify({'locations': []})
     except Exception as e:
         return jsonify({'locations': [], 'error': str(e)})
+
+# ─── API: Ruta base del servidor (para remapeo de OneDrive en clientes) ───────
+
+@app.route('/api/server-base')
+def server_base():
+    """Devuelve la ruta raíz del OneDrive en el servidor.
+    Los clientes la usan para calcular qué prefijo reemplazar por su ruta local."""
+    try:
+        # Leer content_locations.json (fuente más confiable)
+        root_locations = os.path.join(ROOT_DIR, 'content_locations.json')
+        if os.path.exists(root_locations):
+            with open(root_locations, 'r', encoding='utf-8') as f:
+                locs = json.load(f)
+            if isinstance(locs, list) and locs:
+                # Extraer todas las rutas y encontrar el prefijo común
+                paths = []
+                for l in locs:
+                    p = l.get('path', '') if isinstance(l, dict) else l
+                    if p:
+                        paths.append(os.path.normpath(p))
+                
+                if paths:
+                    base = os.path.commonpath(paths)
+                    return jsonify({'base': base, 'source': 'content_locations_commonpath'})
+
+        return jsonify({'base': '', 'source': 'none'})
+    except Exception as e:
+        return jsonify({'base': '', 'error': str(e)})
+
+# ─── API: Detección automática de OneDrive (el VBS del cliente reporta aquí) ────────
+
+@app.route('/api/report-onedrive', methods=['POST'])
+def report_onedrive():
+    """El VBS cliente llama a este endpoint con las rutas OneDrive detectadas localmente."""
+    try:
+        data = request.get_json(force=True)
+        token = (data.get('token') or '').strip()
+        paths = data.get('paths') or []
+        if token and paths:
+            _onedrive_detections[token] = {
+                'paths': [p for p in paths if p],
+                'time': datetime.now()
+            }
+        # Limpiar tokens viejos (más de 2 minutos)
+        old = [t for t, v in _onedrive_detections.items()
+               if (datetime.now() - v['time']).seconds > 120]
+        for t in old:
+            _onedrive_detections.pop(t, None)
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+@app.route('/api/poll-onedrive')
+def poll_onedrive():
+    """El navegador del cliente consulta si el VBS ya reportó las rutas."""
+    token = request.args.get('token', '').strip()
+    if token and token in _onedrive_detections:
+        result = _onedrive_detections.pop(token)
+        return jsonify({'found': True, 'paths': result['paths']})
+    return jsonify({'found': False, 'paths': []})
 
 # ─── API: Archivos del Cliente ──────────────────────────────────────────────────
 

@@ -505,5 +505,17 @@ class ThemeManager:
             tree.tag_configure('evenrow', background=self.colores["tree_bg"], foreground=self.colores["tree_fg"])
             tree.tag_configure('oddrow', background=self.colores["tree_bg"], foreground=self.colores["tree_fg"])
             
+            # ── Highlight MigradoSIUGJ ──────────────────────────────────────
+            # Rojo suave y sobrio que guarda la estética sin saturar la vista.
+            if self.tema_actual == "oscuro":
+                tree.tag_configure('migrado_highlight',
+                                   background='#5c1d1d',   # Burdeos / vino oscuro elegante
+                                   foreground='#ffcdd2')   # Rosa suave / crema para óptima legibilidad
+            else:
+                tree.tag_configure('migrado_highlight',
+                                   background='#ffebee',   # Rosa pastel suave
+                                   foreground='#b71c1c')   # Rojo carmesí vino
+            
         except Exception as e:
             print(f"[ThemeManager] Error configurando tags de métodos: {e}")
+

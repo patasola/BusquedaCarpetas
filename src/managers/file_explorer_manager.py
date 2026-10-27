@@ -8,6 +8,10 @@ from datetime import datetime
 from ..ui.explorer_ui import ExplorerUI
 from ..utils.file_monitor import FileMonitor
 from ..utils.file_operations import FileOperations
+from .explorer_context_menu import ExplorerContextMenu
+from .explorer_clipboard import ExplorerClipboard
+from .explorer_path_sync import ExplorerPathSync
+from .explorer_drag_drop import ExplorerDragDrop
 
 class FileExplorerManager:
     """Gestor principal del explorador de archivos - Con crear carpeta inline"""
@@ -21,6 +25,10 @@ class FileExplorerManager:
         self.ui = None
         self.file_monitor = FileMonitor(self)
         self.file_ops = FileOperations(self)
+        self.context_menu = ExplorerContextMenu(self)
+        self.clipboard = ExplorerClipboard(self)
+        self.path_sync = ExplorerPathSync(self)
+        self.drag_drop = ExplorerDragDrop(self)
         
         # Variables de estado
         self.resize_start_x = 0
@@ -40,19 +48,6 @@ class FileExplorerManager:
         self.loaded_items = set()
         self.expanding_items = set()
 
-        # Clipboard para Ctrl+X/C/V
-        self._clipboard = {'paths': [], 'mode': None}
-        
-        # Drag & Drop state (soporta m├║ltiples items)
-        self._drag_state = {
-            'active': False,
-            'source_items': [],
-            'source_paths': [],
-            'start_x': 0,
-            'start_y': 0
-        }
-        self._drop_indicator = None
-    
         # Callback para notificar cambios al TreeView principal
         self.on_file_change_callback = None
         
@@ -189,8 +184,9 @@ class FileExplorerManager:
             self.ui.tree.bind('<Control-V>', lambda e: self.paste_item())
             
             # Drag & Drop visual
-            self.ui.tree.bind('<B1-Motion>', self._on_drag_motion, add='+')
-            self.ui.tree.bind('<ButtonRelease-1>', self._on_drag_release, add='+')
+            self.ui.tree.bind('<ButtonPress-1>', self.drag_drop.on_press, add='+')
+            self.ui.tree.bind('<B1-Motion>', self.drag_drop.on_motion, add='+')
+            self.ui.tree.bind('<ButtonRelease-1>', self.drag_drop.on_release, add='+')
             
             print("[DEBUG] Bindings Ctrl+C/X/V configurados")
             print(f"[DEBUG] Tree existe: {self.ui.tree is not None}")
@@ -415,23 +411,42 @@ class FileExplorerManager:
         if hasattr(self.app, 'label_estado'):
             self.app.label_estado.config(text="Creación de carpeta cancelada")
     
+    def _cancel_any_inline_edit(self):
+        """Cancela cualquier edición inline activa (crear o renombrar) de forma limpia.
+        Necesario antes de un reset completo del árbol (load_directory): si no se cancela
+        primero, el cuadro de edición queda "flotando" sobre un item ya borrado, y terminar
+        la edición falla con 'Item not found'."""
+        if not self.edit_entry:
+            return
+        try:
+            self.edit_entry.destroy()
+        except Exception:
+            pass
+        self.edit_entry = None
+        self.is_creating_new = False
+        self.new_folder_parent = None
+        self.editing_item = None
+        self.original_name = None
+
     def load_directory(self, path):
         """Carga el contenido de un directorio en estructura de ├írbol"""
         if not os.path.exists(path) or not os.path.isdir(path):
             return
-        
+
+        self._cancel_any_inline_edit()
+
         self.current_path = os.path.normpath(path)
         self.path_label.configure(text=f"Raíz: {self.current_path}")
-        
+
         # Si no hay un enfoque pendiente específico, limpiar cualquier rastro anterior
         # Pero NO limpiar si venimos de un focus_path que acaba de establecer un pending
         if not self.pending_focus_path:
-             pass 
-             
+             pass
+
         from datetime import datetime as _datetime
         current_time = _datetime.now().strftime("%H:%M:%S.%f")[:-3]
         print(f"[{current_time}] [DEBUG] Cargando directorio: {self.current_path}")
-        
+
         # Limpiar ├írbol y mapeos
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -491,6 +506,10 @@ class FileExplorerManager:
     def _finalize_load(self, parent_item, items, directory_path):
         """Actualiza la UI con los items cargados (Main Thread)"""
         try:
+            if not self.tree.exists(parent_item):
+                # Carga obsoleta: el item destino ya no existe (se recargó el árbol
+                # completo, o se refrescó otro nodo, mientras esta carga estaba en vuelo)
+                return
             self._clear_children(parent_item)
             if items is None:
                 self._add_error_node(parent_item, "⚠️ Acceso denegado")
@@ -518,6 +537,11 @@ class FileExplorerManager:
         """Limpia los hijos de un item"""
         children = self.tree.get_children(parent_item)
         for child in children:
+            # No borrar el item que está siendo creado/renombrado en este momento:
+            # un refresco concurrente (monitor de archivos o Actualizar Árbol) no debe
+            # arrancarlo de debajo de una edición inline en curso.
+            if self.edit_entry is not None and child == self.editing_item:
+                continue
             if child in self.item_to_path:
                 path_to_remove = self.item_to_path[child]
                 if path_to_remove in self.path_to_item:
@@ -613,35 +637,42 @@ class FileExplorerManager:
             print('[FileExplorer] Ya est├ís en la ra├¡z')
     
     def on_double_click(self, event):
-        """Doble click: abre carpeta/archivo en Windows Explorer"""
+        """Doble click: expande/colapsa carpetas en el panel; abre archivos con la app predeterminada"""
         selection = self.ui.tree.selection()
         if not selection:
             return
-        
+
         item = selection[0]
         path = self.item_to_path.get(item)
-        
-        if path:
-            # Abrir en Windows Explorer o app predeterminada
+
+        if not path:
+            return
+
+        if os.path.isdir(path):
+            self.toggle_expand_collapse()
+        else:
             self.file_ops.open_item(path)
     
     def on_enter_key(self, event):
         """Maneja tecla Enter"""
+        self.toggle_expand_collapse()
+        return "break"
+
+    def toggle_expand_collapse(self):
+        """Expande o colapsa la carpeta seleccionada"""
         selection = self.ui.tree.selection()
         if not selection:
-            return "break"
-        
+            return
+
         item = selection[0]
         path = self.item_to_path.get(item)
-        
+
         if path and os.path.isdir(path):
             is_open = self.tree.item(item, 'open')
             self.tree.item(item, open=not is_open)
-            
+
             if not is_open:
                 self.handle_node_expansion_immediate(item)
-        
-        return "break"
     
     def on_f2_key(self, event):
         """Maneja F2 para renombrar"""
@@ -663,7 +694,7 @@ class FileExplorerManager:
     def start_inline_edit(self, item):
         """Inicia edici├│n inline del nombre (SOLO para renombrar existentes)"""
         name = self.tree.item(item, 'text')
-        clean_name = name.replace('­ƒôü ', '').replace('­ƒôä ', '')
+        clean_name = name.replace('📁 ', '').replace('📄 ', '')
         
         bbox = self.tree.bbox(item, column='#0')
         if not bbox:
@@ -716,7 +747,7 @@ class FileExplorerManager:
         self.item_to_path[self.editing_item] = new_path
         
         is_dir = os.path.isdir(new_path)
-        prefix = "­ƒôü " if is_dir else "­ƒôä "
+        prefix = "📁 " if is_dir else "📄 "
         self.tree.item(self.editing_item, text=f"{prefix}{new_name}")
         
         if hasattr(self.app, 'label_estado'):
@@ -729,98 +760,8 @@ class FileExplorerManager:
             self.edit_entry = None
     
     def show_context_menu(self, event):
-        """Muestra men├║ contextual"""
-        region = self.tree.identify('region', event.x, event.y)
-        
-        if region != 'tree':
-            context_menu = tk.Menu(self.tree, tearoff=0)
-            context_menu.add_command(
-                label="📁 Nueva carpeta", 
-                command=self.create_new_folder_inline,
-                accelerator="Ctrl+N"
-            )
-            context_menu.add_separator()
-            context_menu.add_command(
-                label="🔄 Actualizar Árbol", 
-                command=self.refresh_tree
-            )
-            context_menu.add_command(
-                label="🏠 Ir a Home", 
-                command=self.go_home
-            )
-            
-            try:
-                context_menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                context_menu.grab_release()
-            return
-        
-        item = self.tree.identify_row(event.y)
-        if not item:
-            return
-        
-        self.tree.selection_set(item)
-        context_menu = tk.Menu(self.tree, tearoff=0)
-        
-        path = self.item_to_path.get(item)
-        if path and path != self.current_path:
-            self._add_context_menu_items(context_menu, path)
-        
-        context_menu.add_separator()
-        context_menu.add_command(
-            label="📁 Nueva carpeta", 
-            command=self.create_new_folder_inline,
-            accelerator="Ctrl+N"
-        )
-        context_menu.add_separator()
-        context_menu.add_command(
-            label="🔄 Actualizar Árbol", 
-            command=self.refresh_tree
-        )
-        context_menu.add_command(
-            label="🏠 Ir a Home", 
-            command=self.go_home
-        )
-        
-        try:
-            context_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            context_menu.grab_release()
-    
-    def _add_context_menu_items(self, menu, path):
-        """Agrega items específicos al menú contextual"""
-        if os.path.isdir(path):
-            menu.add_command(
-                label="📂 Expandir/Colapsar", 
-                command=lambda: self.on_double_click(None)
-            )
-            menu.add_command(
-                label="✍️ Renombrar carpeta", 
-                command=self.handle_f2,
-                accelerator="F2"
-            )
-        elif os.path.isfile(path):
-            menu.add_command(
-                label="📄 Abrir archivo", 
-                command=lambda: self.on_double_click(None)
-            )
-            menu.add_command(
-                label="✍️ Renombrar archivo", 
-                command=self.handle_f2,
-                accelerator="F2"
-            )
-        
-        menu.add_separator()
-        # ELIMINAR sin espacios extra
-        menu.add_command(
-            label="🗑️ Eliminar",
-            command=self.delete_selected_item,
-            accelerator="Supr"
-        )
-        menu.add_command(
-            label="📋 Copiar ruta", 
-            command=self.copy_selected_path
-        )
+        """Muestra menú contextual (delegado a ExplorerContextMenu)"""
+        self.context_menu.show(event)
 
     def copy_selected_path(self):
         """Copia ruta del elemento seleccionado"""
@@ -966,349 +907,21 @@ class FileExplorerManager:
                 self.ui.update_shortcuts_bar('none')
         else:
             self.ui.update_shortcuts_bar('none')
-    # ==================== CLIPBOARD METHODS (Ctrl+X/C/V) ====================
-    
+    # ==================== CLIPBOARD (Ctrl+X/C/V) - delegado a ExplorerClipboard ====
+
     def copy_item(self):
-        """Copia los items seleccionados al clipboard"""
-        selection = self.ui.tree.selection()
-        if not selection:
-            print('[FileExplorer] No hay selecci├│n para copiar')
-            return
-        
-        paths = [self.item_to_path.get(item) for item in selection if self.item_to_path.get(item)]
-        
-        if paths:
-            self._clipboard['paths'] = paths
-            self._clipboard['mode'] = 'copy'
-            print(f'[FileExplorer] Copiados {len(paths)} items')
-        else:
-            print('[FileExplorer] Error: no se pudo obtener rutas')
-        
+        self.clipboard.copy()
+
     def cut_item(self):
-        print('[FileExplorer] cut_item() LLAMADO')
-        """Corta los items seleccionados al clipboard (para mover)"""
-        selection = self.ui.tree.selection()
-        if not selection:
-            print('[FileExplorer] No hay selecci├│n para cortar')
-            return
+        self.clipboard.cut()
 
-        paths = [self.item_to_path.get(item) for item in selection if self.item_to_path.get(item)]
-
-        if paths:
-            self._clipboard['paths'] = paths
-            self._clipboard['mode'] = 'cut'
-            print(f'[FileExplorer] Cortados {len(paths)} items')
-        else:
-            print('[FileExplorer] Error: no se pudo obtener rutas')
-    
     def paste_item(self):
-        print('[FileExplorer] paste_item() LLAMADO')
-        """Pega el item del clipboard en la ubicaci├│n seleccionada"""
-        import shutil
-        
-        if not self._clipboard.get('paths'):
-            print('[FileExplorer] Clipboard vac├¡o')
-            return
-        
-        # Obtener destino
-        selection = self.ui.tree.selection()
-        if selection:
-            dest_item = selection[0]
-            dest_path = self.item_to_path.get(dest_item)
-        else:
-            dest_path = self.current_path
-        
-        if not dest_path or not os.path.isdir(dest_path):
-            messagebox.showerror("Error", "Destino debe ser una carpeta")
-            return
-        
-        source_paths = self._clipboard['paths']
-        mode = self._clipboard['mode']
-        
-        try:
-            successful = 0
-            for source_path in source_paths:
-                if not os.path.exists(source_path):
-                    continue
-                
-                item_name = os.path.basename(source_path)
-                new_path = os.path.join(dest_path, item_name)
-                
-                # Auto-renombrar si existe
-                if os.path.exists(new_path):
-                    base, ext = os.path.splitext(item_name)
-                    counter = 1
-                    while os.path.exists(new_path):
-                        new_name = f"{base}_{counter}{ext}" if ext else f"{item_name}_{counter}"
-                        new_path = os.path.join(dest_path, new_name)
-                        counter += 1
-                
-                # Copiar o mover
-                if mode == 'copy':
-                    if os.path.isdir(source_path):
-                        shutil.copytree(source_path, new_path, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(source_path, new_path)
-                    successful += 1
-                elif mode == 'cut':
-                    shutil.move(source_path, new_path)
-                    successful += 1
-            
-            if mode == 'cut':
-                self._clipboard = {'paths': [], 'mode': None}
-            
-            # Refresh en background para no congelar UI
-            self.ui.tree.after(100, self.refresh_tree)
-            print(f'[FileExplorer] {successful} items procesados')
-            
-            # Notificar al TreeView principal
-            if self.on_file_change_callback:
-                operation = 'move' if mode == 'cut' else 'copy'
-                self.on_file_change_callback(operation, source_paths)
-            
-        except PermissionError:
-            messagebox.showerror("Error", "Sin permisos para realizar la operaci├│n")
-        except OSError as e:
-            messagebox.showerror("Error", f"Error:\\n{str(e)}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Error inesperado:\\n{str(e)}")
-            import traceback
-            traceback.print_exc()
-
-    # ==================== DRAG & DROP METHODS ====================
-    
-    def _on_drag_motion(self, event):
-        """Detecta movimiento y activa drag si threshold > 30px"""
-        # Inicializar start position en primer motion
-        if not self._drag_state.get('start_x'):
-            self._drag_state['start_x'] = event.x
-            self._drag_state['start_y'] = event.y
-            return
-        
-        # Activar drag solo si movimiento > 30px
-        if not self._drag_state['active']:
-            dx = abs(event.x - self._drag_state['start_x'])
-            dy = abs(event.y - self._drag_state['start_y'])
-            
-            if dx > 10 or dy > 10:
-                # Iniciar drag con selecci├│n m├║ltiple
-                selection = self.ui.tree.selection()
-                if selection:
-                    self._drag_state['active'] = True
-                    self._drag_state['source_items'] = list(selection)
-                    self._drag_state['source_paths'] = [
-                        self.item_to_path.get(item) for item in selection 
-                        if self.item_to_path.get(item)
-                    ]
-                    print(f'[FileExplorer] Drag iniciado: {len(self._drag_state["source_paths"])} items')
-        
-        # Si drag activo, mostrar gu├¡a visual (validaci├│n al soltar)
-        if self._drag_state['active']:
-            target_item = self.ui.tree.identify_row(event.y)
-            if target_item and target_item not in self._drag_state['source_items']:
-                # Siempre mostrar como v├ílido, validar al soltar
-                self._show_drop_indicator(target_item)
-                self.ui.tree.config(cursor='exchange')
-            else:
-                self._hide_drop_indicator()
-                self.ui.tree.config(cursor='')
-    
-    def _on_drag_release(self, event):
-        """Ejecuta drop al soltar"""
-        try:
-            # Reset start position
-            self._drag_state['start_x'] = 0
-            self._drag_state['start_y'] = 0
-            
-            # Limpiar UI
-            self.ui.tree.config(cursor='')
-            self._hide_drop_indicator()
-            
-            if not self._drag_state['active']:
-                return
-            
-            # Obtener destino
-            target_item = self.ui.tree.identify_row(event.y)
-            
-            if target_item and target_item not in self._drag_state['source_items']:
-                dest_path = self.item_to_path.get(target_item)
-                
-                # Si destino es archivo, usar su carpeta padre
-                if dest_path and os.path.isfile(dest_path):
-                    dest_path = os.path.dirname(dest_path)
-                
-                # Validar carpeta v├ílida
-                if dest_path and os.path.isdir(dest_path):
-                    # Mover cada item v├ílido
-                    for source_path in self._drag_state['source_paths']:
-                        source_dir = os.path.dirname(source_path)
-                        
-                        # Rechazar si: misma carpeta O subcarpeta del origen
-                        if dest_path == source_dir:
-                            print(f'[FileExplorer] Saltando: {source_path}')
-                            continue
-                        
-                        if dest_path.startswith(source_path + os.sep):
-                            print(f'[FileExplorer] Saltando subcarpeta: {source_path}')
-                            continue
-                        
-                        # Drop v├ílido: ejecutar movimiento
-                        self._drag_paste(source_path, dest_path)
-                else:
-                    print('[FileExplorer] Drop rechazado: destino no es carpeta v├ílida')
-        
-        finally:
-            # Reset drag state
-            self._drag_state = {
-                'active': False,
-                'source_items': [],
-                'source_paths': [],
-                'start_x': 0,
-                'start_y': 0
-            }
-    
-    def _drag_paste(self, source_path, dest_path):
-        """Ejecuta paste durante drag & drop (siempre mueve)"""
-        import shutil
-        
-        try:
-            item_name = os.path.basename(source_path)
-            new_path = os.path.join(dest_path, item_name)
-            
-            # Auto-renombrar si existe
-            if os.path.exists(new_path):
-                base, ext = os.path.splitext(item_name)
-                counter = 1
-                while os.path.exists(new_path):
-                    if ext:
-                        new_name = f"{base}_{counter}{ext}"
-                    else:
-                        new_name = f"{item_name}_{counter}"
-                    new_path = os.path.join(dest_path, new_name)
-                    counter += 1
-                print(f'[FileExplorer] Auto-renombrado a: {os.path.basename(new_path)}')
-            
-            # Drag & Drop siempre mueve
-            shutil.move(source_path, new_path)
-            print(f'[FileExplorer] Movido (drag): {source_path} -> {new_path}')
-            
-            # Actualizar UI en background (no bloquear)
-            self.ui.tree.after(100, self.refresh_tree)
-            
-        except PermissionError:
-            messagebox.showerror("Error", "Sin permisos para mover")
-        except OSError as e:
-            messagebox.showerror("Error", f"Error moviendo:\\n{str(e)}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Error inesperado:\\n{str(e)}")
-            import traceback
-            traceback.print_exc()
-    
-    def _show_drop_indicator(self, target_item):
-        """Muestra l├¡nea gu├¡a azul en item destino"""
-        try:
-            if not self._drop_indicator:
-                self._drop_indicator = tk.Frame(
-                    self.ui.tree.master,
-                    bg='#007ACC',
-                    height=2
-                )
-            
-            bbox = self.ui.tree.bbox(target_item)
-            if bbox:
-                x, y, width, height = bbox
-                self._drop_indicator.place(
-                    x=0,
-                    y=y + height,
-                    width=self.ui.tree.winfo_width(),
-                    height=2
-                )
-        except:
-            pass
-    
-    def _hide_drop_indicator(self):
-        """Oculta l├¡nea gu├¡a"""
-        if self._drop_indicator:
-            self._drop_indicator.place_forget()
+        self.clipboard.paste()
 
     def focus_path(self, target_path):
-        """
-        Sincroniza el explorador con una ruta específica:
-        Expande la jerarquía y resalta el elemento.
-        """
-        if not target_path or not os.path.exists(target_path):
-            return
-
-        print(f"[DEBUG] Sincronizando explorador con: {target_path}")
-        
-        # Asegurar que el explorador esté visible
-        if not self.is_visible():
-            self.show()
-
-        target_path = os.path.normpath(target_path)
-        
-        # 1. Verificar si la ruta está dentro de la raíz actual
-        if not target_path.lower().startswith(self.current_path.lower()):
-            # Si no está en la raíz actual, cargamos la carpeta contenedora como nueva raíz
-            # y establecemos un "enfoque pendiente"
-            parent_dir = os.path.dirname(target_path)
-            if os.path.exists(parent_dir):
-                print(f"[DEBUG] Cambiando raíz y estableciendo enfoque pendiente: {target_path}")
-                self.pending_focus_path = target_path
-                self.load_directory(parent_dir)
-            return
-
-        # Limpiar enfoque pendiente si ya estamos en la raíz correcta
-        if self.pending_focus_path == target_path:
-            self.pending_focus_path = None
-
-        # 2. Descomponer la ruta en partes relativas a la raíz
-        try:
-            rel_path = os.path.relpath(target_path, self.current_path)
-        except ValueError:
-            return
-
-        if rel_path == ".":
-            # Es la propia raíz
-            root_item = self.path_to_item.get(self.current_path)
-            if root_item:
-                self.tree.selection_set(root_item)
-                self.tree.see(root_item)
-            return
-
-        parts = rel_path.split(os.sep)
-        current_traversal = self.current_path
-        
-        # 3. Recorrer y expandir
-        for part in parts:
-            current_traversal = os.path.join(current_traversal, part)
-            
-            # Buscar el item en el árbol
-            item = self.path_to_item.get(current_traversal)
-            
-            if item:
-                # Si es un directorio y no es el último elemento, expandir
-                if os.path.isdir(current_traversal):
-                    self.tree.item(item, open=True)
-                    # Forzar carga de hijos si no están cargados
-                    if item not in self.loaded_items:
-                        self.handle_node_expansion_immediate(item)
-                        # CRÍTICO: Permitir que la UI procese la inserción de hijos antes de seleccionar
-                        self.tree.update_idletasks()
-                
-                # Seleccionar y desplazar a la vista (sin robar foco de teclado)
-                self.tree.selection_set(item)
-                self.tree.see(item)
-            else:
-                # Intento desesperado: si el item no está en el mapa, quizá se está cargando
-                pass
+        """Sincroniza el explorador con una ruta específica (delegado a ExplorerPathSync)"""
+        self.path_sync.focus_path(target_path)
 
     def _apply_pending_focus(self):
-        """Aplica el enfoque que quedó pendiente tras una carga asíncrona"""
-        if not self.pending_focus_path:
-            return
-            
-        target = self.pending_focus_path
-        self.pending_focus_path = None # Limpiar para evitar bucles
-        self.focus_path(target)
+        self.path_sync.apply_pending_focus()
 

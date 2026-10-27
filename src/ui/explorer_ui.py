@@ -202,6 +202,14 @@ class ExplorerUI:
                          style="Custom.Treeview", selectmode="extended",
                          yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         
+        # IMPORTANTE: en ttk.Treeview, cuando varios tags de un mismo item definen
+        # el mismo atributo (aquí, background), gana el tag cuyo tag_configure()
+        # se llamó PRIMERO en la vida del widget — no el último, ni el orden en la
+        # tupla tags=(...) del item. Por eso el tag de resaltado de drop target
+        # debe registrarse aquí, antes que 'evenrow'/'oddrow', para poder ganarles
+        # más adelante cuando un item tenga ambos tags a la vez.
+        self.tree.tag_configure('drop_target_highlight', background='#007ACC', foreground='#ffffff')
+
         # Tags IDÉNTICOS al TreeView principal
         self.tree.tag_configure('evenrow', background='#ffffff')
         self.tree.tag_configure('oddrow', background='#f8f9fa')

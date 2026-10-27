@@ -1,5 +1,114 @@
 # Changelog - BusquedaCarpetas
 
+## [7.25.0] - 2026-10-27 (V.12.19 en el título de la ventana)
+
+### 🎨 Resaltado automático y estético para carpetas de `MigradoSIUGJ`
+- **ADDED:** Detección automática de cualquier resultado o subcarpeta perteneciente a la ruta de expedientes migrados (`MigradoSIUGJ`).
+- **CHANGED:** Resaltado sobrio y elegante adaptado a cada tema:
+  - **Tema Oscuro:** Fondo rojo vino/burdeos suave (`#5c1d1d`) con texto crema claro (`#ffcdd2`) para lectura nítida sin encandilar.
+  - **Tema Claro:** Fondo rosa pastel tenue (`#ffebee`) con texto rojo carmesí vino (`#b71c1c`).
+- **FIXED:** En `ttk.Treeview`, la sobreescritura de estilos por los tags de filas alternas (`evenrow`/`oddrow`) impedía visualizar el resaltado. Ahora se configura el tag directamente en el renderizador previo a la inserción y se aplica de forma unificada e insensible a mayúsculas o espacios.
+- **ADDED:** Al desplegar nodos (`TreeExpansionHandler`), las subcarpetas hijas contenidas en `MigradoSIUGJ` heredan también el resaltado estético.
+- **BUMP:** Título de ventana `V.12.18` → `V.12.19` y `APP_VERSION` `V7.24` → `V7.25`.
+
+## [7.24.0] - 2026-08-03 (V.12.18 en el título de la ventana)
+
+### 🐛 "La app no abre" — en realidad abría fuera de la pantalla visible
+
+- **FIXED:** `window_manager.py::configurar_ventana` aplicaba la geometría guardada (`config.json`, posición/tamaño de la última sesión) sin validar que cupiera en la pantalla actual. Confirmado en el log: geometría guardada `1840x815+24+1208` en una pantalla de 1080px de alto — la ventana se posicionaba 128px por debajo del borde inferior visible. El proceso corría normalmente (confirmado con `tasklist`), solo que invisible; parecía que la app "no cargaba". Se agregó `_clamp_geometry_to_screen()`, que acota tamaño y posición a los límites de la pantalla actual antes de aplicar la geometría guardada. Puede pasar tras cambiar de resolución, desconectar un segundo monitor, o mover el equipo a otra pantalla.
+
+## [7.23.0] - 2026-08-03 (V.12.17 en el título de la ventana)
+
+### 🐛 Causa real del resaltado de destino que no se veía (corrección de la explicación anterior)
+
+- **FIXED:** El diagnóstico de la versión 7.22 sobre el orden de tags era incorrecto — el orden dentro de la tupla `tags=(...)` de un item NO determina cuál tag gana. La causa real, confirmada con capturas de píxel reales sobre una réplica exacta de la secuencia de arranque de la app: en `ttk.Treeview`, cuando dos tags definen el mismo atributo (aquí, `background`), gana el tag cuyo **`tag_configure()` se llamó primero en la vida del widget**, sin importar el orden en la tupla del item ni si se reconfigura después. El tag `drop_target_highlight` se registraba recién al primer arrastre — mucho después de que `evenrow`/`oddrow` ya se hubieran registrado al crear el árbol — así que nunca podía ganar. Se movió el registro de `drop_target_highlight` a `explorer_ui.py`, justo antes de `evenrow`/`oddrow`, en el mismo lugar donde se crea el árbol.
+
+## [7.22.0] - 2026-07-30 (V.12.16 en el título de la ventana)
+
+### 🐛 Causa raíz: colisión de atajos Ctrl+Shift+E / Ctrl+E
+
+- **FIXED (bug preexistente, no introducido por el refactor):** `<Control-Shift-e>` (abrir/cerrar Explorador, en `keyboard_manager.py`) y `<Control-e>` (centrar ventana, en `event_manager.py`) capturaban la MISMA combinación de teclas. En Tkinter, un binding con letra mayúscula como `<Control-E>` implica Shift también (la "E" solo se produce con Shift presionado), así que `<Control-E>` y `<Control-Shift-E>` son el mismo evento. Al presionar Ctrl+Shift+E, ambos handlers se disparaban en cadena: primero abría el Explorador, y sin nada que lo detuviera, inmediatamente después centraba la ventana de golpe — de ahí que "al abrir el explorador, cambia la ubicación de la app". El mismo patrón afectaba a `<Control-Shift-h>`/`<Control-h>` (historial). Se agregó `"break"` a ambos bindings de `keyboard_manager.py` para no propagar el evento.
+- **CHANGED (drag & drop, rediseño tras reporte de regresión):**
+  - El resaltado de la carpeta destino no se veía porque el tag de color quedaba después del tag de fila par/impar en la tupla — en ttk gana el primer tag de la lista. Se invirtió el orden.
+  - La selección múltiple con Shift no funcionaba porque el enfoque anterior (interceptar el clic y devolver `"break"`) bloqueaba también el comportamiento nativo de Shift de Tkinter. Rediseñado: ahora solo se toma una "foto" de la selección antes del clic, sin bloquear nada; si el arrastre termina siendo sobre un item que ya era parte de una selección múltiple, se recupera esa foto en vez de la selección ya colapsada por Tkinter. Shift y Ctrl funcionan exactamente igual que antes de tocar nada.
+  - Cada archivo movido programaba su propio refresco completo del árbol; con varios archivos seleccionados esto disparaba una ráfaga de recargas simultáneas del mismo nodo (confirmado en el log: 7 líneas de "Refrescando árbol completo" en los mismos milisegundos), lo que probablemente contribuía a la falla de crear carpeta al chocar con la protección de edición en curso. Ahora hay un solo refresco al final del drop, sin importar cuántos archivos se movieron.
+- **VERIFIED:** Todo lo anterior confirmado con pruebas automatizadas aisladas (creación de carpeta hasta persistir en disco, drag con selección Shift/Ctrl preservada, orden de tags de resaltado, conteo de refrescos).
+
+## [7.21.0] - 2026-07-30 (V.12.15 en el título de la ventana)
+
+### 🖱️ Drag & Drop: resaltado de destino + selección múltiple real
+
+- **CHANGED:** La línea guía azul del drag & drop se reemplazó por resaltar la fila de la carpeta destino (como el Explorador de Windows), usando tags de Treeview en vez de un `Frame` flotante encima del árbol.
+- **FIXED:** Arrastrar varios items seleccionados con Shift no funcionaba en la práctica — Tkinter colapsa la selección múltiple al item clickeado apenas se presiona el botón del mouse, antes de que el código de arrastre alcanzara a leerla. Se agregó `on_press` (nuevo binding `<ButtonPress-1>`) que intercepta el clic inicial: si es sobre un item ya parte de una selección múltiple y sin Ctrl/Shift, preserva la selección para el arrastre; si al final no hubo arrastre (fue un clic simple), la colapsa a un único item igual que el comportamiento nativo.
+- **VERIFIED:** Ambos cambios probados con una prueba automatizada aislada (selección preservada durante el drag, colapso correcto en clic simple, tag de resaltado aplicado/quitado en el destino).
+
+## [7.20.0] - 2026-07-30 (V.12.14 en el título de la ventana)
+
+### 🐛 "No me deja crear carpetas" — segunda vuelta de la misma familia de bug
+
+- **FIXED:** `load_directory()` borraba el árbol completo del panel Explorador sin ningún resguardo, a diferencia de `_clear_children()` (que ya protegía el item en edición). Si el usuario tenía una carpeta a medio crear/renombrar y algo disparaba una recarga completa (ej. clic en otro resultado de la búsqueda principal mientras el cuadro de edición seguía abierto), el cuadro quedaba "flotando" sobre un item ya borrado, y terminar la edición fallaba. Se agregó `_cancel_any_inline_edit()`, que cancela limpiamente cualquier edición activa antes de recargar.
+- **FIXED:** `_finalize_load()` ahora verifica que el item destino todavía exista en el árbol antes de tocarlo — si otra carga (recarga completa u otro nodo) invalidó ese item mientras esta carga estaba en curso, se descarta en silencio en vez de fallar con "Item not found". Reproducido y confirmado corregido con una prueba automatizada aislada.
+
+## [7.19.0] - 2026-07-30 (V.12.13 en el título de la ventana)
+
+### 🔧 Refactor incremental de file_explorer_manager.py — pieza 4/7: arrastrar y soltar
+
+- **REFACTOR:** Extraído todo el drag & drop a `src/managers/explorer_drag_drop.py` (`ExplorerDragDrop`), incluyendo su propio estado (`_drag_state`, `_drop_indicator`), totalmente autocontenido. `file_explorer_manager.py` pasó de 1067 a 903 líneas (por debajo de las 1000 por primera vez). Los bindings `<B1-Motion>`/`<ButtonRelease-1>` ahora apuntan directo al nuevo componente.
+- **CLEANUP:** Mismo detalle del `\\n` literal (en vez de salto de línea real) en los mensajes de error de mover por drag & drop, corregido igual que en el portapapeles.
+
+## [7.18.0] - 2026-07-30 (V.12.12 en el título de la ventana)
+
+### 🔧 Refactor incremental de file_explorer_manager.py — pieza 3/7: sincronización de ruta
+
+- **REFACTOR:** Extraído `focus_path`/`_apply_pending_focus` a `src/managers/explorer_path_sync.py` (`ExplorerPathSync`). `file_explorer_manager.py` pasó de 1139 a 1067 líneas. `pending_focus_path` (el estado que indica "hay que enfocar esta ruta en cuanto termine de cargar") se queda en `FileExplorerManager` porque también lo leen `load_directory`/`_finalize_load`, que no se movieron.
+- **CLEANUP:** Quitado un `else: pass` vacío que no hacía nada (quedaba de una rama sin implementar).
+
+## [7.17.0] - 2026-07-30 (V.12.11 en el título de la ventana)
+
+### 🎨 Alineación del menú contextual del explorador
+
+- **FIXED:** Los emoji del menú contextual se renderizaban de forma inconsistente en Windows/Tkinter — algunos (📁📋📄) se veían bien, otros con variador de emoji (✍️✂️🗑️🔄🏠) se veían mal o directamente en blanco, descuadrando el menú. Se quitaron todos los íconos y se dejó texto plano — se ve parejo sin depender de qué emoji decida renderizar bien la fuente de Windows en cada equipo.
+
+## [7.16.0] - 2026-07-30 (V.12.10 en el título de la ventana)
+
+### 🖱️ Menú contextual del explorador: Copiar/Cortar/Pegar + doble clic en carpetas
+
+- **NEW:** El menú contextual del explorador ahora tiene "📄 Copiar", "✂️ Cortar" y "📋 Pegar" (antes solo estaban disponibles por Ctrl+C/X/V).
+- **NEW:** "🪟 Abrir en Windows" para carpetas — abre la carpeta en el Explorador de Windows nativo.
+- **CHANGED:** Doble clic en una carpeta del panel Explorador ahora expande/colapsa el nodo dentro del propio panel, en vez de abrir Windows Explorer. Doble clic en un archivo sigue abriéndolo con la app predeterminada (sin cambios ahí).
+
+## [7.15.0] - 2026-07-30 (V.12.9 en el título de la ventana)
+
+### 🔧 Refactor incremental de file_explorer_manager.py — pieza 2/7: clipboard
+
+- **REFACTOR:** Extraído copiar/cortar/pegar (Ctrl+X/C/V) a `src/managers/explorer_clipboard.py` (`ExplorerClipboard`). `file_explorer_manager.py` pasó de 1234 a 1135 líneas; `copy_item`/`cut_item`/`paste_item` quedan como fachadas de una línea.
+- **CLEANUP:** De paso, dos detalles menores en el código movido: los mensajes de error de pegar usaban `\\n` (backslash-n literal) en vez de salto de línea real, y el docstring de `cut_item` estaba después de un `print`, por lo que Python no lo reconocía como docstring.
+
+## [7.14.0] - 2026-07-30 (V.12.8 en el título de la ventana)
+
+### 🐛 Bugs preexistentes del explorador, encontrados al probar el menú contextual extraído
+
+- **FIXED:** "📂 Expandir/Colapsar" del menú contextual llamaba a `on_double_click` (abre en Windows Explorer) en vez de expandir/colapsar el nodo en el árbol. Se extrajo la lógica correcta de `on_enter_key` a un nuevo método `toggle_expand_collapse()`, y el menú ahora lo usa.
+- **FIXED:** Corrupción de bytes en dos strings de `file_explorer_manager.py` (`start_inline_edit` y `_update_item_after_rename`) que debían contener los emoji 📁/📄 — al renombrar, el nombre aparecía con el emoji sin poder quitarlo, y el nuevo nombre quedaba con caracteres inválidos al inicio.
+- **FIXED:** Crear una carpeta nueva podía fallar con `Error inesperado: Item IXXX not found` — el monitor de archivos (`watchdog`) detecta el `os.makedirs` de la nueva carpeta y dispara un refresco automático que puede borrar el item temporal justo cuando el código todavía lo está finalizando. `_clear_children` ahora protege el item que está en edición inline activa para que ningún refresco concurrente pueda borrarlo.
+- **INVESTIGANDO:** Reporte de "Actualizar Árbol" quedándose en "Buscando..." sin avanzar — puede ser el mismo síntoma del bug de "Expandir/Colapsar" (que nunca disparaba la carga real). Pendiente de reconfirmar con este build.
+
+## [7.13.0] - 2026-07-30 (V.12.7 en el título de la ventana)
+
+### 🔧 Refactor incremental de file_explorer_manager.py — pieza 1/7: menú contextual
+
+- **REFACTOR:** Extraído el menú contextual (clic derecho) del explorador de `file_explorer_manager.py` a `src/managers/explorer_context_menu.py` (`ExplorerContextMenu`). `file_explorer_manager.py` pasó de 1315 a 1226 líneas; `show_context_menu` queda como fachada delgada que delega al nuevo componente. Sin cambios de comportamiento esperados — pendiente de verificación manual (clic derecho sobre fondo y sobre archivo/carpeta).
+- **CLEANUP:** De paso se eliminó una duplicación real encontrada al mover el código: los 3 ítems finales del menú ("Nueva carpeta", "Actualizar Árbol", "Ir a Home") estaban repetidos casi textualmente en las dos ramas de `show_context_menu`; ahora hay un solo método `_add_footer`.
+
+## [7.12.0] - 2026-07-30 (V.12.6 en el título de la ventana)
+
+### 🧹 Eliminado el segundo camino de búsqueda muerto (results_display.py / SearchMethods)
+
+- **REMOVED:** `src/ui/results_display.py` (`ResultsDisplay`, 205 líneas) — quedó sin ningún llamador alcanzable tras eliminar `_on_search_completed_async` en la limpieza anterior.
+- **REMOVED:** `src/managers/search_methods.py` completo (190 líneas) — `ejecutar_busqueda` siempre delegaba a `search_coordinator.ejecutar_busqueda` (el fallback con `ResultsDisplay` nunca era alcanzable, ya que `search_coordinator` siempre existe); todo el resto del archivo (`buscar_tradicional_fallback`, `_buscar_ubicacion`, `_buscar_directo`, `_enriquecer_con_bd`, etc.) solo era código muerto colgado de ese fallback.
+- **REMOVED:** `app.buscar_carpetas` y `app.mostrar_resultados` (wrappers "de compatibilidad" en `app.py`) — cero llamadores.
+- **CHANGED:** El botón Buscar/Enter (`app.buscar_carpeta`) ahora llama a `search_coordinator.ejecutar_busqueda` directamente, sin la capa intermedia. Confirmado que este era el mismo camino que ya usaba la búsqueda incremental al escribir — no había dos motores de búsqueda reales, solo uno con un envoltorio redundante.
+
 ## [7.11.0] - 2026-07-30 (V.12.5 en el título de la ventana)
 
 ### ⚡ La consulta de Demandante/Demandado ya no espera al pipeline completo

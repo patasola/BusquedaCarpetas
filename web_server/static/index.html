@@ -145,6 +145,31 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
   .stats-badge{display:none}
   .logo-text{display:none}
 }
+/* ─── Modal configuración OneDrive ─── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:2rem;width:min(560px,95vw);box-shadow:0 24px 60px rgba(0,0,0,.6);animation:fadeIn .25s ease}
+.modal-box h3{font-size:1.1rem;font-weight:700;margin-bottom:.3rem;display:flex;align-items:center;gap:.5rem}
+.modal-box .modal-sub{font-size:.82rem;color:var(--text2);margin-bottom:1.5rem;line-height:1.6}
+.modal-box label{font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:.4rem}
+.modal-input{width:100%;padding:.75rem 1rem;background:var(--bg3);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:.9rem;font-family:monospace;outline:none;transition:border .2s}
+.modal-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+.modal-input::placeholder{color:var(--text2);font-family:'Inter',sans-serif}
+.modal-hint{font-size:.75rem;color:var(--text2);margin-top:.4rem;line-height:1.5}
+.modal-hint code{background:var(--bg3);border:1px solid var(--border);padding:.05rem .35rem;border-radius:4px;font-size:.7rem;color:var(--accent)}
+.modal-actions{display:flex;gap:.75rem;margin-top:1.5rem;justify-content:flex-end}
+.btn-modal-cancel{padding:.55rem 1.1rem;border-radius:9px;font-size:.85rem;border:1.5px solid var(--border);background:none;color:var(--text2);cursor:pointer;transition:all .15s}
+.btn-modal-cancel:hover{background:var(--glass);color:var(--text)}
+.btn-modal-save{padding:.55rem 1.4rem;border-radius:9px;font-size:.85rem;font-weight:600;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;transition:all .2s}
+.btn-modal-save:hover{opacity:.88;transform:translateY(-1px)}
+.btn-modal-clear{padding:.55rem 1rem;border-radius:9px;font-size:.85rem;border:1.5px solid var(--border);background:none;color:var(--red);cursor:pointer;margin-right:auto;transition:all .15s}
+.btn-modal-clear:hover{background:rgba(248,81,73,.1)}
+.onedrive-status{display:flex;align-items:center;gap:.5rem;font-size:.78rem;padding:.45rem .85rem;border-radius:8px;border:1px solid;margin-right:auto}
+.onedrive-ok{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.35);color:var(--green)}
+.onedrive-warn{background:rgba(240,136,62,.1);border-color:rgba(240,136,62,.35);color:var(--orange)}
+.btn-config{display:flex;align-items:center;gap:.4rem;padding:.4rem .85rem;border-radius:8px;font-size:.8rem;border:1.5px solid var(--border);background:var(--glass);color:var(--text2);cursor:pointer;transition:all .2s;flex-shrink:0}
+.btn-config:hover{border-color:var(--accent);color:var(--text)}
+.btn-config.configured{border-color:rgba(63,185,80,.5);color:var(--green)}
 </style>
 </head>
 <body><div class="overlay" id="overlay"></div>
@@ -165,8 +190,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="stats-badge" id="statsBadge" title="Documentos indexados">
       📦 <span id="totalDocs">–</span> docs · <span id="lastUpdate">–</span>
     </div>
+    <button class="btn-config" id="btnOneDriveConfig" title="Configurar mi ruta de OneDrive local">
+      <span id="configIcon">☁️</span> <span id="configLabel">Mi OneDrive</span>
+    </button>
     <a href="/download/instalar_cliente.bat" class="btn-sm" style="text-decoration:none; display:flex; align-items:center; gap:5px; background:var(--glass)" title="Instalar acceso directo para abrir archivos">
-      🔌 Configurar
+      🔌 Instalar
     </a>
   </div>
 </div>
@@ -252,6 +280,56 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="toast" id="toast"></div>
 
+<!-- ─── Modal configuración OneDrive ─────────────────────────────────────── -->
+<div class="modal-bg" id="modalOneDrive">
+  <div class="modal-box">
+    <h3>☁️ Configurar mi OneDrive local</h3>
+    <p class="modal-sub">
+      El buscador usa las rutas del servidor. Para abrirlos en <strong>tu equipo</strong>,
+      indica dónde está tu carpeta de OneDrive local.
+    </p>
+
+    <label>Ruta base en el <strong>servidor</strong> <span style="color:var(--text2);font-weight:400">(auto-detectada)</span></label>
+    <input class="modal-input" id="inputServerBase" type="text" placeholder="Detectando…" />
+    <div class="modal-hint" style="margin-bottom:1.25rem">
+      Esta ruta se obtiene automáticamente del servidor. Puedes editarla si es necesario.
+    </div>
+
+    <label>Tu ruta local de OneDrive <span style="color:var(--accent)">*</span></label>
+
+    <!-- Botón detectar -->
+    <div style="display:flex;gap:.6rem;margin-bottom:.6rem;align-items:center">
+      <button class="btn-action" id="btnDetectOneDrive" style="width:auto;padding:.5rem 1rem;font-size:.82rem">
+        🔍 Detectar automáticamente
+      </button>
+      <span id="detectStatus" style="font-size:.75rem;color:var(--text2)"></span>
+    </div>
+
+    <!-- Dropdown de rutas detectadas (oculto hasta que haya resultados) -->
+    <div id="detectedPathsWrap" style="display:none;margin-bottom:.6rem">
+      <select class="modal-input" id="selectDetectedPath"
+        style="cursor:pointer;padding:.6rem .85rem">
+      </select>
+      <div class="modal-hint">Selecciona tu carpeta de OneDrive de la lista.</div>
+    </div>
+
+    <!-- Entrada manual -->
+    <input class="modal-input" id="inputLocalBase" type="text"
+      placeholder="O pega tu ruta manualmente: C:\Users\TuUsuario\OneDrive - Consejo..."
+      style="margin-top:.25rem" />
+    <div class="modal-hint">
+      Si la detección no funciona: abre el Explorador de Windows → navega a tu carpeta OneDrive
+      → haz clic en la barra de direcciones → copia la ruta → pégala aquí.
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-modal-clear" id="btnClearOneDrive" title="Borrar configuración">🗑️ Limpiar</button>
+      <button class="btn-modal-cancel" id="btnModalCancel">Cancelar</button>
+      <button class="btn-modal-save" id="btnModalSave">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 let debounceTimer, activeExt = 'all', activeField = 'content', activeCard = null;
@@ -260,6 +338,155 @@ let sortConfig = { field: 'mtime', asc: false }; // Default sort by date desc
 
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const protocolInstalled = localStorage.getItem('busqueda_protocol') === 'ok';
+
+// ─── Configuración OneDrive ───────────────────────────────────────────────────
+const OD_SERVER_KEY = 'od_server_base';
+const OD_LOCAL_KEY  = 'od_local_base';
+
+function getOneDriveConfig() {
+  return {
+    serverBase: localStorage.getItem(OD_SERVER_KEY) || '',
+    localBase:  localStorage.getItem(OD_LOCAL_KEY)  || ''
+  };
+}
+
+/** Dado el path del servidor, devuelve la ruta local equivalente si hay config */
+function remapPath(serverPath) {
+  const { serverBase, localBase } = getOneDriveConfig();
+  if (!serverBase || !localBase || !serverPath) return serverPath;
+  // Comparación case-insensitive para Windows
+  if (serverPath.toLowerCase().startsWith(serverBase.toLowerCase())) {
+    return localBase + serverPath.slice(serverBase.length);
+  }
+  return serverPath;
+}
+
+function updateConfigButton() {
+  const { localBase } = getOneDriveConfig();
+  const btn = $('btnOneDriveConfig');
+  if (localBase) {
+    btn.classList.add('configured');
+    $('configIcon').textContent = '✅';
+    $('configLabel').textContent = 'Mi OneDrive ✓';
+  } else {
+    btn.classList.remove('configured');
+    $('configIcon').textContent = '☁️';
+    $('configLabel').textContent = 'Mi OneDrive';
+  }
+}
+updateConfigButton();
+
+// ─── Lógica del modal de OneDrive ───────────────────────────────────────────────────
+let _detectPollTimer = null;
+
+// Abrir modal — carga la base del servidor automáticamente
+$('btnOneDriveConfig').onclick = async () => {
+  const cfg = getOneDriveConfig();
+  $('inputLocalBase').value = cfg.localBase;
+  $('detectedPathsWrap').style.display = 'none';
+  $('detectStatus').textContent = '';
+
+  // Obtener base del servidor via API
+  let serverBase = cfg.serverBase;
+  try {
+    const resp = await fetch('/api/server-base');
+    const data = await resp.json();
+    if (data.base) serverBase = data.base;
+  } catch(e) {}
+  $('inputServerBase').value = serverBase;
+  $('modalOneDrive').classList.add('open');
+  setTimeout(() => $('inputLocalBase').focus(), 120);
+};
+
+// Detección automática
+$('btnDetectOneDrive').onclick = () => {
+  const token = Math.random().toString(36).substr(2, 12);
+  const serverOrigin = location.origin; // ej: http://172.30.212.95:8080
+  const detectUrl = `busqueda://detect-onedrive?token=${token}&server=${encodeURIComponent(serverOrigin)}`;
+
+  $('detectStatus').textContent = '⏳ Detectando...';
+  $('detectStatus').style.color = 'var(--text2)';
+  $('btnDetectOneDrive').disabled = true;
+
+  // Activar el VBS via protocolo
+  window.location.href = detectUrl;
+
+  // Hacer polling al servidor esperando la respuesta del VBS
+  let attempts = 0;
+  const maxAttempts = 30; // 15 segundos máximo
+  clearInterval(_detectPollTimer);
+  _detectPollTimer = setInterval(async () => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(_detectPollTimer);
+      $('detectStatus').textContent = '❌ No se detectó. Ingresa la ruta manualmente.';
+      $('detectStatus').style.color = 'var(--red)';
+      $('btnDetectOneDrive').disabled = false;
+      return;
+    }
+    try {
+      const r = await fetch(`/api/poll-onedrive?token=${token}`);
+      const d = await r.json();
+      if (d.found && d.paths && d.paths.length > 0) {
+        clearInterval(_detectPollTimer);
+        $('btnDetectOneDrive').disabled = false;
+        $('detectStatus').textContent = `✅ ${d.paths.length} carpeta(s) encontrada(s)`;
+        $('detectStatus').style.color = 'var(--green)';
+
+        // Poblar dropdown
+        const sel = $('selectDetectedPath');
+        sel.innerHTML = '';
+        d.paths.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          sel.appendChild(opt);
+        });
+        $('detectedPathsWrap').style.display = '';
+
+        // Autoseleccionar el primer resultado en el input manual
+        $('inputLocalBase').value = d.paths[0];
+
+        // Al cambiar selección en dropdown, actualizar input
+        sel.onchange = () => { $('inputLocalBase').value = sel.value; };
+      }
+    } catch(e) {}
+  }, 500);
+};
+
+$('btnModalCancel').onclick = () => {
+  clearInterval(_detectPollTimer);
+  $('modalOneDrive').classList.remove('open');
+};
+$('modalOneDrive').addEventListener('click', e => {
+  if (e.target === $('modalOneDrive')) {
+    clearInterval(_detectPollTimer);
+    $('modalOneDrive').classList.remove('open');
+  }
+});
+
+$('btnModalSave').onclick = () => {
+  const srv = $('inputServerBase').value.trim().replace(/[\\/]+$/, '');
+  const loc = $('inputLocalBase').value.trim().replace(/[\\/]+$/, '');
+  if (!loc) { showToast('⚠️ Ingresa tu ruta local de OneDrive'); return; }
+  localStorage.setItem(OD_SERVER_KEY, srv);
+  localStorage.setItem(OD_LOCAL_KEY,  loc);
+  clearInterval(_detectPollTimer);
+  $('modalOneDrive').classList.remove('open');
+  updateConfigButton();
+  showToast('✅ Configuración guardada');
+};
+
+$('btnClearOneDrive').onclick = () => {
+  localStorage.removeItem(OD_SERVER_KEY);
+  localStorage.removeItem(OD_LOCAL_KEY);
+  $('inputServerBase').value = '';
+  $('inputLocalBase').value  = '';
+  $('detectedPathsWrap').style.display = 'none';
+  $('detectStatus').textContent = '';
+  updateConfigButton();
+  showToast('🗑️ Configuración borrada');
+};
 
 function escHtml(s) {
   const d = document.createElement('div');
@@ -500,7 +727,7 @@ function copyToClipboard(text) {
 
 function openWithProtocol(mode, path) {
   if (isLocalhost) {
-    // En el servidor: usar API directa
+    // En el servidor: usar API directa (sin remapeo)
     fetch('/api/open-folder', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({path})
@@ -509,8 +736,20 @@ function openWithProtocol(mode, path) {
       else showToast('⚠️ No se pudo abrir: ' + (d.error || ''));
     });
   } else {
-    // En clientes remotos: usar protocolo busqueda://
-    const encoded = encodeURIComponent(path);
+    // En clientes remotos: remap OneDrive y usar protocolo busqueda://
+    const localPath = remapPath(path);
+    const { localBase } = getOneDriveConfig();
+    if (!localBase && path.toLowerCase().includes('onedrive')) {
+      // Sugerir configuración si la ruta tiene OneDrive y no hay config
+      showToast('☁️ Configura tu ruta de OneDrive (botón "Mi OneDrive" arriba)');
+      $('btnOneDriveConfig').style.animation = 'none';
+      setTimeout(() => {
+        $('btnOneDriveConfig').style.animation = '';
+        $('btnOneDriveConfig').style.boxShadow = '0 0 0 3px rgba(59,130,246,.4)';
+        setTimeout(() => $('btnOneDriveConfig').style.boxShadow = '', 2500);
+      }, 10);
+    }
+    const encoded = encodeURIComponent(localPath);
     const protoUrl = `busqueda://${mode}?path=${encoded}`;
     try {
       window.location.href = protoUrl;

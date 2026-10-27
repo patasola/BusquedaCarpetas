@@ -54,6 +54,21 @@ class ResultsRenderer:
             # Determinar configuración según método de búsqueda
             letra_metodo = metodo[0].upper() if metodo else 'C'
             
+            # ── Configurar tag de highlight MigradoSIUGJ directamente en el árbol ──
+            # Esto garantiza que el tag esté siempre disponible,
+            # independientemente de si el ThemeManager ya lo configuró.
+            _tema = 'oscuro'
+            if hasattr(app, 'theme_manager') and hasattr(app.theme_manager, 'tema_actual'):
+                _tema = app.theme_manager.tema_actual
+            if _tema == 'oscuro':
+                app.tree.tag_configure('migrado_highlight',
+                                       background='#5c1d1d',
+                                       foreground='#ffcdd2')
+            else:
+                app.tree.tag_configure('migrado_highlight',
+                                       background='#ffebee',
+                                       foreground='#b71c1c')
+            
             # OPTIMIZACIÓN: Batch processing para evitar lag en UI
             batch_size = 500
             total = len(resultados)
@@ -65,6 +80,8 @@ class ResultsRenderer:
                 # Insertar batch en TreeView
                 for i, resultado in enumerate(batch, start=batch_start):
                     tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                    # Tag extra para resaltar resultados de MigradoSIUGJ
+                    is_migrado = False
                     
                     # Extraer datos del resultado unificado: (nom, rel, abs, hijos, loc, dem1, dem2)
                     if isinstance(resultado, tuple) and len(resultado) >= 3:
@@ -115,13 +132,20 @@ class ResultsRenderer:
                     import os as _os
                     ruta_abs_norm = _os.path.normpath(ruta_abs)
                     
+                    # Detectar si el resultado pertenece a MigradoSIUGJ (inspeccionando ruta absoluta y relativa)
+                    ruta_check = f"{ruta_abs_norm} {ruta_rel}".lower().replace(' ', '').replace('_', '')
+                    is_migrado = 'migradosiugj' in ruta_check
+                    
+                    # Asignar tag migrado_highlight si aplica
+                    item_tags = ('migrado_highlight',) if is_migrado else (tag,)
+                    
                     # Insertar en TreeView usando la ruta absoluta normalizada como IID único
                     if not app.tree.exists(ruta_abs_norm):
                         item_id = app.tree.insert("", "end",
                                        iid=ruta_abs_norm,
                                        text=f"{icon} {nombre}",
                                        values=tuple(tree_values),
-                                       tags=(tag,),
+                                       tags=item_tags,
                                        open=False)
                     else:
                         # Si ya existe (ej: lo encontró el indexador y el disco), 

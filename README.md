@@ -3,12 +3,13 @@
 Sistema de búsqueda de alta fidelidad para documentos locales (PDF, Word, Excel, TXT) con acceso compartido a través de red local (LAN). Esta versión unifica el motor de escritorio y el servidor web bajo la arquitectura V7.
 
 ## 🚀 Características Principales
-- **Arquitectura Unificada V7**: Desktop y Web sincronizados.
+- **Arquitectura Unificada V7**: Desktop y Web sincronizados (Versión V.12.19 / V7.25).
+- **Resaltado Inteligente de Expedientes Migrados**: Las carpetas y expedientes pertenecientes a `MigradoSIUGJ` se resaltan automáticamente en un tono rojo sobrio y elegante adaptado tanto al tema oscuro como claro.
 - **Motor FTS5**: Búsqueda instantánea en el contenido de miles de archivos.
 - **Acceso LAN**: Interfaz web moderna (Glassmorphism) accesible desde cualquier PC de la red.
 - **Búsqueda Insensible**: Ignora acentos y mayúsculas automáticamente (ej: "anotación" = "ANOTACION").
 - **Apertura Local**: Abre archivos y carpetas directamente en el Explorador de Windows desde el navegador (requiere instalación del cliente).
-- **Manual Integrado**: Guía de usuario profesional en `/static/manual.html`.
+- **Manual Integrado**: Guía de usuario profesional en `/static/manual.html` y accesible con tecla `F1` o menú Ayuda.
 
 ## 🛠️ Estructura del Proyecto
 - `/web_server`: Backend en Flask y Frontend SPA.

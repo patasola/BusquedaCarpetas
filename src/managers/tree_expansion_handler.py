@@ -115,9 +115,13 @@ class TreeExpansionHandler:
                 parent_values = self.app.tree.item(parent_item, 'values')
                 metodo = parent_values[0] if parent_values else "E"
                 
-                # Determinar tag para filas alternadas
+                # Determinar tag para filas alternadas o migrado_highlight
                 existing_children = len(self.app.tree.get_children(parent_item))
                 tag = 'evenrow' if (existing_children + i) % 2 == 0 else 'oddrow'
+                
+                # Detectar si la ruta pertenece a MigradoSIUGJ
+                ruta_str = str(ruta).lower().replace(' ', '').replace('_', '')
+                child_tags = ('migrado_highlight',) if 'migradosiugj' in ruta_str else (tag,)
                 
                 # Insertar subcarpeta
                 child_item = self.app.tree.insert(
@@ -125,7 +129,7 @@ class TreeExpansionHandler:
                     'end',
                     text=f"📂 {nombre}",
                     values=(metodo, ruta),
-                    tags=(tag,)
+                    tags=child_tags
                 )
                 
                 # Agregar nodo dummy si tiene subcarpetas (Verificación real para subniveles)
