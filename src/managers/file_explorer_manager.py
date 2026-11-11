@@ -183,10 +183,11 @@ class FileExplorerManager:
             self.ui.tree.bind('<Control-v>', lambda e: self.paste_item())
             self.ui.tree.bind('<Control-V>', lambda e: self.paste_item())
             
-            # Drag & Drop visual
+            # Drag & Drop visual y OLE nativo (Windows Explorer, Word, Nitro, etc.)
             self.ui.tree.bind('<ButtonPress-1>', self.drag_drop.on_press, add='+')
             self.ui.tree.bind('<B1-Motion>', self.drag_drop.on_motion, add='+')
             self.ui.tree.bind('<ButtonRelease-1>', self.drag_drop.on_release, add='+')
+            self.drag_drop.setup_drop_target()
             
             print("[DEBUG] Bindings Ctrl+C/X/V configurados")
             print(f"[DEBUG] Tree existe: {self.ui.tree is not None}")

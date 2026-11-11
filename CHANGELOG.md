@@ -1,5 +1,22 @@
 # Changelog - BusquedaCarpetas
 
+## [7.26.0] - 2026-11-11 (V.12.20 en el título de la ventana)
+
+### 🖱️ Soporte nativo de Windows OLE Drag & Drop (DoDragDrop / IDropTarget)
+- **ADDED (`src/core/ole_drag_drop.py`):** Implementación completa en ctypes de las interfaces COM nativas de Windows (`IDataObject`, `IDropSource`, `IEnumFORMATETC`, `IDropTarget`) utilizando las APIs de `ole32.dll` y `shell32.dll`.
+  - Provee formato estándar de archivos `CF_HDROP`, efecto preferido `Preferred DropEffect` y texto plano `CF_UNICODETEXT`.
+  - Permite arrastrar archivos hacia cualquier aplicación externa:
+    - **Windows Explorer:** Mueve o copia el archivo/carpeta al directorio de destino.
+    - **Nitro PDF / Acrobat Reader:** Abre el archivo PDF inmediatamente al soltarlo en la ventana del visor.
+    - **Microsoft Word / Excel:** Abre el documento o plantilla al soltarlo en la ventana del editor.
+    - **Navegadores / Outlook:** Adjunta el archivo arrastrado.
+- **ADDED (`ExplorerDragDrop`):** Integración en el panel lateral Explorador de Archivos:
+  - Registro de `IDropTarget` en el TreeView del explorador con soporte bidireccional (soltar internamente para mover, o arrastrar archivos desde Windows Explorer hacia cualquier carpeta del árbol).
+  - Resaltado visual instantáneo de la carpeta destino (`drop_target_highlight`).
+  - Detección de movimiento > 8px con soporte para selección múltiple (Ctrl/Shift).
+- **ADDED (`EventManager`):** Soporte de arrastre OLE nativo desde la tabla principal de resultados de búsqueda (`app.tree`) hacia aplicaciones externas (Nitro, Word, Explorer).
+- **BUMP:** Título de ventana `V.12.19` → `V.12.20` y `APP_VERSION` `V7.25` → `V7.26`.
+
 ## [7.25.0] - 2026-10-27 (V.12.19 en el título de la ventana)
 
 ### 🎨 Resaltado automático y estético para carpetas de `MigradoSIUGJ`

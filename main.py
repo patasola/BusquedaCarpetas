@@ -97,7 +97,7 @@ def main():
     root = tk.Tk()
     root.withdraw() # OCULTAR VENTANA INICIALMENTE
     
-    root.title("Búsqueda Rápida de Carpetas - V.12.19")
+    root.title("Búsqueda Rápida de Carpetas - V.12.20")
     
     app = BusquedaCarpetaApp(root)
     

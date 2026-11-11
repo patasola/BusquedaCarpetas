@@ -1,7 +1,7 @@
 # src/core/constants.py - Constantes V7 (Purgatorio)
 
 # Información de la aplicación
-APP_VERSION = "V7.25 - Resaltado automático para carpetas de MigradoSIUGJ"
+APP_VERSION = "V7.26 - Soporte nativo de Windows OLE Drag & Drop (Explorer, Word, Nitro)"
 APP_TITLE = "Búsqueda Rápida de Carpetas"
 
 # Configuración de ventana

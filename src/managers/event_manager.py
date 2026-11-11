@@ -104,6 +104,57 @@ class EventManager:
         nav_keys = ["<Up>", "<Down>", "<Prior>", "<Next>", "<Home>", "<End>"]
         for key in nav_keys:
             self.app.tree.bind(key, self._manejar_navegacion_tabla)
+            
+        # Drag & Drop OLE nativo desde la tabla de resultados (hacia Explorer, Nitro, Word, etc.)
+        self._search_drag_start = None
+        self._search_press_item = None
+        self.app.tree.bind('<ButtonPress-1>', self._on_search_tree_press, add='+')
+        self.app.tree.bind('<B1-Motion>', self._on_search_tree_motion, add='+')
+        self.app.tree.bind('<ButtonRelease-1>', self._on_search_tree_release, add='+')
+    
+    def _on_search_tree_press(self, event):
+        """Registra inicio de posible arrastre en la tabla de resultados"""
+        self._search_press_item = self.app.tree.identify_row(event.y)
+        self._search_drag_start = (event.x, event.y)
+
+    def _on_search_tree_motion(self, event):
+        """Detecta arrastre desde la tabla de resultados hacia aplicaciones externas"""
+        if not self._search_drag_start:
+            return
+        dx = abs(event.x - self._search_drag_start[0])
+        dy = abs(event.y - self._search_drag_start[1])
+        if dx > 8 or dy > 8:
+            self._search_drag_start = None
+            selection = self.app.tree.selection()
+            if not selection and self._search_press_item:
+                selection = [self._search_press_item]
+
+            paths = []
+            for item in selection:
+                ruta = None
+                values = self.app.tree.item(item, 'values')
+                # En results_renderer: tree_values = [metodo, ruta_rel, extra1, extra2, ruta_abs]
+                if values and len(values) >= 5 and values[4] and os.path.exists(values[4]):
+                    ruta = values[4]
+                elif os.path.exists(item):
+                    ruta = item
+                elif values and len(values) >= 2 and values[1] and os.path.exists(values[1]):
+                    ruta = values[1]
+
+                if ruta:
+                    paths.append(os.path.abspath(ruta))
+
+            if paths:
+                try:
+                    from ..core.ole_drag_drop import do_drag_drop, DROPEFFECT_COPY
+                    print(f"[EventManager] Drag iniciado desde resultados para {len(paths)} elemento(s)")
+                    do_drag_drop(paths, preferred_effect=DROPEFFECT_COPY)
+                except Exception as e:
+                    print(f"[EventManager] Error en drag & drop de resultados: {e}")
+
+    def _on_search_tree_release(self, event):
+        """Limpia estado al soltar el botón"""
+        self._search_drag_start = None
     
     def _config_eventos_botones(self):
         """Configura comandos de botones"""

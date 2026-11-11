@@ -3,7 +3,8 @@
 Sistema de búsqueda de alta fidelidad para documentos locales (PDF, Word, Excel, TXT) con acceso compartido a través de red local (LAN). Esta versión unifica el motor de escritorio y el servidor web bajo la arquitectura V7.
 
 ## 🚀 Características Principales
-- **Arquitectura Unificada V7**: Desktop y Web sincronizados (Versión V.12.19 / V7.25).
+- **Arquitectura Unificada V7**: Desktop y Web sincronizados (Versión V.12.20 / V7.26).
+- **Drag & Drop OLE Nativo**: Arrastra archivos y carpetas directamente desde el explorador interno hacia el Explorador de Windows (para moverlos) o hacia aplicaciones externas como Nitro PDF, Word o Excel (para abrirlos al instante). También permite soltar archivos desde Windows hacia las carpetas del explorador.
 - **Resaltado Inteligente de Expedientes Migrados**: Las carpetas y expedientes pertenecientes a `MigradoSIUGJ` se resaltan automáticamente en un tono rojo sobrio y elegante adaptado tanto al tema oscuro como claro.
 - **Motor FTS5**: Búsqueda instantánea en el contenido de miles de archivos.
 - **Acceso LAN**: Interfaz web moderna (Glassmorphism) accesible desde cualquier PC de la red.
