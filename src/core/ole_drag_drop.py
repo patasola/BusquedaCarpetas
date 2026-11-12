@@ -117,6 +117,9 @@ class STGMEDIUM(ctypes.Structure):
         ("pUnkForRelease", wintypes.LPVOID)
     ]
 
+ole32.ReleaseStgMedium.argtypes = [ctypes.POINTER(STGMEDIUM)]
+ole32.ReleaseStgMedium.restype = None
+
 class DROPFILES(ctypes.Structure):
     _fields_ = [
         ("pFiles", wintypes.DWORD),
@@ -154,10 +157,12 @@ SKIP_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.ULONG)
 RESET_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID)
 CLONE_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, ctypes.POINTER(wintypes.LPVOID))
 
-DRAGENTER_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.LPVOID, wintypes.DWORD, POINTL, ctypes.POINTER(wintypes.DWORD))
-DRAGOVER_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.DWORD, POINTL, ctypes.POINTER(wintypes.DWORD))
+# En 64-bit y 32-bit, POINTL (2 x LONG de 32 bits = 64 bits) empaquetado como un escalar
+# ctypes.c_uint64 evita problemas de alineación de pila (stack mismatch en libffi) con el 5° argumento (pdwEffect).
+DRAGENTER_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.LPVOID, wintypes.DWORD, ctypes.c_uint64, ctypes.POINTER(wintypes.DWORD))
+DRAGOVER_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.DWORD, ctypes.c_uint64, ctypes.POINTER(wintypes.DWORD))
 DRAGLEAVE_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID)
-DROP_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.LPVOID, wintypes.DWORD, POINTL, ctypes.POINTER(wintypes.DWORD))
+DROP_PROTO = ctypes.WINFUNCTYPE(ctypes.c_long, wintypes.LPVOID, wintypes.LPVOID, wintypes.DWORD, ctypes.c_uint64, ctypes.POINTER(wintypes.DWORD))
 
 # VTables e implementaciones
 class IDataObjectVtbl(ctypes.Structure):
@@ -504,6 +509,17 @@ class DataObject:
         return E_NOTIMPL
 
 
+def _unpack_point(pt_raw):
+    """Desempaqueta coordenadas X, Y desde un POINTL de 64 bits empaquetado en c_uint64"""
+    if isinstance(pt_raw, int):
+        x = ctypes.c_long(pt_raw & 0xFFFFFFFF).value
+        y = ctypes.c_long((pt_raw >> 32) & 0xFFFFFFFF).value
+        return x, y
+    elif hasattr(pt_raw, 'x') and hasattr(pt_raw, 'y'):
+        return pt_raw.x, pt_raw.y
+    return 0, 0
+
+
 # ─── Receptor de Soltado (IDropTarget) ─────────────────────────────────────────
 class DropTarget:
     """Implementa IDropTarget para widgets Tkinter (como ttk.Treeview)"""
@@ -514,6 +530,7 @@ class DropTarget:
         self.on_drag_leave = on_drag_leave
         self.on_drop = on_drop
         self.ref_count = 1
+        self._cached_files = []
 
         self.vtbl = IDropTargetVtbl(
             QueryInterface=QI_PROTO(self._QueryInterface),
@@ -549,59 +566,86 @@ class DropTarget:
         self.ref_count -= 1
         return self.ref_count
 
-    def _DragEnter(self, this, pDataObj, grfKeyState, pt, pdwEffect):
-        if not pDataObj:
-            pdwEffect[0] = DROPEFFECT_NONE
-            return S_OK
-        # Verificar si hay archivos CF_HDROP
-        files = extract_hdrop_files(pDataObj)
-        if files:
-            pdwEffect[0] = DROPEFFECT_MOVE | DROPEFFECT_COPY
-        else:
-            pdwEffect[0] = DROPEFFECT_NONE
+    def _DragEnter(self, this, pDataObj, grfKeyState, pt_raw, pdwEffect):
+        try:
+            self._cached_files = extract_hdrop_files(pDataObj)
+            if self._cached_files:
+                if pdwEffect:
+                    pdwEffect[0] = DROPEFFECT_MOVE | DROPEFFECT_COPY
+            else:
+                if pdwEffect:
+                    pdwEffect[0] = DROPEFFECT_NONE
+        except Exception as e:
+            print(f"[OleDragDrop] Error en DragEnter: {e}")
+            if pdwEffect:
+                try:
+                    pdwEffect[0] = DROPEFFECT_NONE
+                except Exception:
+                    pass
         return S_OK
 
-    def _DragOver(self, this, grfKeyState, pt, pdwEffect):
+    def _DragOver(self, this, grfKeyState, pt_raw, pdwEffect):
         try:
+            x, y = _unpack_point(pt_raw)
             # Convertir coordenadas de pantalla a relativas del widget
             wx = self.widget.winfo_rootx()
             wy = self.widget.winfo_rooty()
-            local_x = pt.x - wx
-            local_y = pt.y - wy
+            local_x = x - wx
+            local_y = y - wy
 
+            effect = DROPEFFECT_MOVE | DROPEFFECT_COPY
             if self.on_drag_over:
-                effect = self.on_drag_over(local_x, local_y, grfKeyState)
-                pdwEffect[0] = effect if effect is not None else (DROPEFFECT_MOVE | DROPEFFECT_COPY)
-            else:
-                pdwEffect[0] = DROPEFFECT_MOVE | DROPEFFECT_COPY
+                res = self.on_drag_over(local_x, local_y, grfKeyState)
+                if res is not None:
+                    effect = res
+
+            if pdwEffect:
+                pdwEffect[0] = effect
         except Exception:
-            pdwEffect[0] = DROPEFFECT_MOVE | DROPEFFECT_COPY
+            if pdwEffect:
+                try:
+                    pdwEffect[0] = DROPEFFECT_MOVE | DROPEFFECT_COPY
+                except Exception:
+                    pass
         return S_OK
 
     def _DragLeave(self, this):
         try:
+            self._cached_files = []
             if self.on_drag_leave:
                 self.on_drag_leave()
         except Exception:
             pass
         return S_OK
 
-    def _Drop(self, this, pDataObj, grfKeyState, pt, pdwEffect):
+    def _Drop(self, this, pDataObj, grfKeyState, pt_raw, pdwEffect):
         try:
-            files = extract_hdrop_files(pDataObj)
+            files = self._cached_files or extract_hdrop_files(pDataObj)
+            self._cached_files = []
+
+            x, y = _unpack_point(pt_raw)
             wx = self.widget.winfo_rootx()
             wy = self.widget.winfo_rooty()
-            local_x = pt.x - wx
-            local_y = pt.y - wy
+            local_x = x - wx
+            local_y = y - wy
 
+            effect = DROPEFFECT_NONE
             if self.on_drop and files:
-                effect = self.on_drop(local_x, local_y, files, grfKeyState)
-                pdwEffect[0] = effect if effect is not None else DROPEFFECT_MOVE
-            else:
-                pdwEffect[0] = DROPEFFECT_NONE
+                res = self.on_drop(local_x, local_y, files, grfKeyState)
+                if res is not None:
+                    effect = res
+                else:
+                    effect = DROPEFFECT_MOVE
+
+            if pdwEffect:
+                pdwEffect[0] = effect
         except Exception as e:
             print(f"[OleDragDrop] Error en Drop: {e}")
-            pdwEffect[0] = DROPEFFECT_NONE
+            if pdwEffect:
+                try:
+                    pdwEffect[0] = DROPEFFECT_NONE
+                except Exception:
+                    pass
         return S_OK
 
 
@@ -631,13 +675,8 @@ def extract_hdrop_files(pDataObj):
             if buf.value:
                 files.append(buf.value)
 
-        # Liberar el medio si corresponde
-        if stg.pUnkForRelease:
-            p_unk_vtbl = ctypes.cast(stg.pUnkForRelease, ctypes.POINTER(ctypes.POINTER(wintypes.LPVOID)))
-            Release_func = RELEASE_PROTO(p_unk_vtbl[0][2])
-            Release_func(stg.pUnkForRelease)
-        else:
-            kernel32.GlobalFree(stg.hGlobal)
+        # Liberar el medio de almacenamiento usando la función oficial de OLE (evita corrupción de heap y crashes)
+        ole32.ReleaseStgMedium(ctypes.byref(stg))
 
         return files
     except Exception as e:

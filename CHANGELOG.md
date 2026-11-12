@@ -1,5 +1,14 @@
 # Changelog - BusquedaCarpetas
 
+## [7.26.1] - 2026-11-11 (V.12.20 en el título de la ventana)
+
+### 🐛 Fix: crash al arrastrar desde el Explorador de Windows hacia la app
+- **FIXED (`src/core/ole_drag_drop.py`):** Al recibir un drop externo (desde el Explorador de Windows), `IDropTarget.DragEnter`, `DragOver` y `Drop` recibían el argumento `POINTL` empaquetado como un entero de 64 bits por la convención de llamada de Windows x64 (ABI `__stdcall`), pero los prototipos `WINFUNCTYPE` lo declaraban como struct `POINTL`. El desajuste de pila causaba que `pdwEffect` apuntara a memoria incorrecta y el proceso terminaba con una excepción de violación de acceso.
+  - Prototipos `DRAGENTER_PROTO`, `DRAGOVER_PROTO` y `DROP_PROTO` cambiados de `POINTL` struct a `ctypes.c_uint64` (escalar de 64 bits).
+  - Nueva función auxiliar `_unpack_point(pt_raw)` desempaqueta X e Y desde el entero compacto.
+  - `extract_hdrop_files` ahora usa `ole32.ReleaseStgMedium` (el método oficial de OLE) para liberar el medio de almacenamiento, evitando doble liberación de memoria.
+  - `DropTarget._DragEnter` guarda la lista de archivos en `self._cached_files` para que `_Drop` la reutilice sin necesidad de un segundo `GetData` al objeto COM externo.
+
 ## [7.26.0] - 2026-11-11 (V.12.20 en el título de la ventana)
 
 ### 🖱️ Soporte nativo de Windows OLE Drag & Drop (DoDragDrop / IDropTarget)
